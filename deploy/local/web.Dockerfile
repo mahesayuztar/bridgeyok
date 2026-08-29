@@ -5,7 +5,9 @@ WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/contracts/package.json ./packages/contracts/package.json
-RUN corepack enable && corepack pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=bridgeyok-pnpm-store,target=/pnpm/store \
+    corepack enable && \
+    corepack pnpm install --frozen-lockfile --store-dir=/pnpm/store
 
 COPY apps/web ./apps/web
 COPY packages/contracts ./packages/contracts
