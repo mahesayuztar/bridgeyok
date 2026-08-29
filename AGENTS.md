@@ -1164,6 +1164,8 @@ Each commit message must contain only one or more lines in this format:
 Use a concise lowercase action that describes the change. Do not add a subject line,
 body text, or metadata outside this format.
 
+Never add attribution trailers, including `Co-authored-by`, to a commit message.
+
 ---
 
 # Final Quality Check
@@ -1208,3 +1210,6 @@ Before considering a task complete, verify:
 * requested work is complete
 * unrelated code was not unnecessarily modified
 * implementation remains easy to trace
+* changes were partitioned into multiple focused commits
+* every commit message contains only `+ action: description` lines
+* no commit message contains a `Co-authored-by` trailer
