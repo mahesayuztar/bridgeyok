@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: bridgeyok-api-staging
+    runtime: go
+    plan: free
+    region: singapore
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: ./scripts/build-render-api.sh
+    startCommand: ./scripts/start-render-api.sh
+    healthCheckPath: /health/ready
+    maxShutdownDelaySeconds: 15
+    envVars:
+      - key: APP_ENV
+        value: preview
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_MAX_CONNS
+        value: 4
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+      - key: READ_HEADER_TIMEOUT
+        value: 5s
+      - key: READ_TIMEOUT
+        value: 15s
+      - key: WRITE_TIMEOUT
+        value: 15s
+      - key: IDLE_TIMEOUT
+        value: 60s
+      - key: SHUTDOWN_TIMEOUT
+        value: 10s
