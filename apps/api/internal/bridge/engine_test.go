@@ -1,0 +1,249 @@
+package bridge
+
+import (
+	"reflect"
+	"testing"
+)
+
+func TestDecidePassedOutBoard(t *testing.T) {
+	t.Parallel()
+
+	initial := newTestBoard(t, 1)
+	state := initial
+	allEvents := []Event{}
+	for _, actor := range []Seat{North, East, South, West} {
+		decision, domainError := Decide(state, MakeCallCommand(actor, Pass()))
+		if domainError != nil {
+			t.Fatalf("Decide(Pass by %s) error = %v", actor, domainError)
+		}
+		allEvents = append(allEvents, decision.Events...)
+		state = decision.NextState
+	}
+	if state.Phase != PhaseBoardScored || state.Result == nil || !state.Result.PassedOut || state.Result.ScoreNS != 0 {
+		t.Fatalf("passed-out state = %+v", state)
+	}
+	replayed, err := Reduce(initial, allEvents)
+	if err != nil {
+		t.Fatalf("Reduce() error = %v", err)
+	}
+	if !reflect.DeepEqual(replayed, state) {
+		t.Fatal("replayed state differs from decided state")
+	}
+}
+
+func TestDecideContractAndOpeningLead(t *testing.T) {
+	t.Parallel()
+
+	state := contractedTestBoard(t)
+	if state.Phase != PhaseOpeningLead || state.Auction.Contract == nil || state.Turn != East {
+		t.Fatalf("contracted state = %+v", state)
+	}
+
+	openingCard := state.Deal.East[0]
+	decision, domainError := Decide(state, PlayCardCommand(East, openingCard))
+	if domainError != nil {
+		t.Fatalf("Decide(opening lead) error = %v", domainError)
+	}
+	if len(decision.Events) != 2 || decision.Events[0].Type != EventCardPlayed || decision.Events[1].Type != EventDummyRevealed {
+		t.Fatalf("opening events = %+v", decision.Events)
+	}
+	next := decision.NextState
+	if next.Phase != PhasePlay || !next.DummyRevealed || next.Turn != South || len(next.Deal.East) != 12 || len(next.CurrentTrick.Plays) != 1 {
+		t.Fatalf("state after opening lead = %+v", next)
+	}
+}
+
+func TestDecideDeclarerControlsDummy(t *testing.T) {
+	t.Parallel()
+
+	state := stateAfterOpeningLead(t)
+	dummyCard := state.Deal.South[0]
+	before := state.clone()
+	if _, domainError := Decide(state, PlayCardCommand(South, dummyCard)); domainError == nil || domainError.Code != ErrorDeclarerControlsDummy {
+		t.Fatalf("dummy command error = %+v, want %s", domainError, ErrorDeclarerControlsDummy)
+	}
+	if !reflect.DeepEqual(state, before) {
+		t.Fatal("rejected dummy command mutated input state")
+	}
+	if _, domainError := Decide(state, PlayCardCommand(North, dummyCard)); domainError != nil {
+		t.Fatalf("declarer play from dummy error = %v", domainError)
+	}
+}
+
+func TestDecideEnforcesFollowSuit(t *testing.T) {
+	t.Parallel()
+
+	state := contractedTestBoard(t)
+	var openingCard Card
+	var offSuit Card
+	found := false
+	for _, candidateLead := range state.Deal.East {
+		var matching bool
+		for _, candidateDummy := range state.Deal.South {
+			if candidateDummy.Suit == candidateLead.Suit {
+				matching = true
+			} else {
+				offSuit = candidateDummy
+			}
+		}
+		if matching && offSuit.Suit != candidateLead.Suit {
+			openingCard = candidateLead
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("test deal has no follow-suit scenario")
+	}
+
+	decision, domainError := Decide(state, PlayCardCommand(East, openingCard))
+	if domainError != nil {
+		t.Fatalf("opening lead error = %v", domainError)
+	}
+	state = decision.NextState
+	if _, domainError := Decide(state, PlayCardCommand(North, offSuit)); domainError == nil || domainError.Code != ErrorMustFollowSuit {
+		t.Fatalf("off-suit command error = %+v, want %s", domainError, ErrorMustFollowSuit)
+	}
+	legal, domainError := state.LegalCards(North)
+	if domainError != nil {
+		t.Fatalf("LegalCards() error = %v", domainError)
+	}
+	for _, card := range legal {
+		if card.Suit != openingCard.Suit {
+			t.Fatalf("LegalCards() returned off-suit card %s", card)
+		}
+	}
+}
+
+func TestDecideCompletesBoard(t *testing.T) {
+	t.Parallel()
+
+	state := contractedTestBoard(t)
+	initial := state.clone()
+	allEvents := []Event{}
+	for _playIndex := 0; state.Phase != PhaseBoardScored; _playIndex++ {
+		if _playIndex >= 52 {
+			t.Fatal("board did not complete in 52 plays")
+		}
+		actor := state.Turn
+		if state.Auction.Contract != nil && state.Turn == state.Auction.Contract.Dummy() {
+			actor = state.Auction.Contract.Declarer
+		}
+		legalCards, domainError := state.LegalCards(actor)
+		if domainError != nil {
+			t.Fatalf("LegalCards(%s) error = %v", actor, domainError)
+		}
+		if len(legalCards) == 0 {
+			t.Fatal("LegalCards() returned no card before board completion")
+		}
+		decision, domainError := Decide(state, PlayCardCommand(actor, legalCards[0]))
+		if domainError != nil {
+			t.Fatalf("Decide(play %d) error = %v", _playIndex, domainError)
+		}
+		allEvents = append(allEvents, decision.Events...)
+		state = decision.NextState
+		if err := state.ValidateInvariants(); err != nil {
+			t.Fatalf("play %d invariants: %v", _playIndex, err)
+		}
+	}
+	if len(state.CompletedTricks) != 13 || state.TricksNS+state.TricksEW != 13 || state.Result == nil {
+		t.Fatalf("completed state = %+v", state)
+	}
+	for _, seat := range []Seat{North, East, South, West} {
+		if got := len(state.Deal.Hand(seat)); got != 0 {
+			t.Errorf("seat %s has %d cards after completion", seat, got)
+		}
+	}
+	replayed, err := Reduce(initial, allEvents)
+	if err != nil {
+		t.Fatalf("Reduce(full play) error = %v", err)
+	}
+	if !reflect.DeepEqual(replayed, state) {
+		t.Fatal("full event replay differs from decided state")
+	}
+}
+
+func TestDecideIsDeterministicAndDoesNotMutateInput(t *testing.T) {
+	t.Parallel()
+
+	state := contractedTestBoard(t)
+	before := state.clone()
+	command := PlayCardCommand(East, state.Deal.East[0])
+	first, firstError := Decide(state, command)
+	second, secondError := Decide(state, command)
+	if firstError != nil || secondError != nil {
+		t.Fatalf("Decide() errors = %v, %v", firstError, secondError)
+	}
+	if !reflect.DeepEqual(first, second) {
+		t.Fatal("same state and command produced different decisions")
+	}
+	if !reflect.DeepEqual(state, before) {
+		t.Fatal("Decide() mutated input state")
+	}
+}
+
+func TestDecideRejectsInvalidCommands(t *testing.T) {
+	t.Parallel()
+
+	auctionState := newTestBoard(t, 1)
+	playState := contractedTestBoard(t)
+	notHeld := playState.Deal.North[0]
+	tests := []struct {
+		name    string
+		state   State
+		command Command
+		code    ErrorCode
+	}{
+		{name: "unknown command", state: auctionState, command: Command{ActorSeat: North, Name: "CLAIM"}, code: ErrorInvalidCommand},
+		{name: "call missing payload", state: auctionState, command: Command{ActorSeat: North, Name: CommandMakeCall}, code: ErrorInvalidCommand},
+		{name: "play during auction", state: auctionState, command: PlayCardCommand(North, auctionState.Deal.North[0]), code: ErrorPlayComplete},
+		{name: "call after auction", state: playState, command: MakeCallCommand(North, Pass()), code: ErrorAuctionComplete},
+		{name: "wrong play actor", state: playState, command: PlayCardCommand(North, playState.Deal.East[0]), code: ErrorNotYourTurn},
+		{name: "card not held", state: playState, command: PlayCardCommand(East, notHeld), code: ErrorCardNotHeld},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if _, domainError := Decide(test.state, test.command); domainError == nil || domainError.Code != test.code {
+				t.Fatalf("Decide() error = %+v, want %s", domainError, test.code)
+			}
+		})
+	}
+}
+
+func newTestBoard(t *testing.T, boardNumber int) State {
+	t.Helper()
+	deal, err := GenerateDeal(constantReader(0x80))
+	if err != nil {
+		t.Fatalf("GenerateDeal() error = %v", err)
+	}
+	state, err := NewBoard(boardNumber, deal)
+	if err != nil {
+		t.Fatalf("NewBoard() error = %v", err)
+	}
+	return state
+}
+
+func contractedTestBoard(t *testing.T) State {
+	t.Helper()
+	state := newTestBoard(t, 1)
+	for _, call := range []Call{Bid(1, StrainNoTrump), Pass(), Pass(), Pass()} {
+		decision, domainError := Decide(state, MakeCallCommand(state.Turn, call))
+		if domainError != nil {
+			t.Fatalf("Decide(call %+v) error = %v", call, domainError)
+		}
+		state = decision.NextState
+	}
+	return state
+}
+
+func stateAfterOpeningLead(t *testing.T) State {
+	t.Helper()
+	state := contractedTestBoard(t)
+	decision, domainError := Decide(state, PlayCardCommand(East, state.Deal.East[0]))
+	if domainError != nil {
+		t.Fatalf("Decide(opening lead) error = %v", domainError)
+	}
+	return decision.NextState
+}

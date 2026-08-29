@@ -68,7 +68,11 @@ func readRandomIndex(randomSource io.Reader, upperBound uint64) (int, error) {
 
 // Hand returns a defensive copy of the hand for a seat.
 func (deal Deal) Hand(seat Seat) Hand {
-	return append(Hand(nil), deal.hand(seat)...)
+	hand := deal.hand(seat)
+	if len(hand) == 0 {
+		return Hand{}
+	}
+	return append(Hand(nil), hand...)
 }
 
 func (deal Deal) hand(seat Seat) Hand {
@@ -97,6 +101,39 @@ func (deal *Deal) setHand(seat Seat, hand Hand) {
 	case West:
 		deal.West = hand
 	}
+}
+
+func (deal *Deal) removeCard(seat Seat, card Card) bool {
+	hand := deal.hand(seat)
+	for _index, candidate := range hand {
+		if candidate == card {
+			hand = append(hand[:_index], hand[_index+1:]...)
+			if len(hand) == 0 {
+				hand = Hand{}
+			}
+			deal.setHand(seat, hand)
+			return true
+		}
+	}
+	return false
+}
+
+func (hand Hand) contains(card Card) bool {
+	for _, candidate := range hand {
+		if candidate == card {
+			return true
+		}
+	}
+	return false
+}
+
+func (hand Hand) hasSuit(suit Suit) bool {
+	for _, card := range hand {
+		if card.Suit == suit {
+			return true
+		}
+	}
+	return false
 }
 
 func (deal Deal) clone() Deal {
