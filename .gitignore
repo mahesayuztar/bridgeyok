@@ -20,6 +20,7 @@ node_modules/
 out/
 dist/
 coverage/
+*.tsbuildinfo
 
 # Go build and test artifacts
 bin/
