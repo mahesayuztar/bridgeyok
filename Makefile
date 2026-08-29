@@ -88,9 +88,9 @@ smoke-api: require-database-url
 	@./scripts/smoke-api.sh
 
 gate-local:
-	./scripts/local-gate.sh run
+	@env -u DATABASE_URL -u MIGRATION_DATABASE_URL ./scripts/local-gate.sh run
 
 gate-local-down:
-	./scripts/local-gate.sh down
+	@env -u DATABASE_URL -u MIGRATION_DATABASE_URL ./scripts/local-gate.sh down
 
 bootstrap: install migrate-up generate
