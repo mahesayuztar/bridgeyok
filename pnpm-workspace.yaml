@@ -5,6 +5,11 @@ packages:
 engineStrict: true
 saveExact: true
 strictPeerDependencies: true
+fetchRetries: 5
+fetchRetryFactor: 2
+fetchRetryMintimeout: 10000
+fetchRetryMaxtimeout: 120000
+fetchTimeout: 600000
 
 allowBuilds:
   unrs-resolver: true
