@@ -9,7 +9,7 @@ GOVULNCHECK_VERSION := v1.7.0
 DATABASE_URL ?= postgresql://bridgeyok:bridgeyok@localhost:5432/bridgeyok?sslmode=disable
 MIGRATION_DATABASE_URL ?= $(DATABASE_URL)
 
-.PHONY: help install db-up db-stop db-down db-logs migrate-up migrate-down migrate-status migrate-validate db-fixture generate generate-db generate-contracts generate-api test-api test-api-integration vet-api security-api build-api run-api smoke-api bootstrap
+.PHONY: help install db-up db-stop db-down db-logs migrate-up migrate-down migrate-status migrate-validate db-fixture generate generate-db generate-contracts generate-api test-api test-api-integration vet-api security-api build-api run-api smoke-api gate-local gate-local-down bootstrap
 
 help:
 	@echo "make bootstrap             Start PostgreSQL, migrate, generate, and verify the fixture"
@@ -17,6 +17,8 @@ help:
 	@echo "make test-api              Run API unit tests with the race detector"
 	@echo "make test-api-integration  Run database integration tests"
 	@echo "make smoke-api             Verify HTTP, CORS, readiness, and graceful shutdown"
+	@echo "make gate-local            Run HTTPS/WSS deploy and rollback gates with Supabase"
+	@echo "make gate-local-down       Stop the local gate without changing Supabase"
 	@echo "make db-stop               Stop local PostgreSQL without deleting data"
 
 install:
@@ -80,5 +82,11 @@ run-api:
 
 smoke-api:
 	DATABASE_URL="$(DATABASE_URL)" ./scripts/smoke-api.sh
+
+gate-local:
+	./scripts/local-gate.sh run
+
+gate-local-down:
+	./scripts/local-gate.sh down
 
 bootstrap: install db-up migrate-up generate db-fixture
