@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -87,15 +89,29 @@ func dial(ctx context.Context, appConfig checkConfig) (*websocket.Conn, *http.Re
 	})
 }
 
-func checkEcho(ctx context.Context, appConfig checkConfig) error {
+func closeDial(connection *websocket.Conn, response *http.Response) error {
+	var connectionError error
+	if connection != nil {
+		connectionError = connection.CloseNow()
+		if errors.Is(connectionError, net.ErrClosed) {
+			connectionError = nil
+		}
+	}
+	var responseError error
+	if response != nil && response.Body != nil {
+		responseError = response.Body.Close()
+	}
+	return errors.Join(connectionError, responseError)
+}
+
+func checkEcho(ctx context.Context, appConfig checkConfig) (returnError error) {
 	connection, response, err := dial(ctx, appConfig)
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
-	if response != nil && response.Body != nil {
-		defer response.Body.Close()
-	}
-	defer connection.CloseNow()
+	defer func() {
+		returnError = errors.Join(returnError, closeDial(connection, response))
+	}()
 	message := []byte(`{"kind":"control","name":"local-gate"}`)
 	if err := connection.Write(ctx, websocket.MessageText, message); err != nil {
 		return fmt.Errorf("write echo message: %w", err)
@@ -131,29 +147,25 @@ func checkEcho(ctx context.Context, appConfig checkConfig) error {
 	}
 }
 
-func checkRejectedOrigin(ctx context.Context, appConfig checkConfig) error {
+func checkRejectedOrigin(ctx context.Context, appConfig checkConfig) (returnError error) {
 	connection, response, err := dial(ctx, appConfig)
-	if connection != nil {
-		connection.CloseNow()
-	}
-	if response != nil && response.Body != nil {
-		defer response.Body.Close()
-	}
+	defer func() {
+		returnError = errors.Join(returnError, closeDial(connection, response))
+	}()
 	if err == nil || response == nil || response.StatusCode != http.StatusForbidden {
 		return fmt.Errorf("origin rejection returned response %v and error %v", response, err)
 	}
 	return nil
 }
 
-func checkOversized(ctx context.Context, appConfig checkConfig) error {
+func checkOversized(ctx context.Context, appConfig checkConfig) (returnError error) {
 	connection, response, err := dial(ctx, appConfig)
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
-	if response != nil && response.Body != nil {
-		defer response.Body.Close()
-	}
-	defer connection.CloseNow()
+	defer func() {
+		returnError = errors.Join(returnError, closeDial(connection, response))
+	}()
 	message := []byte(strings.Repeat("x", (8<<10)+1))
 	if err := connection.Write(ctx, websocket.MessageText, message); err != nil {
 		return fmt.Errorf("write oversized message: %w", err)

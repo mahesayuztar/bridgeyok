@@ -3,8 +3,10 @@ package wsprobe
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -72,7 +74,11 @@ func (probe handler) serveWebSocket(writer http.ResponseWriter, request *http.Re
 		probe.logger.WarnContext(request.Context(), "websocket probe handshake failed", "request_id", requestID)
 		return
 	}
-	defer connection.CloseNow()
+	defer func() {
+		if err := connection.CloseNow(); err != nil && !errors.Is(err, net.ErrClosed) {
+			probe.logger.WarnContext(request.Context(), "websocket probe cleanup failed", "request_id", requestID)
+		}
+	}()
 	connection.SetReadLimit(maxMessageBytes)
 	startedAt := time.Now()
 	messageCount := 0
