@@ -17,7 +17,11 @@ type Trick struct {
 
 func (trick Trick) clone() Trick {
 	clone := trick
-	clone.Plays = append([]PlayedCard{}, trick.Plays...)
+	if trick.Plays == nil {
+		clone.Plays = nil
+	} else {
+		clone.Plays = append([]PlayedCard{}, trick.Plays...)
+	}
 	return clone
 }
 

@@ -137,7 +137,7 @@ func Decide(state State, command Command) (Decision, *DomainError) {
 		return Decision{}, domainError
 	}
 
-	nextState, err := Reduce(state, events)
+	nextState, err := reduceFromValid(state, events)
 	if err != nil {
 		return Decision{}, reject(ErrorInvalidState, err.Error())
 	}
@@ -181,7 +181,7 @@ func decidePlay(state State, command Command) ([]Event, *DomainError) {
 		return nil, domainError
 	}
 
-	hand := state.Deal.Hand(state.Turn)
+	hand := state.Deal.hand(state.Turn)
 	if !hand.contains(*command.Card) {
 		return nil, reject(ErrorCardNotHeld, "card is not in the active hand")
 	}
@@ -194,39 +194,35 @@ func decidePlay(state State, command Command) ([]Event, *DomainError) {
 
 	cardCopy := *command.Card
 	events := []Event{{Type: EventCardPlayed, Seat: state.Turn, Card: &cardCopy}}
-	preview, err := Reduce(state, events)
-	if err != nil {
-		return nil, reject(ErrorInvalidState, err.Error())
-	}
 	if state.Phase == PhaseOpeningLead {
 		events = append(events, Event{Type: EventDummyRevealed})
-		preview, err = Reduce(preview, events[1:])
-		if err != nil {
-			return nil, reject(ErrorInvalidState, err.Error())
-		}
 	}
-	if len(preview.CurrentTrick.Plays) != 4 {
+	if len(state.CurrentTrick.Plays) != 3 {
 		return events, nil
 	}
 
-	winner, err := trickWinner(preview.CurrentTrick, state.Auction.Contract.Strain)
+	completedTrick := state.CurrentTrick.clone()
+	completedTrick.Plays = append(completedTrick.Plays, PlayedCard{Seat: state.Turn, Card: cardCopy})
+	winner, err := trickWinner(completedTrick, state.Auction.Contract.Strain)
 	if err != nil {
 		return nil, reject(ErrorInvalidState, err.Error())
 	}
-	completedTrick := preview.CurrentTrick.clone()
 	completedTrick.Winner = winner
 	events = append(events, Event{Type: EventTrickCompleted, Trick: &completedTrick})
-	preview, err = Reduce(preview, events[len(events)-1:])
-	if err != nil {
-		return nil, reject(ErrorInvalidState, err.Error())
-	}
-	if len(preview.CompletedTricks) != 13 {
+	if len(state.CompletedTricks) != 12 {
 		return events, nil
 	}
 
-	tricksDeclarer := preview.TricksNS
+	tricksNS := state.TricksNS
+	tricksEW := state.TricksEW
+	if winner.Partnership() == NorthSouth {
+		tricksNS++
+	} else {
+		tricksEW++
+	}
+	tricksDeclarer := tricksNS
 	if state.Auction.Contract.Declarer.Partnership() == EastWest {
-		tricksDeclarer = preview.TricksEW
+		tricksDeclarer = tricksEW
 	}
 	result, err := ScoreContract(*state.Auction.Contract, state.Board.Vulnerability, tricksDeclarer)
 	if err != nil {
@@ -264,13 +260,13 @@ func (state State) LegalCards(actor Seat) ([]Card, *DomainError) {
 	if domainError := state.authorizePlay(actor); domainError != nil {
 		return nil, domainError
 	}
-	hand := state.Deal.Hand(state.Turn)
+	hand := state.Deal.hand(state.Turn)
 	if len(state.CurrentTrick.Plays) == 0 {
-		return hand, nil
+		return append([]Card{}, hand...), nil
 	}
 	ledSuit := state.CurrentTrick.Plays[0].Card.Suit
 	if !hand.hasSuit(ledSuit) {
-		return hand, nil
+		return append([]Card{}, hand...), nil
 	}
 	legal := make([]Card, 0, len(hand))
 	for _, card := range hand {
@@ -286,6 +282,10 @@ func Reduce(state State, events []Event) (State, error) {
 	if err := state.ValidateInvariants(); err != nil {
 		return State{}, fmt.Errorf("initial state: %w", err)
 	}
+	return reduceFromValid(state, events)
+}
+
+func reduceFromValid(state State, events []Event) (State, error) {
 	next := state.clone()
 	for _index, event := range events {
 		if err := next.apply(event); err != nil {
@@ -335,7 +335,7 @@ func (state *State) apply(event Event) error {
 		if (state.Phase != PhaseOpeningLead && state.Phase != PhasePlay) || event.Card == nil || event.Seat != state.Turn || len(state.CurrentTrick.Plays) >= 4 {
 			return fmt.Errorf("invalid card-played event")
 		}
-		hand := state.Deal.Hand(event.Seat)
+		hand := state.Deal.hand(event.Seat)
 		if len(state.CurrentTrick.Plays) > 0 {
 			ledSuit := state.CurrentTrick.Plays[0].Card.Suit
 			if event.Card.Suit != ledSuit && hand.hasSuit(ledSuit) {
