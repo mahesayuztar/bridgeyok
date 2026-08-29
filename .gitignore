@@ -1,0 +1,13 @@
+# AI agent tooling and metadata
+.agents/
+.agent/
+.ai/
+.claude/
+.codex/
+.cursor/
+skills-lock.json
+skill-lock.json
+
+# Agent instruction files and all Markdown documentation
+docs/
+*.md
