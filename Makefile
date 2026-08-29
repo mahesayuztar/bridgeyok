@@ -6,17 +6,20 @@ GOOSE_BUILD_TAGS := no_clickhouse no_libsql no_mssql no_mysql no_sqlite3 no_vert
 SQLC_VERSION := v1.31.1
 OAPI_CODEGEN_VERSION := v2.8.0
 GOVULNCHECK_VERSION := v1.7.0
+GOLANGCI_LINT_VERSION := v2.13.2
 DATABASE_URL ?=
 MIGRATION_DATABASE_URL ?= $(DATABASE_URL)
 export DATABASE_URL
 export MIGRATION_DATABASE_URL
 
-.PHONY: help install require-database-url migrate-up migrate-down migrate-status migrate-validate generate generate-db generate-contracts generate-api test-api test-api-integration vet-api security-api build-api run-api smoke-api gate-local gate-local-down bootstrap
+.PHONY: help install require-database-url migrate-up migrate-down migrate-status migrate-validate generate generate-db generate-contracts generate-api test-api test-api-integration test-engine-fixtures fuzz-engine vet-api lint-api security-api build-api run-api smoke-api gate-local gate-local-down bootstrap
 
 help:
 	@echo "make bootstrap             Install, migrate Supabase, and generate sources"
 	@echo "make run-api               Run the local API against Supabase"
 	@echo "make test-api              Run API unit tests with the race detector"
+	@echo "make test-engine-fixtures  Run test-only fixture serialization tests"
+	@echo "make fuzz-engine           Run bounded card, decision, and fixture fuzzing"
 	@echo "make test-api-integration  Run database integration tests"
 	@echo "make smoke-api             Verify HTTP, CORS, readiness, and graceful shutdown"
 	@echo "make gate-local            Run HTTPS/WSS deploy and rollback gates with Supabase"
@@ -55,11 +58,22 @@ generate: generate-db generate-contracts
 test-api:
 	go test -race ./apps/api/...
 
+test-engine-fixtures:
+	go test -race -cover -tags=testfixture ./apps/api/internal/bridgefixture
+
+fuzz-engine:
+	go test ./apps/api/internal/bridge -run '^$$' -fuzz '^FuzzParseCard$$' -fuzztime=2s -parallel=2
+	go test ./apps/api/internal/bridge -run '^$$' -fuzz '^FuzzDecide$$' -fuzztime=2s -parallel=2
+	go test -tags=testfixture ./apps/api/internal/bridgefixture -run '^$$' -fuzz '^FuzzUnmarshal$$' -fuzztime=2s -parallel=2
+
 test-api-integration: require-database-url
 	@TEST_DATABASE_URL="$${DATABASE_URL}" go test -race -tags=integration ./apps/api/internal/database
 
 vet-api:
 	go vet ./apps/api/...
+
+lint-api:
+	cd apps/api && GOWORK=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
 
 security-api:
 	cd apps/api && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...

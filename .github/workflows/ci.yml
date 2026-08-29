@@ -65,7 +65,10 @@ jobs:
       - name: Verify Go API
         run: |
           make vet-api
+          make lint-api
           make test-api
+          make test-engine-fixtures
+          make fuzz-engine
           make test-api-integration
           make build-api
           make smoke-api
