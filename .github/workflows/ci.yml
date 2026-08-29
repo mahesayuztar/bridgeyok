@@ -78,11 +78,11 @@ jobs:
           corepack pnpm test
           corepack pnpm build
           corepack pnpm audit --prod --audit-level high
-      - name: Verify local release images
+      - name: Verify local release drill
         env:
-          DATABASE_URL: postgresql://validation:validation@db.example.invalid:5432/postgres?sslmode=require
-          LOCAL_GATE_RELEASE: ci
+          DATABASE_URL: postgresql://bridgeyok:bridgeyok@host.docker.internal:5432/bridgeyok?sslmode=disable
         run: |
-          docker compose -f deploy/local/compose.yaml config --quiet
-          docker compose -f deploy/local/compose.yaml build api web
-          docker run --rm --volume "$PWD/deploy/local/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
+          gateEnvFile="$RUNNER_TEMP/bridgeyok-local-gate.env"
+          printf 'DATABASE_URL=%s\n' "$DATABASE_URL" > "$gateEnvFile"
+          LOCAL_GATE_ENV_FILE="$gateEnvFile" ./scripts/local-gate.sh run
+          LOCAL_GATE_ENV_FILE="$gateEnvFile" ./scripts/local-gate.sh down

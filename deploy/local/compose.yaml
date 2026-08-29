@@ -24,6 +24,8 @@ services:
     labels:
       io.bridgeyok.release: ${LOCAL_GATE_RELEASE:-current}
     init: true
+    extra_hosts:
+      - host.docker.internal:host-gateway
     networks:
       - gate
 
