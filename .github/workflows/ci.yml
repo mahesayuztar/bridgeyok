@@ -56,7 +56,7 @@ jobs:
         run: |
           make migrate-validate
           make migrate-up
-          make migrate-down
+          ALLOW_MIGRATION_DOWN=1 make migrate-down
           make migrate-up
       - name: Verify generated sources
         run: |
