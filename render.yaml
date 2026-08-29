@@ -9,7 +9,6 @@ services:
     buildCommand: ./scripts/build-render-api.sh
     startCommand: ./scripts/start-render-api.sh
     healthCheckPath: /health/ready
-    maxShutdownDelaySeconds: 15
     envVars:
       - key: APP_ENV
         value: preview
