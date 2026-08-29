@@ -45,15 +45,30 @@ requireLocalTools() {
 waitForStack() {
   local releaseId="$1"
   for _attempt in {1..120}; do
-    if composeForRelease "${releaseId}" cp edge:/data/caddy/pki/authorities/local/root.crt "${caFile}" >/dev/null 2>&1 && \
-      curl --cacert "${caFile}" --resolve "api.bridgeyok.localhost:${httpsPort}:127.0.0.1" --connect-timeout 2 --max-time 5 --fail --silent "${apiOrigin}/health/ready" >"${bodyFile}" 2>/dev/null && \
-      grep -q '"status":"ready"' "${bodyFile}"; then
-      return 0
+    if composeForRelease "${releaseId}" cp edge:/data/caddy/pki/authorities/local/root.crt "${caFile}" >/dev/null 2>&1; then
+      chmod 0644 "${caFile}"
+      if curl --cacert "${caFile}" --resolve "api.bridgeyok.localhost:${httpsPort}:127.0.0.1" --connect-timeout 2 --max-time 5 --fail --silent "${apiOrigin}/health/ready" >"${bodyFile}" 2>/dev/null && \
+        grep -q '"status":"ready"' "${bodyFile}"; then
+        return 0
+      fi
     fi
     sleep 1
   done
   printf 'Local stack did not become ready within 120 seconds.\n' >&2
   return 1
+}
+
+runWebSocketCheck() {
+  local releaseId="$1"
+  local mode="$2"
+  local origin="$3"
+
+  composeForRelease "${releaseId}" run --rm --no-deps \
+    --volume "${caFile}:/tmp/caddy-root.crt:ro" \
+    -e WS_CHECK_CA_FILE=/tmp/caddy-root.crt \
+    -e "WS_CHECK_MODE=${mode}" \
+    -e "WS_CHECK_ORIGIN=${origin}" \
+    wscheck
 }
 
 assertRelease() {
@@ -96,9 +111,9 @@ smokeRelease() {
   grep -q 'BridgeYok' "${bodyFile}"
   grep -q 'Fondasi siap' "${bodyFile}"
 
-  composeForRelease "${releaseId}" run --rm --no-deps -e WS_CHECK_MODE=echo -e "WS_CHECK_ORIGIN=${webOrigin}" wscheck
-  composeForRelease "${releaseId}" run --rm --no-deps -e WS_CHECK_MODE=rejected-origin -e WS_CHECK_ORIGIN=https://attacker.example wscheck
-  composeForRelease "${releaseId}" run --rm --no-deps -e WS_CHECK_MODE=oversized -e "WS_CHECK_ORIGIN=${webOrigin}" wscheck
+  runWebSocketCheck "${releaseId}" echo "${webOrigin}"
+  runWebSocketCheck "${releaseId}" rejected-origin https://attacker.example
+  runWebSocketCheck "${releaseId}" oversized "${webOrigin}"
 }
 
 deployRelease() {

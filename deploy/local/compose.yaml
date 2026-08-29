@@ -85,12 +85,10 @@ services:
     entrypoint:
       - /workspace/bin/wscheck
     environment:
-      WS_CHECK_CA_FILE: /data/caddy/pki/authorities/local/root.crt
+      WS_CHECK_CA_FILE: /tmp/caddy-root.crt
       WS_CHECK_MODE: ${WS_CHECK_MODE:-echo}
       WS_CHECK_ORIGIN: ${WS_CHECK_ORIGIN:-https://bridgeyok.localhost:8443}
       WS_CHECK_URL: wss://api.bridgeyok.localhost/v1/ws
-    volumes:
-      - caddy-data:/data:ro
     networks:
       - gate
 
