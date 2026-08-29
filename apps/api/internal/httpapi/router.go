@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpapi/apigen"
 )
 
 const requestIDHeader = "X-Request-ID"
@@ -31,18 +32,6 @@ type contextKey string
 
 const requestIDKey contextKey = "request_id"
 
-type healthResponse struct {
-	Status  string `json:"status"`
-	Service string `json:"service"`
-}
-
-type problemResponse struct {
-	Type      string `json:"type"`
-	Title     string `json:"title"`
-	Status    int    `json:"status"`
-	RequestID string `json:"requestId,omitempty"`
-}
-
 func NewRouter(options Options) http.Handler {
 	router := chi.NewRouter()
 	router.Use(requestIDMiddleware)
@@ -52,17 +41,17 @@ func NewRouter(options Options) http.Handler {
 	router.Use(corsMiddleware(options.AllowedOrigins))
 
 	router.Get("/", func(writer http.ResponseWriter, request *http.Request) {
-		writeJSON(writer, http.StatusOK, healthResponse{Status: "ok", Service: "bridgeyok-api"})
+		writeJSON(writer, http.StatusOK, apigen.HealthResponse{Status: apigen.Ok, Service: "bridgeyok-api"})
 	})
 	router.Get("/health/live", func(writer http.ResponseWriter, request *http.Request) {
-		writeJSON(writer, http.StatusOK, healthResponse{Status: "ok", Service: "api"})
+		writeJSON(writer, http.StatusOK, apigen.HealthResponse{Status: apigen.Ok, Service: "api"})
 	})
 	router.Get("/health/ready", func(writer http.ResponseWriter, request *http.Request) {
 		if options.Readiness == nil || options.Readiness.Ping(request.Context()) != nil {
-			writeJSON(writer, http.StatusServiceUnavailable, healthResponse{Status: "unavailable", Service: "api"})
+			writeJSON(writer, http.StatusServiceUnavailable, apigen.HealthResponse{Status: apigen.Unavailable, Service: "api"})
 			return
 		}
-		writeJSON(writer, http.StatusOK, healthResponse{Status: "ready", Service: "api"})
+		writeJSON(writer, http.StatusOK, apigen.HealthResponse{Status: apigen.Ready, Service: "api"})
 	})
 	router.NotFound(func(writer http.ResponseWriter, request *http.Request) {
 		writeProblem(writer, request, http.StatusNotFound, "Resource not found")
@@ -180,10 +169,11 @@ func writeJSON(writer http.ResponseWriter, status int, response any) {
 }
 
 func writeProblem(writer http.ResponseWriter, request *http.Request, status int, title string) {
-	writeJSON(writer, status, problemResponse{
+	requestID := requestIDFromContext(request.Context())
+	writeJSON(writer, status, apigen.Problem{
 		Type:      "about:blank",
 		Title:     title,
 		Status:    status,
-		RequestID: requestIDFromContext(request.Context()),
+		RequestId: &requestID,
 	})
 }

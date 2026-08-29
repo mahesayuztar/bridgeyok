@@ -1,0 +1,6 @@
+package: apigen
+generate:
+  models: true
+output: apps/api/internal/httpapi/apigen/openapi.gen.go
+output-options:
+  skip-prune: true

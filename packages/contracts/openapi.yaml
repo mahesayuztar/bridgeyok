@@ -1,0 +1,124 @@
+openapi: 3.1.0
+info:
+  title: BridgeYok HTTP API
+  version: 0.1.0
+  description: Public HTTP contract for the BridgeYok service foundation.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+paths:
+  /:
+    get:
+      operationId: getServiceInfo
+      summary: Get API service information
+      responses:
+        "200":
+          description: API is serving requests
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                service: bridgeyok-api
+  /health/live:
+    get:
+      operationId: getLiveness
+      summary: Check process liveness
+      responses:
+        "200":
+          description: Process is alive
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                service: api
+  /health/ready:
+    get:
+      operationId: getReadiness
+      summary: Check database and migration readiness
+      responses:
+        "200":
+          description: API dependencies are ready
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ready
+                service: api
+        "503":
+          description: A required dependency is unavailable
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: unavailable
+                service: api
+components:
+  headers:
+    RequestId:
+      description: Correlation identifier for the request.
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        pattern: "^[A-Za-z0-9_-]+$"
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - service
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+            - ready
+            - unavailable
+        service:
+          type: string
+          minLength: 1
+          maxLength: 64
+    Problem:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        requestId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: "^[A-Za-z0-9_-]+$"

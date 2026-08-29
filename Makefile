@@ -4,10 +4,11 @@ SHELL := /usr/bin/env bash
 GOOSE_VERSION := v3.27.3
 GOOSE_BUILD_TAGS := no_clickhouse no_libsql no_mssql no_mysql no_sqlite3 no_vertica no_ydb
 SQLC_VERSION := v1.31.1
+OAPI_CODEGEN_VERSION := v2.8.0
 DATABASE_URL ?= postgresql://bridgeyok:bridgeyok@localhost:5432/bridgeyok?sslmode=disable
 MIGRATION_DATABASE_URL ?= $(DATABASE_URL)
 
-.PHONY: help db-up db-stop db-down db-logs migrate-up migrate-down migrate-status migrate-validate db-fixture generate-db test-api test-api-integration build-api run-api bootstrap
+.PHONY: help install db-up db-stop db-down db-logs migrate-up migrate-down migrate-status migrate-validate db-fixture generate generate-db generate-contracts generate-api test-api test-api-integration build-api run-api bootstrap
 
 help:
 	@echo "make bootstrap             Start PostgreSQL, migrate, generate, and verify the fixture"
@@ -15,6 +16,9 @@ help:
 	@echo "make test-api              Run API unit tests with the race detector"
 	@echo "make test-api-integration  Run database integration tests"
 	@echo "make db-stop               Stop local PostgreSQL without deleting data"
+
+install:
+	corepack pnpm install --frozen-lockfile
 
 db-up:
 	docker compose up -d --wait postgres
@@ -46,6 +50,14 @@ db-fixture:
 generate-db:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) generate
 
+generate-api:
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION) -config packages/contracts/oapi-codegen.yaml packages/contracts/openapi.yaml
+
+generate-contracts: generate-api
+	corepack pnpm --filter @bridgeyok/contracts generate
+
+generate: generate-db generate-contracts
+
 test-api:
 	go test -race ./apps/api/...
 
@@ -58,4 +70,4 @@ build-api:
 run-api:
 	DATABASE_URL="$(DATABASE_URL)" ALLOWED_ORIGINS="$${ALLOWED_ORIGINS:-http://localhost:3000}" go run ./apps/api/cmd/api
 
-bootstrap: db-up migrate-up generate-db db-fixture
+bootstrap: install db-up migrate-up generate db-fixture

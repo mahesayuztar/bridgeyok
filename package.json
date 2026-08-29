@@ -3,6 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "packageManager": "pnpm@11.24.0",
+  "scripts": {
+    "build": "corepack pnpm -r --if-present build",
+    "generate": "make generate",
+    "lint": "corepack pnpm -r --if-present lint",
+    "test": "corepack pnpm -r --if-present test",
+    "typecheck": "corepack pnpm -r --if-present typecheck"
+  },
   "engines": {
     "node": ">=24.19.0 <25",
     "pnpm": "11.24.0"

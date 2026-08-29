@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "kind": "error",
+  "name": "command.rejected",
+  "request_id": "req_action_0001",
+  "table_id": "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31",
+  "code": "REVISION_CONFLICT",
+  "retryable": true,
+  "payload": {}
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@bridgeyok/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "openapi-typescript openapi.yaml -o src/openapi.generated.ts && json2ts -i websocket/envelope.schema.json -o src/realtime.generated.ts",
+    "test": "node --test test/contracts.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "json-schema-to-typescript": "16.0.0",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

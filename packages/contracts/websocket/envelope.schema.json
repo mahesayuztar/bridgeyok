@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bridgeyok.example/contracts/websocket/envelope.schema.json",
+  "title": "BridgeYok realtime envelope",
+  "oneOf": [
+    { "$ref": "#/$defs/commandEnvelope" },
+    { "$ref": "#/$defs/ackEnvelope" },
+    { "$ref": "#/$defs/eventEnvelope" },
+    { "$ref": "#/$defs/errorEnvelope" },
+    { "$ref": "#/$defs/snapshotEnvelope" },
+    { "$ref": "#/$defs/controlEnvelope" }
+  ],
+  "$defs": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["command", "ack", "event", "error", "snapshot", "control"]
+    },
+    "messageName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_.-]*$"
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "tableId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {
+      "type": "object"
+    },
+    "commandEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "kind", "name", "request_id", "table_id", "payload"],
+      "properties": {
+        "v": { "$ref": "#/$defs/version" },
+        "kind": { "const": "command" },
+        "name": { "$ref": "#/$defs/messageName" },
+        "request_id": { "$ref": "#/$defs/requestId" },
+        "table_id": { "$ref": "#/$defs/tableId" },
+        "expected_revision": { "$ref": "#/$defs/revision" },
+        "payload": { "$ref": "#/$defs/payload" }
+      }
+    },
+    "ackEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "kind", "name", "request_id", "table_id", "revision", "seq", "payload"],
+      "properties": {
+        "v": { "$ref": "#/$defs/version" },
+        "kind": { "const": "ack" },
+        "name": { "$ref": "#/$defs/messageName" },
+        "request_id": { "$ref": "#/$defs/requestId" },
+        "table_id": { "$ref": "#/$defs/tableId" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "seq": { "$ref": "#/$defs/sequence" },
+        "payload": { "$ref": "#/$defs/payload" }
+      }
+    },
+    "eventEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "kind", "name", "table_id", "revision", "seq", "payload"],
+      "properties": {
+        "v": { "$ref": "#/$defs/version" },
+        "kind": { "const": "event" },
+        "name": { "$ref": "#/$defs/messageName" },
+        "table_id": { "$ref": "#/$defs/tableId" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "seq": { "$ref": "#/$defs/sequence" },
+        "payload": { "$ref": "#/$defs/payload" }
+      }
+    },
+    "errorEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "kind", "name", "code", "retryable", "payload"],
+      "properties": {
+        "v": { "$ref": "#/$defs/version" },
+        "kind": { "const": "error" },
+        "name": { "$ref": "#/$defs/messageName" },
+        "request_id": { "$ref": "#/$defs/requestId" },
+        "table_id": { "$ref": "#/$defs/tableId" },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "retryable": { "type": "boolean" },
+        "payload": { "$ref": "#/$defs/payload" }
+      }
+    },
+    "snapshotEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "kind", "name", "table_id", "revision", "seq", "payload"],
+      "properties": {
+        "v": { "$ref": "#/$defs/version" },
+        "kind": { "const": "snapshot" },
+        "name": { "$ref": "#/$defs/messageName" },
+        "table_id": { "$ref": "#/$defs/tableId" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "seq": { "$ref": "#/$defs/sequence" },
+        "payload": { "$ref": "#/$defs/payload" }
+      }
+    },
+    "controlEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "kind", "name", "payload"],
+      "properties": {
+        "v": { "$ref": "#/$defs/version" },
+        "kind": { "const": "control" },
+        "name": { "$ref": "#/$defs/messageName" },
+        "request_id": { "$ref": "#/$defs/requestId" },
+        "table_id": { "$ref": "#/$defs/tableId" },
+        "payload": { "$ref": "#/$defs/payload" }
+      }
+    }
+  }
+}
