@@ -68,7 +68,6 @@ jobs:
           make test-api
           make test-api-integration
           make build-api
-          ./scripts/build-render-api.sh
           make smoke-api
           make security-api
       - name: Verify TypeScript workspace
