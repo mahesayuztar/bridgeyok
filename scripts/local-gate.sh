@@ -84,7 +84,7 @@ smokeRelease() {
 
   curl --cacert "${caFile}" --resolve "api.bridgeyok.localhost:${httpsPort}:127.0.0.1" --fail --silent --show-error "${apiOrigin}/health/live" | grep -q '"status":"ok"'
   curl --cacert "${caFile}" --resolve "api.bridgeyok.localhost:${httpsPort}:127.0.0.1" --fail --silent --show-error --dump-header "${headersFile}" --output "${bodyFile}" --header "Origin: ${webOrigin}" "${apiOrigin}/health/live"
-  tr -d '\r' <"${headersFile}" | grep -Fqx "Access-Control-Allow-Origin: ${webOrigin}"
+  tr -d '\r' <"${headersFile}" | grep -Fiqx "Access-Control-Allow-Origin: ${webOrigin}"
 
   invalidStatus="$(curl --cacert "${caFile}" --resolve "api.bridgeyok.localhost:${httpsPort}:127.0.0.1" --silent --show-error --output /dev/null --write-out '%{http_code}' --header 'Origin: https://attacker.example' "${apiOrigin}/health/live")"
   if [[ "${invalidStatus}" != "403" ]]; then
