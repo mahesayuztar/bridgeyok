@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: postgresql://bridgeyok:bridgeyok@localhost:5432/bridgeyok?sslmode=disable
+  MIGRATION_DATABASE_URL: postgresql://bridgeyok:bridgeyok@localhost:5432/bridgeyok?sslmode=disable
+  ALLOWED_ORIGINS: http://localhost:3000
+  APP_ENV: test
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_DB: bridgeyok
+          POSTGRES_PASSWORD: bridgeyok
+          POSTGRES_USER: bridgeyok
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bridgeyok -d bridgeyok"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.27.0
+          cache-dependency-path: |
+            apps/api/go.sum
+            go.work.sum
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.20.0
+          package-manager-cache: false
+      - name: Install dependencies
+        run: |
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+      - name: Verify reversible migrations
+        run: |
+          make migrate-validate
+          make migrate-up
+          make migrate-down
+          make migrate-up
+      - name: Verify generated sources
+        run: |
+          make generate
+          git diff --exit-code
+      - name: Verify Go API
+        run: |
+          make vet-api
+          make test-api
+          make test-api-integration
+          make build-api
+          make smoke-api
+          make security-api
+      - name: Verify TypeScript workspace
+        run: |
+          corepack pnpm lint
+          corepack pnpm typecheck
+          corepack pnpm test
+          corepack pnpm build
+          corepack pnpm audit --prod --audit-level high

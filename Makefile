@@ -5,16 +5,18 @@ GOOSE_VERSION := v3.27.3
 GOOSE_BUILD_TAGS := no_clickhouse no_libsql no_mssql no_mysql no_sqlite3 no_vertica no_ydb
 SQLC_VERSION := v1.31.1
 OAPI_CODEGEN_VERSION := v2.8.0
+GOVULNCHECK_VERSION := v1.7.0
 DATABASE_URL ?= postgresql://bridgeyok:bridgeyok@localhost:5432/bridgeyok?sslmode=disable
 MIGRATION_DATABASE_URL ?= $(DATABASE_URL)
 
-.PHONY: help install db-up db-stop db-down db-logs migrate-up migrate-down migrate-status migrate-validate db-fixture generate generate-db generate-contracts generate-api test-api test-api-integration build-api run-api bootstrap
+.PHONY: help install db-up db-stop db-down db-logs migrate-up migrate-down migrate-status migrate-validate db-fixture generate generate-db generate-contracts generate-api test-api test-api-integration vet-api security-api build-api run-api smoke-api bootstrap
 
 help:
 	@echo "make bootstrap             Start PostgreSQL, migrate, generate, and verify the fixture"
 	@echo "make run-api               Run the API against local PostgreSQL"
 	@echo "make test-api              Run API unit tests with the race detector"
 	@echo "make test-api-integration  Run database integration tests"
+	@echo "make smoke-api             Verify HTTP, CORS, readiness, and graceful shutdown"
 	@echo "make db-stop               Stop local PostgreSQL without deleting data"
 
 install:
@@ -64,10 +66,19 @@ test-api:
 test-api-integration:
 	TEST_DATABASE_URL="$(DATABASE_URL)" go test -race -tags=integration ./apps/api/internal/database
 
+vet-api:
+	go vet ./apps/api/...
+
+security-api:
+	cd apps/api && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
+
 build-api:
 	go build -o bin/bridgeyok-api ./apps/api/cmd/api
 
 run-api:
 	DATABASE_URL="$(DATABASE_URL)" ALLOWED_ORIGINS="$${ALLOWED_ORIGINS:-http://localhost:3000}" go run ./apps/api/cmd/api
+
+smoke-api:
+	DATABASE_URL="$(DATABASE_URL)" ./scripts/smoke-api.sh
 
 bootstrap: install db-up migrate-up generate db-fixture
