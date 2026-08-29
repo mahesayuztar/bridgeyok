@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./openapi": "./src/openapi.generated.ts",
+    "./realtime": "./src/realtime.generated.ts"
+  },
   "scripts": {
     "generate": "openapi-typescript openapi.yaml -o src/openapi.generated.ts && json2ts -i websocket/envelope.schema.json -o src/realtime.generated.ts",
     "test": "node --test test/contracts.test.mjs",
