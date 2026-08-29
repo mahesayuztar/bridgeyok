@@ -1,0 +1,100 @@
+name: bridgeyok-local-gate
+
+services:
+  api:
+    image: bridgeyok-api:${LOCAL_GATE_RELEASE:-current}
+    build:
+      context: ../..
+      dockerfile: deploy/local/api.Dockerfile
+      args:
+        RELEASE_ID: ${LOCAL_GATE_RELEASE:-current}
+    environment:
+      ALLOWED_ORIGINS: https://bridgeyok.localhost:${LOCAL_GATE_HTTPS_PORT:-8443}
+      API_HOST: 0.0.0.0
+      APP_ENV: preview
+      DATABASE_MAX_CONNS: ${DATABASE_MAX_CONNS:-4}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must point to the Supabase session pooler}
+      IDLE_TIMEOUT: 60s
+      LOG_LEVEL: info
+      PORT: 8080
+      READ_HEADER_TIMEOUT: 5s
+      READ_TIMEOUT: 15s
+      SHUTDOWN_TIMEOUT: 10s
+      WRITE_TIMEOUT: 15s
+    labels:
+      io.bridgeyok.release: ${LOCAL_GATE_RELEASE:-current}
+    init: true
+    networks:
+      - gate
+
+  wsprobe:
+    image: bridgeyok-api:${LOCAL_GATE_RELEASE:-current}
+    entrypoint:
+      - /workspace/bin/wsprobe
+    environment:
+      PORT: 8090
+      WS_PROBE_ALLOWED_ORIGIN: https://bridgeyok.localhost:${LOCAL_GATE_HTTPS_PORT:-8443}
+    labels:
+      io.bridgeyok.release: ${LOCAL_GATE_RELEASE:-current}
+    init: true
+    networks:
+      - gate
+
+  web:
+    image: bridgeyok-web:${LOCAL_GATE_RELEASE:-current}
+    build:
+      context: ../..
+      dockerfile: deploy/local/web.Dockerfile
+      args:
+        RELEASE_ID: ${LOCAL_GATE_RELEASE:-current}
+    environment:
+      API_BASE_URL: http://api:8080
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      PORT: 3000
+    labels:
+      io.bridgeyok.release: ${LOCAL_GATE_RELEASE:-current}
+    init: true
+    networks:
+      - gate
+
+  edge:
+    image: caddy:2.11.4-alpine
+    depends_on:
+      - api
+      - web
+      - wsprobe
+    ports:
+      - 127.0.0.1:${LOCAL_GATE_HTTPS_PORT:-8443}:443
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      gate:
+        aliases:
+          - api.bridgeyok.localhost
+          - bridgeyok.localhost
+
+  wscheck:
+    profiles:
+      - tools
+    image: bridgeyok-api:${LOCAL_GATE_RELEASE:-current}
+    entrypoint:
+      - /workspace/bin/wscheck
+    environment:
+      WS_CHECK_CA_FILE: /data/caddy/pki/authorities/local/root.crt
+      WS_CHECK_MODE: ${WS_CHECK_MODE:-echo}
+      WS_CHECK_ORIGIN: ${WS_CHECK_ORIGIN:-https://bridgeyok.localhost:8443}
+      WS_CHECK_URL: wss://api.bridgeyok.localhost/v1/ws
+    volumes:
+      - caddy-data:/data:ro
+    networks:
+      - gate
+
+networks:
+  gate:
+
+volumes:
+  caddy-config:
+  caddy-data:
