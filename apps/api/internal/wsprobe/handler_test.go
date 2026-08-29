@@ -2,8 +2,10 @@ package wsprobe
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -91,10 +93,14 @@ func TestHandlerWebSocket(t *testing.T) {
 			})
 			if test.wantStatus == http.StatusForbidden {
 				if connection != nil {
-					connection.CloseNow()
+					if err := connection.CloseNow(); err != nil {
+						t.Errorf("CloseNow() error = %v", err)
+					}
 				}
 				if response != nil && response.Body != nil {
-					defer response.Body.Close()
+					if err := response.Body.Close(); err != nil {
+						t.Errorf("response Body.Close() error = %v", err)
+					}
 				}
 				if err == nil || response == nil || response.StatusCode != http.StatusForbidden {
 					t.Fatalf("Dial() error = %v, response = %v, want status %d", err, response, http.StatusForbidden)
@@ -104,7 +110,11 @@ func TestHandlerWebSocket(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Dial() unexpected error: %v", err)
 			}
-			defer connection.CloseNow()
+			t.Cleanup(func() {
+				if err := connection.CloseNow(); err != nil && !errors.Is(err, net.ErrClosed) {
+					t.Errorf("CloseNow() error = %v", err)
+				}
+			})
 
 			if err := connection.Write(ctx, websocket.MessageText, test.message); err != nil {
 				t.Fatalf("Write() unexpected error: %v", err)
