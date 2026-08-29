@@ -8,6 +8,30 @@
 skills-lock.json
 skill-lock.json
 
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# JavaScript build and dependency artifacts
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+coverage/
+
+# Go build and test artifacts
+bin/
+*.test
+*.out
+
+# Local tooling artifacts
+.DS_Store
+.idea/
+.vscode/
+tmp/
+
 # Agent instruction files and all Markdown documentation
 docs/
 *.md
