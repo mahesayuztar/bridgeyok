@@ -90,11 +90,11 @@ func (state State) validateCardsAndTricks() error {
 	if state.CurrentTrick.Winner != "" {
 		return fmt.Errorf("current trick cannot have a winner")
 	}
-	seen := make(map[Card]string, 52)
+	seen := make(map[Card]struct{}, 52)
 	cardCount := 0
 	for _, seat := range [...]Seat{North, East, South, West} {
 		for _, card := range state.Deal.hand(seat) {
-			if err := addCardLocation(seen, card, fmt.Sprintf("hand %s", seat)); err != nil {
+			if err := addCardLocation(seen, card); err != nil {
 				return err
 			}
 			cardCount++
@@ -115,7 +115,7 @@ func (state State) validateCardsAndTricks() error {
 			return fmt.Errorf("completed trick %d leader does not match prior winner", _index)
 		}
 		for _, play := range trick.Plays {
-			if err := addCardLocation(seen, play.Card, fmt.Sprintf("completed trick %d", _index)); err != nil {
+			if err := addCardLocation(seen, play.Card); err != nil {
 				return err
 			}
 			cardCount++
@@ -137,7 +137,7 @@ func (state State) validateCardsAndTricks() error {
 		return fmt.Errorf("current leader does not match prior trick winner")
 	}
 	for _, play := range state.CurrentTrick.Plays {
-		if err := addCardLocation(seen, play.Card, "current trick"); err != nil {
+		if err := addCardLocation(seen, play.Card); err != nil {
 			return err
 		}
 		cardCount++
@@ -155,13 +155,13 @@ func (state State) contractStrain() Strain {
 	return state.Auction.Contract.Strain
 }
 
-func addCardLocation(seen map[Card]string, card Card, location string) error {
+func addCardLocation(seen map[Card]struct{}, card Card) error {
 	if err := card.Validate(); err != nil {
-		return fmt.Errorf("%s: %w", location, err)
+		return err
 	}
-	if previous, exists := seen[card]; exists {
-		return fmt.Errorf("card %s appears in %s and %s", card, previous, location)
+	if _, exists := seen[card]; exists {
+		return fmt.Errorf("card %s appears in multiple locations", card)
 	}
-	seen[card] = location
+	seen[card] = struct{}{}
 	return nil
 }
