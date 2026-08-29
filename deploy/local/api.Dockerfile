@@ -34,7 +34,7 @@ COPY --from=builder --chown=bridgeyok:bridgeyok /out/wsprobe ./bin/wsprobe
 COPY --from=builder --chown=bridgeyok:bridgeyok /out/wscheck ./bin/wscheck
 COPY --from=builder --chown=bridgeyok:bridgeyok /out/goose ./bin/goose
 COPY --chown=bridgeyok:bridgeyok db/migrations ./db/migrations
-COPY --chown=bridgeyok:bridgeyok scripts/start-render-api.sh ./scripts/start-api.sh
+COPY --chown=bridgeyok:bridgeyok scripts/start-local-api.sh ./scripts/start-api.sh
 
 USER bridgeyok
 
