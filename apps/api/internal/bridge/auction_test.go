@@ -165,6 +165,21 @@ func TestAuctionRejectsCallAfterCompletion(t *testing.T) {
 	}
 }
 
+func TestAuctionAcceptedResultDoesNotAliasInput(t *testing.T) {
+	t.Parallel()
+
+	auction := runCalls(t, mustAuction(t, North), []Call{Bid(1, StrainClubs)})
+	before := auction.clone()
+	after, domainError := auction.MakeCall(East, Pass())
+	if domainError != nil {
+		t.Fatalf("MakeCall() error = %v", domainError)
+	}
+	after.Calls[0].Call = Bid(7, StrainNoTrump)
+	if !reflect.DeepEqual(auction, before) {
+		t.Fatal("mutating accepted auction changed input auction")
+	}
+}
+
 func TestAuctionLegalCalls(t *testing.T) {
 	t.Parallel()
 
