@@ -335,8 +335,8 @@ button.physical-card:disabled { opacity: .82; }
   .player-copy > .player-presence { font-size: .52rem; }
   .player-top { top: .3rem; }
   .player-bottom { bottom: .3rem; }
-  .player-left { left: .3rem; }
-  .player-right { right: .3rem; }
+  .player-left { top: .3rem; bottom: auto; left: .3rem; transform: none; }
+  .player-right { top: .3rem; right: .3rem; bottom: auto; transform: none; }
   .seat-name { display: none; }
   .physical-card { flex-basis: 3.15rem; width: 3.15rem; height: 4.65rem; }
   .hand-cards .physical-card + .physical-card, .own-hand .hand-cards .physical-card + .physical-card { margin-left: -1.65rem; }
