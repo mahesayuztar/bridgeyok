@@ -70,7 +70,88 @@ paths:
               example:
                 status: unavailable
                 service: api
+  /v1/guest-sessions:
+    post:
+      operationId: createGuestSession
+      summary: Create a device-scoped guest session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGuestSessionRequest"
+      responses:
+        "201":
+          description: Guest session created
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestCredentials"
+        "400":
+          $ref: "#/components/responses/ProblemResponse"
+  /v1/guest-sessions/refresh:
+    post:
+      operationId: refreshGuestSession
+      summary: Rotate a device credential and issue fresh access
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshGuestSessionRequest"
+      responses:
+        "200":
+          description: Guest credentials rotated
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuestCredentials"
+        "401":
+          $ref: "#/components/responses/ProblemResponse"
+  /v1/guest-sessions/current:
+    delete:
+      operationId: revokeGuestSession
+      summary: Revoke the authenticated guest session
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Guest session revoked
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
+        "401":
+          $ref: "#/components/responses/ProblemResponse"
+  /v1/realtime/tickets:
+    post:
+      operationId: createRealtimeTicket
+      summary: Issue a single-use WebSocket ticket
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Realtime ticket issued
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RealtimeTicket"
+        "401":
+          $ref: "#/components/responses/ProblemResponse"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
   headers:
     RequestId:
       description: Correlation identifier for the request.
@@ -80,6 +161,16 @@ components:
         minLength: 1
         maxLength: 64
         pattern: "^[A-Za-z0-9_-]+$"
+  responses:
+    ProblemResponse:
+      description: The request was rejected
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
   schemas:
     HealthResponse:
       type: object
@@ -122,3 +213,76 @@ components:
           minLength: 1
           maxLength: 64
           pattern: "^[A-Za-z0-9_-]+$"
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: "^[A-Z][A-Z0-9_]*$"
+        messageKey:
+          type: string
+          minLength: 1
+          maxLength: 128
+        retryable:
+          type: boolean
+    CreateGuestSessionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - nickname
+      properties:
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 128
+    RefreshGuestSessionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - deviceCredential
+      properties:
+        deviceCredential:
+          type: string
+          minLength: 43
+          maxLength: 43
+          pattern: "^[A-Za-z0-9_-]+$"
+    GuestCredentials:
+      type: object
+      additionalProperties: false
+      required:
+        - sessionId
+        - nickname
+        - accessToken
+        - accessExpiresAt
+        - deviceCredential
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        accessToken:
+          type: string
+          minLength: 32
+        accessExpiresAt:
+          type: string
+          format: date-time
+        deviceCredential:
+          type: string
+          minLength: 43
+          maxLength: 43
+          pattern: "^[A-Za-z0-9_-]+$"
+    RealtimeTicket:
+      type: object
+      additionalProperties: false
+      required:
+        - ticket
+        - expiresAt
+      properties:
+        ticket:
+          type: string
+          minLength: 43
+          maxLength: 43
+          pattern: "^[A-Za-z0-9_-]+$"
+        expiresAt:
+          type: string
+          format: date-time

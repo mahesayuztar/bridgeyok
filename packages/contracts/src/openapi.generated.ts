@@ -55,6 +55,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/guest-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a device-scoped guest session */
+        post: operations["createGuestSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/guest-sessions/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate a device credential and issue fresh access */
+        post: operations["refreshGuestSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/guest-sessions/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke the authenticated guest session */
+        delete: operations["revokeGuestSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/realtime/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue a single-use WebSocket ticket */
+        post: operations["createRealtimeTicket"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -70,9 +138,43 @@ export interface components {
             title: string;
             status: number;
             requestId?: string;
+            code?: string;
+            messageKey?: string;
+            retryable?: boolean;
+        };
+        CreateGuestSessionRequest: {
+            nickname: string;
+        };
+        RefreshGuestSessionRequest: {
+            deviceCredential: string;
+        };
+        GuestCredentials: {
+            /** Format: uuid */
+            sessionId: string;
+            nickname: string;
+            accessToken: string;
+            /** Format: date-time */
+            accessExpiresAt: string;
+            deviceCredential: string;
+        };
+        RealtimeTicket: {
+            ticket: string;
+            /** Format: date-time */
+            expiresAt: string;
         };
     };
-    responses: never;
+    responses: {
+        /** @description The request was rejected */
+        ProblemResponse: {
+            headers: {
+                "X-Request-ID": components["headers"]["RequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: {
@@ -178,6 +280,100 @@ export interface operations {
                     "application/json": components["schemas"]["HealthResponse"];
                 };
             };
+        };
+    };
+    createGuestSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGuestSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Guest session created */
+            201: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestCredentials"];
+                };
+            };
+            400: components["responses"]["ProblemResponse"];
+        };
+    };
+    refreshGuestSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshGuestSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Guest credentials rotated */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuestCredentials"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+        };
+    };
+    revokeGuestSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Guest session revoked */
+            204: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["ProblemResponse"];
+        };
+    };
+    createRealtimeTicket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Realtime ticket issued */
+            201: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RealtimeTicket"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
         };
     };
 }
