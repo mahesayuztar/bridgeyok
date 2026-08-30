@@ -38,13 +38,41 @@ class ApiError extends Error {
   }
 }
 
-function readStoredValue<T>(storage: Storage, key: string): T | null {
+function browserStorage(kind: "local" | "session"): Storage | null {
+  try {
+    return kind === "local" ? window.localStorage : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredValue<T>(storage: Storage | null, key: string): T | null {
+  if (storage === null) {
+    return null;
+  }
   try {
     const value = storage.getItem(key);
     return value === null ? null : (JSON.parse(value) as T);
   } catch {
-    storage.removeItem(key);
+    try {
+      storage.removeItem(key);
+    } catch {
+    }
     return null;
+  }
+}
+
+function writeStoredValue(storage: Storage | null, key: string, value: unknown) {
+  try {
+    storage?.setItem(key, JSON.stringify(value));
+  } catch {
+  }
+}
+
+function removeStoredValue(storage: Storage | null, key: string) {
+  try {
+    storage?.removeItem(key);
+  } catch {
   }
 }
 
@@ -58,8 +86,8 @@ function persistCredentials(credentials: GuestCredentials) {
     accessToken: credentials.accessToken,
     accessExpiresAt: credentials.accessExpiresAt
   };
-  localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
-  sessionStorage.setItem(ACCESS_KEY, JSON.stringify(access));
+  writeStoredValue(browserStorage("local"), IDENTITY_KEY, identity);
+  writeStoredValue(browserStorage("session"), ACCESS_KEY, access);
 }
 
 async function readProblem(response: Response): Promise<ApiError> {
@@ -139,7 +167,7 @@ export type TableSession = {
 
 export function useTableSession({ restoreTable = true }: { restoreTable?: boolean } = {}): TableSession {
   const [tableState, dispatch] = useReducer(reduceTableState, undefined, createEmptyTableState);
-  const [initializing, setInitializing] = useState(true);
+  const [initializing, setInitializing] = useState(restoreTable);
   const [busy, setBusy] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -160,7 +188,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     if (refreshPromiseRef.current !== null) {
       return refreshPromiseRef.current;
     }
-    const storedIdentity = identity ?? readStoredValue<StoredIdentity>(localStorage, IDENTITY_KEY);
+    const storedIdentity = identity ?? readStoredValue<StoredIdentity>(browserStorage("local"), IDENTITY_KEY);
     if (storedIdentity === null) {
       throw new ApiError(issueFromServer({ code: "SESSION_INVALID", source: "rest" }), "SESSION_INVALID");
     }
@@ -238,7 +266,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
 
   const clearTable = useCallback(() => {
     stopConnection();
-    localStorage.removeItem(TABLE_KEY);
+    removeStoredValue(browserStorage("local"), TABLE_KEY);
     setInviteCode(null);
     setConnectionState("idle");
     dispatch({ type: "clear" });
@@ -389,13 +417,15 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
   useEffect(() => {
     let active = true;
     async function restoreSession() {
-      const identity = readStoredValue<StoredIdentity>(localStorage, IDENTITY_KEY);
+      const local = browserStorage("local");
+      const session = browserStorage("session");
+      const identity = readStoredValue<StoredIdentity>(local, IDENTITY_KEY);
       if (identity === null) {
         setInitializing(false);
         return;
       }
       if (!restoreTable) {
-        const access = readStoredValue<StoredAccess>(sessionStorage, ACCESS_KEY);
+        const access = readStoredValue<StoredAccess>(session, ACCESS_KEY);
         if (access !== null && Date.parse(access.accessExpiresAt) > Date.now() + 30_000) {
           credentialsRef.current = { ...identity, ...access };
         }
@@ -404,14 +434,14 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
         return;
       }
       try {
-        const access = readStoredValue<StoredAccess>(sessionStorage, ACCESS_KEY);
+        const access = readStoredValue<StoredAccess>(session, ACCESS_KEY);
         if (access !== null && Date.parse(access.accessExpiresAt) > Date.now() + 30_000) {
           credentialsRef.current = { ...identity, ...access };
           setNickname(identity.nickname);
         } else {
           await refreshCredentials(identity);
         }
-        const storedTable = restoreTable ? readStoredValue<StoredTable>(localStorage, TABLE_KEY) : null;
+        const storedTable = restoreTable ? readStoredValue<StoredTable>(local, TABLE_KEY) : null;
         if (storedTable !== null && active) {
           const table = await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(storedTable.tableId)}`);
           if (isLiveTableProjection(table)) {
@@ -419,13 +449,13 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
             dispatch({ type: "enter", table });
             beginConnection(table.tableId);
           } else {
-            localStorage.removeItem(TABLE_KEY);
+            removeStoredValue(local, TABLE_KEY);
           }
         }
       } catch (error) {
         if (error instanceof ApiError && (error.code === "SESSION_INVALID" || error.code === "SESSION_INACTIVE")) {
-          localStorage.removeItem(IDENTITY_KEY);
-          sessionStorage.removeItem(ACCESS_KEY);
+          removeStoredValue(local, IDENTITY_KEY);
+          removeStoredValue(session, ACCESS_KEY);
           setNickname(null);
         } else {
           dispatch({ type: "issue", issue: issueForError(error) });
@@ -493,8 +523,8 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     } catch {
     } finally {
       credentialsRef.current = null;
-      localStorage.removeItem(IDENTITY_KEY);
-      sessionStorage.removeItem(ACCESS_KEY);
+      removeStoredValue(browserStorage("local"), IDENTITY_KEY);
+      removeStoredValue(browserStorage("session"), ACCESS_KEY);
       setNickname(null);
       setBusy(false);
     }
@@ -508,7 +538,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
         throw new ApiError(issueFromServer({ source: "rest" }));
       }
       clearTable();
-      localStorage.setItem(TABLE_KEY, JSON.stringify({ tableId: created.table.tableId, inviteCode: created.inviteCode }));
+      writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: created.table.tableId, inviteCode: created.inviteCode });
       setInviteCode(created.inviteCode);
       dispatch({ type: "enter", table: created.table });
       beginConnection(created.table.tableId);
@@ -545,7 +575,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           throw new ApiError(issueFromServer({ source: "rest" }));
         }
         clearTable();
-        localStorage.setItem(TABLE_KEY, JSON.stringify({ tableId: table.tableId, inviteCode: normalizedInviteCode }));
+        writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: table.tableId, inviteCode: normalizedInviteCode });
         setInviteCode(normalizedInviteCode);
         dispatch({ type: "enter", table });
         beginConnection(table.tableId);
@@ -571,7 +601,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
         throw new ApiError(issueFromServer({ source: "rest" }));
       }
       clearTable();
-      localStorage.setItem(TABLE_KEY, JSON.stringify({ tableId }));
+      writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId });
       dispatch({ type: "enter", table });
       beginConnection(table.tableId);
       return true;
