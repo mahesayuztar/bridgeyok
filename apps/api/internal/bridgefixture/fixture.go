@@ -8,29 +8,75 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
 )
 
-// Fixture contains a valid initial board and the events replayed from it.
-type Fixture struct {
-	InitialState bridge.State   `json:"initialState"`
-	Events       []bridge.Event `json:"events"`
+// SchemaVersion identifies the current deterministic fixture envelope.
+const SchemaVersion = 1
+
+// Step preserves one actor command and the exact events it must produce.
+type Step struct {
+	Command bridge.Command `json:"command"`
+	Events  []bridge.Event `json:"events"`
 }
 
-// Replay validates and reduces the complete fixture history.
+// Fixture contains a complete deterministic board scenario for replay tests.
+type Fixture struct {
+	SchemaVersion  int            `json:"schemaVersion"`
+	RulesetVersion string         `json:"rulesetVersion"`
+	InitialState   bridge.State   `json:"initialState"`
+	Steps          []Step         `json:"steps"`
+	ExpectedResult *bridge.Result `json:"expectedResult"`
+}
+
+// Replay validates command decisions and durable event replay for the complete scenario.
 func (fixture Fixture) Replay() (bridge.State, error) {
-	if fixture.Events == nil {
-		return bridge.State{}, fmt.Errorf("events must be initialized")
+	if fixture.SchemaVersion != SchemaVersion {
+		return bridge.State{}, fmt.Errorf("unsupported fixture schema version %d", fixture.SchemaVersion)
 	}
-	state, err := bridge.Reduce(fixture.InitialState, fixture.Events)
-	if err != nil {
-		return bridge.State{}, fmt.Errorf("replay fixture: %w", err)
+	if fixture.RulesetVersion != bridge.RulesetVersion {
+		return bridge.State{}, fmt.Errorf("unsupported fixture ruleset version %q", fixture.RulesetVersion)
+	}
+	if fixture.Steps == nil {
+		return bridge.State{}, fmt.Errorf("steps must be initialized")
+	}
+	if fixture.ExpectedResult == nil {
+		return bridge.State{}, fmt.Errorf("expected result is required")
+	}
+
+	state := fixture.InitialState
+	for _stepIndex, step := range fixture.Steps {
+		if step.Events == nil {
+			return bridge.State{}, fmt.Errorf("step %d events must be initialized", _stepIndex)
+		}
+		decision, domainError := bridge.Decide(state, step.Command)
+		if domainError != nil {
+			return bridge.State{}, fmt.Errorf("step %d decide: %w", _stepIndex, domainError)
+		}
+		if !reflect.DeepEqual(decision.Events, step.Events) {
+			return bridge.State{}, fmt.Errorf("step %d events do not match decision", _stepIndex)
+		}
+		replayed, err := bridge.Reduce(state, step.Events)
+		if err != nil {
+			return bridge.State{}, fmt.Errorf("step %d replay: %w", _stepIndex, err)
+		}
+		if !reflect.DeepEqual(replayed, decision.NextState) {
+			return bridge.State{}, fmt.Errorf("step %d replay state does not match decision", _stepIndex)
+		}
+		state = decision.NextState
+	}
+	if state.Phase != bridge.PhaseBoardScored || state.Result == nil {
+		return bridge.State{}, fmt.Errorf("fixture does not end with a scored board")
+	}
+	if !reflect.DeepEqual(state.Result, fixture.ExpectedResult) {
+		return bridge.State{}, fmt.Errorf("fixture result does not match expected result")
 	}
 	return state, nil
 }
 
-// Marshal validates a fixture and returns canonical indented JSON.
+// Marshal validates a fixture and returns stable indented JSON.
 func Marshal(fixture Fixture) ([]byte, error) {
 	if _, err := fixture.Replay(); err != nil {
 		return nil, err
