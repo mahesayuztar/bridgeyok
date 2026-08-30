@@ -50,6 +50,7 @@ type ErrorCode string
 
 const (
 	ErrorInvalidState       ErrorCode = "INVALID_STATE"
+	ErrorStateChanged       ErrorCode = "STATE_CHANGED"
 	ErrorNotParticipant     ErrorCode = "NOT_PARTICIPANT"
 	ErrorAlreadyParticipant ErrorCode = "ALREADY_PARTICIPANT"
 	ErrorTableLocked        ErrorCode = "TABLE_LOCKED"

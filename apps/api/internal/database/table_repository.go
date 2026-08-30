@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -46,6 +47,9 @@ func (postgres *Postgres) CreateTable(ctx context.Context, record table.CreateRe
 			JoinedAt:  timestamptz(owner.JoinedAt),
 		}); err != nil {
 			return fmt.Errorf("insert owner participant: %w", err)
+		}
+		if err := upsertPrivateSnapshot(ctx, queries, record.Aggregate, record.CreatedAt); err != nil {
+			return err
 		}
 		return nil
 	})
@@ -114,7 +118,14 @@ func (postgres *Postgres) JoinTable(ctx context.Context, inviteCodeHash []byte, 
 		}); err != nil {
 			return fmt.Errorf("insert table participant: %w", err)
 		}
-		joined = decision.NextState
+		result, err := persistAcceptedDecision(ctx, queries, table.CommandRequest{
+			TableID: aggregate.ID, SessionID: participant.SessionID,
+			RequestID: "rest_join", Command: table.Command{Name: table.CommandJoinTable},
+		}, aggregate, decision, participant.JoinedAt)
+		if err != nil {
+			return err
+		}
+		joined = result.Aggregate
 		return nil
 	})
 	if err != nil {
@@ -156,35 +167,15 @@ func (postgres *Postgres) LeaveTable(ctx context.Context, tableID string, sessio
 		if err != nil {
 			return err
 		}
-		participantID := ""
-		for _, participant := range aggregate.Participants {
-			if participant.SessionID == sessionID && participant.LeftAt == nil {
-				participantID = participant.ID
-				break
-			}
-		}
 		decision, domainError := table.Decide(aggregate, table.Command{Name: table.CommandLeaveTable, SessionID: sessionID, OccurredAt: occurredAt})
 		if domainError != nil {
 			return domainError
 		}
-		rows, err := queries.MarkTableParticipantLeft(ctx, dbgen.MarkTableParticipantLeftParams{
-			LeftAt:    timestamptz(occurredAt),
-			TableID:   tableID,
-			SessionID: sessionID,
-		})
-		if err != nil {
-			return fmt.Errorf("mark participant left: %w", err)
-		}
-		if rows != 1 {
-			return fmt.Errorf("mark participant left: affected %d rows", rows)
-		}
-		if err := queries.DeleteParticipantSeat(ctx, dbgen.DeleteParticipantSeatParams{TableID: tableID, ParticipantID: participantID}); err != nil {
-			return fmt.Errorf("delete participant seat: %w", err)
-		}
-		if err := decision.NextState.Validate(); err != nil {
-			return fmt.Errorf("validate persisted leave: %w", err)
-		}
-		return nil
+		_, err = persistAcceptedDecision(ctx, queries, table.CommandRequest{
+			TableID: tableID, SessionID: sessionID,
+			RequestID: "rest_leave", Command: table.Command{Name: table.CommandLeaveTable},
+		}, aggregate, decision, occurredAt)
+		return err
 	})
 }
 
@@ -198,6 +189,23 @@ type tableRow struct {
 }
 
 func loadTableAggregate(ctx context.Context, queries *dbgen.Queries, row tableRow) (table.Aggregate, error) {
+	snapshot, err := queries.LoadGameSnapshot(ctx, row.id)
+	if err == nil {
+		var aggregate table.Aggregate
+		if err := json.Unmarshal(snapshot.PrivateState, &aggregate); err != nil {
+			return table.Aggregate{}, fmt.Errorf("decode private snapshot: %w", err)
+		}
+		if snapshot.SchemaVersion != 1 || snapshot.Revision != row.revision || snapshot.LastSeq != row.lastSeq || aggregate.ID != row.id || aggregate.OwnerSessionID != row.ownerSessionID || aggregate.State != table.State(row.state) || aggregate.Locked != row.locked || aggregate.Revision != row.revision || aggregate.LastSeq != row.lastSeq {
+			return table.Aggregate{}, fmt.Errorf("private snapshot does not match table row")
+		}
+		if err := aggregate.Validate(); err != nil {
+			return table.Aggregate{}, fmt.Errorf("validate private snapshot: %w", err)
+		}
+		return aggregate, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return table.Aggregate{}, fmt.Errorf("load private snapshot: %w", err)
+	}
 	participantRows, err := queries.ListActiveTableParticipants(ctx, row.id)
 	if err != nil {
 		return table.Aggregate{}, fmt.Errorf("list table participants: %w", err)
