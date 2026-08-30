@@ -52,7 +52,7 @@ SELECT id,
        state,
        locked,
        revision,
-       next_seq - 1 AS last_seq
+       (next_seq - 1)::bigint AS last_seq
 FROM bridgeyok.tables
 WHERE invite_code_hash = sqlc.arg(invite_code_hash)
 FOR UPDATE;
@@ -63,7 +63,7 @@ SELECT id,
        state,
        locked,
        revision,
-       next_seq - 1 AS last_seq
+       (next_seq - 1)::bigint AS last_seq
 FROM bridgeyok.tables
 WHERE id = sqlc.arg(id)
 FOR UPDATE;
@@ -74,7 +74,7 @@ SELECT id,
        state,
        locked,
        revision,
-       next_seq - 1 AS last_seq
+       (next_seq - 1)::bigint AS last_seq
 FROM bridgeyok.tables
 WHERE id = sqlc.arg(id);
 
@@ -100,15 +100,3 @@ SELECT seat,
 FROM bridgeyok.table_seats
 WHERE table_id = sqlc.arg(table_id)
 ORDER BY seat;
-
--- name: MarkTableParticipantLeft :execrows
-UPDATE bridgeyok.table_participants
-SET left_at = sqlc.arg(left_at)
-WHERE table_id = sqlc.arg(table_id)
-  AND session_id = sqlc.arg(session_id)
-  AND left_at IS NULL;
-
--- name: DeleteParticipantSeat :exec
-DELETE FROM bridgeyok.table_seats
-WHERE table_id = sqlc.arg(table_id)
-  AND participant_id = sqlc.arg(participant_id);

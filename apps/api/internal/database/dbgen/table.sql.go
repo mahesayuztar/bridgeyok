@@ -87,29 +87,13 @@ func (q *Queries) CreateTableParticipant(ctx context.Context, arg CreateTablePar
 	return err
 }
 
-const deleteParticipantSeat = `-- name: DeleteParticipantSeat :exec
-DELETE FROM bridgeyok.table_seats
-WHERE table_id = $1
-  AND participant_id = $2
-`
-
-type DeleteParticipantSeatParams struct {
-	TableID       string `json:"table_id"`
-	ParticipantID string `json:"participant_id"`
-}
-
-func (q *Queries) DeleteParticipantSeat(ctx context.Context, arg DeleteParticipantSeatParams) error {
-	_, err := q.db.Exec(ctx, deleteParticipantSeat, arg.TableID, arg.ParticipantID)
-	return err
-}
-
 const findTableByID = `-- name: FindTableByID :one
 SELECT id,
        owner_session_id,
        state,
        locked,
        revision,
-       next_seq - 1 AS last_seq
+       (next_seq - 1)::bigint AS last_seq
 FROM bridgeyok.tables
 WHERE id = $1
 `
@@ -120,7 +104,7 @@ type FindTableByIDRow struct {
 	State          string `json:"state"`
 	Locked         bool   `json:"locked"`
 	Revision       int64  `json:"revision"`
-	LastSeq        int32  `json:"last_seq"`
+	LastSeq        int64  `json:"last_seq"`
 }
 
 func (q *Queries) FindTableByID(ctx context.Context, id string) (FindTableByIDRow, error) {
@@ -236,7 +220,7 @@ SELECT id,
        state,
        locked,
        revision,
-       next_seq - 1 AS last_seq
+       (next_seq - 1)::bigint AS last_seq
 FROM bridgeyok.tables
 WHERE id = $1
 FOR UPDATE
@@ -248,7 +232,7 @@ type LockTableByIDRow struct {
 	State          string `json:"state"`
 	Locked         bool   `json:"locked"`
 	Revision       int64  `json:"revision"`
-	LastSeq        int32  `json:"last_seq"`
+	LastSeq        int64  `json:"last_seq"`
 }
 
 func (q *Queries) LockTableByID(ctx context.Context, id string) (LockTableByIDRow, error) {
@@ -271,7 +255,7 @@ SELECT id,
        state,
        locked,
        revision,
-       next_seq - 1 AS last_seq
+       (next_seq - 1)::bigint AS last_seq
 FROM bridgeyok.tables
 WHERE invite_code_hash = $1
 FOR UPDATE
@@ -283,7 +267,7 @@ type LockTableByInviteRow struct {
 	State          string `json:"state"`
 	Locked         bool   `json:"locked"`
 	Revision       int64  `json:"revision"`
-	LastSeq        int32  `json:"last_seq"`
+	LastSeq        int64  `json:"last_seq"`
 }
 
 func (q *Queries) LockTableByInvite(ctx context.Context, inviteCodeHash []byte) (LockTableByInviteRow, error) {
@@ -298,28 +282,6 @@ func (q *Queries) LockTableByInvite(ctx context.Context, inviteCodeHash []byte) 
 		&i.LastSeq,
 	)
 	return i, err
-}
-
-const markTableParticipantLeft = `-- name: MarkTableParticipantLeft :execrows
-UPDATE bridgeyok.table_participants
-SET left_at = $1
-WHERE table_id = $2
-  AND session_id = $3
-  AND left_at IS NULL
-`
-
-type MarkTableParticipantLeftParams struct {
-	LeftAt    pgtype.Timestamptz `json:"left_at"`
-	TableID   string             `json:"table_id"`
-	SessionID string             `json:"session_id"`
-}
-
-func (q *Queries) MarkTableParticipantLeft(ctx context.Context, arg MarkTableParticipantLeftParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markTableParticipantLeft, arg.LeftAt, arg.TableID, arg.SessionID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }
 
 const previewTable = `-- name: PreviewTable :one
