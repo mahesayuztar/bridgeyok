@@ -67,6 +67,7 @@ SET board_id = EXCLUDED.board_id,
 UPDATE bridgeyok.tables
 SET state = sqlc.arg(state),
     locked = sqlc.arg(locked),
+    owner_session_id = sqlc.arg(owner_session_id),
     revision = sqlc.arg(next_revision),
     next_seq = sqlc.arg(next_seq),
     meaningful_at = sqlc.arg(occurred_at),
@@ -139,6 +140,12 @@ SET left_at = sqlc.arg(left_at)
 WHERE table_id = sqlc.arg(table_id)
   AND id = sqlc.arg(participant_id)
   AND left_at IS NULL;
+
+-- name: SyncParticipantRole :exec
+UPDATE bridgeyok.table_participants
+SET role = sqlc.arg(role)
+WHERE table_id = sqlc.arg(table_id)
+  AND id = sqlc.arg(participant_id);
 
 -- name: UpsertBoard :exec
 INSERT INTO bridgeyok.boards (

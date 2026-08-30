@@ -237,6 +237,86 @@ func TestDecideStartPassedOutAndFinish(t *testing.T) {
 	}
 }
 
+func TestDecideActiveTableParticipantReplacement(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testReadyAggregate(t)
+	aggregate.Locked = true
+	deal := testDeal(t)
+	aggregate = acceptedDecision(t, aggregate, Command{
+		Name: CommandStartGame, SessionID: "session-owner", Deal: &deal, BoardID: "board-one",
+	}).NextState
+	east := aggregate.Participants[1]
+	removedAt := testJoinedAt.Add(5 * time.Minute)
+	aggregate = acceptedDecision(t, aggregate, Command{
+		Name: CommandRemoveParticipant, SessionID: "session-owner", ParticipantID: east.ID, OccurredAt: removedAt,
+	}).NextState
+	if _, occupied := aggregate.Seats[bridge.East]; occupied {
+		t.Fatal("removed active participant retained seat")
+	}
+
+	replacement := testParticipant("participant-replacement", "session-replacement", "Replacement", RoleParticipant)
+	replacement.JoinedAt = removedAt.Add(time.Second)
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandJoinTable, Participant: &replacement}).NextState
+	aggregate = acceptedDecision(t, aggregate, Command{
+		Name: CommandTakeSeat, SessionID: replacement.SessionID, Seat: bridge.East,
+	}).NextState
+	if assignment := aggregate.Seats[bridge.East]; assignment.ParticipantID != replacement.ID || !assignment.Ready {
+		t.Fatalf("replacement seat = %+v", assignment)
+	}
+
+	pass := bridge.Pass()
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: "session-owner", Call: &pass}).NextState
+	acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: replacement.SessionID, Call: &pass})
+}
+
+func TestDecideOfflineParticipantTimeout(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testAggregateWithGuests(t, 1)
+	guest := aggregate.Participants[1]
+	decision := acceptedDecision(t, aggregate, Command{
+		Name: CommandExpireParticipant, SessionID: "session-owner", ParticipantID: guest.ID, OccurredAt: testJoinedAt.Add(10 * time.Minute),
+	})
+	if decision.Events[0].Type != "PARTICIPANT_TIMED_OUT" {
+		t.Fatalf("timeout event = %s", decision.Events[0].Type)
+	}
+}
+
+func TestDecideOwnerTimeoutTransfersOwnership(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testAggregateWithGuests(t, 2)
+	owner := aggregate.Participants[0]
+	replacement := aggregate.Participants[2]
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandTakeSeat, SessionID: replacement.SessionID, Seat: bridge.South}).NextState
+	decision := acceptedDecision(t, aggregate, Command{
+		Name: CommandExpireParticipant, SessionID: owner.SessionID, ParticipantID: owner.ID,
+		ReplacementParticipantID: replacement.ID, OccurredAt: testJoinedAt.Add(time.Minute),
+	})
+	if decision.NextState.OwnerSessionID != replacement.SessionID || decision.NextState.Participants[2].Role != RoleOwner {
+		t.Fatalf("replacement owner = %+v", decision.NextState.Participants[2])
+	}
+	if _, active := decision.NextState.activeParticipant(owner.SessionID); active {
+		t.Fatal("expired owner remained active")
+	}
+	payload, ok := decision.Events[0].Payload.(map[string]any)
+	if !ok || payload["ownerParticipantId"] != replacement.ID {
+		t.Fatalf("timeout payload = %#v", decision.Events[0].Payload)
+	}
+}
+
+func TestDecideOwnerRemovalRequiresReplacement(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testAggregate(t)
+	owner := aggregate.Participants[0]
+	_, domainError := Decide(aggregate, Command{
+		Name: CommandRemoveParticipant, SessionID: owner.SessionID, ParticipantID: owner.ID, OccurredAt: testJoinedAt.Add(time.Minute),
+	})
+	assertDomainError(t, domainError, ErrorOwnerCannotLeave)
+}
+
 func TestDecideStartRequiresFourReadySeats(t *testing.T) {
 	t.Parallel()
 

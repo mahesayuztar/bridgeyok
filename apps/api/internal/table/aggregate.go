@@ -38,6 +38,7 @@ const (
 	CommandSetReady          CommandName = "SET_READY"
 	CommandLockTable         CommandName = "LOCK_TABLE"
 	CommandRemoveParticipant CommandName = "REMOVE_PARTICIPANT"
+	CommandExpireParticipant CommandName = "EXPIRE_PARTICIPANT"
 	CommandStartGame         CommandName = "START_GAME"
 	CommandMakeCall          CommandName = "MAKE_CALL"
 	CommandPlayCard          CommandName = "PLAY_CARD"
@@ -115,19 +116,20 @@ type Aggregate struct {
 
 // Command contains one authenticated table mutation.
 type Command struct {
-	Name            CommandName
-	SessionID       string
-	Participant     *Participant
-	OccurredAt      time.Time
-	Seat            bridge.Seat
-	Ready           bool
-	Locked          bool
-	ParticipantID   string
-	Call            *bridge.Call
-	Card            *bridge.Card
-	Deal            *bridge.Deal
-	BoardID         string
-	ControllerEpoch int64
+	Name                     CommandName
+	SessionID                string
+	Participant              *Participant
+	OccurredAt               time.Time
+	Seat                     bridge.Seat
+	Ready                    bool
+	Locked                   bool
+	ParticipantID            string
+	Call                     *bridge.Call
+	Card                     *bridge.Card
+	Deal                     *bridge.Deal
+	BoardID                  string
+	ControllerEpoch          int64
+	ReplacementParticipantID string
 }
 
 // Event is a durable aggregate fact with a privacy-safe typed payload.
@@ -205,8 +207,8 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		}
 		events = []Event{{Type: "PARTICIPANT_LEFT", Payload: map[string]any{"participantId": participant.ID}}}
 	case CommandTakeSeat:
-		if next.State != StateWaiting {
-			return Decision{}, reject(ErrorInvalidState, "seat changes require a waiting table")
+		if next.State != StateWaiting && next.State != StateActive && next.State != StateBetweenBoards {
+			return Decision{}, reject(ErrorInvalidState, "seat changes require an open table")
 		}
 		if !command.Seat.Valid() {
 			return Decision{}, reject(ErrorInvalidCommand, "seat is invalid")
@@ -214,8 +216,10 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		if assignment, occupied := next.Seats[command.Seat]; occupied && assignment.ParticipantID != participant.ID {
 			return Decision{}, reject(ErrorSeatTaken, "seat is already occupied")
 		}
-		if currentSeat, seated := next.seatForParticipant(participant.ID); seated && currentSeat == command.Seat {
-			return Decision{}, reject(ErrorAlreadySeated, "participant already occupies the seat")
+		if currentSeat, seated := next.seatForParticipant(participant.ID); seated {
+			if currentSeat == command.Seat || next.State != StateWaiting {
+				return Decision{}, reject(ErrorAlreadySeated, "participant already occupies a seat")
+			}
 		}
 		for seat, assignment := range next.Seats {
 			if assignment.ParticipantID == participant.ID && seat != command.Seat {
@@ -226,7 +230,7 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		if current, occupied := next.Seats[command.Seat]; occupied {
 			epoch = current.ControllerEpoch
 		}
-		next.Seats[command.Seat] = SeatAssignment{ParticipantID: participant.ID, ControllerEpoch: epoch}
+		next.Seats[command.Seat] = SeatAssignment{ParticipantID: participant.ID, Ready: next.State != StateWaiting, ControllerEpoch: epoch}
 		events = []Event{{Type: "SEAT_CHANGED", Payload: map[string]any{"participantId": participant.ID, "seat": command.Seat}}}
 	case CommandLeaveSeat:
 		if next.State != StateWaiting {
@@ -259,28 +263,46 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		}
 		next.Locked = command.Locked
 		events = []Event{{Type: "TABLE_LOCKED", Payload: map[string]any{"locked": command.Locked}}}
-	case CommandRemoveParticipant:
+	case CommandRemoveParticipant, CommandExpireParticipant:
 		if participant.Role != RoleOwner {
 			return Decision{}, reject(ErrorOwnerRequired, "only the owner can remove a participant")
 		}
-		if next.State != StateWaiting {
-			return Decision{}, reject(ErrorInvalidState, "removal requires a waiting table")
+		if next.State == StateFinished {
+			return Decision{}, reject(ErrorInvalidState, "finished table participants cannot be removed")
 		}
 		targetIndex := slices.IndexFunc(next.Participants, func(candidate Participant) bool {
 			return candidate.ID == command.ParticipantID && candidate.LeftAt == nil
 		})
-		if targetIndex < 0 || next.Participants[targetIndex].Role == RoleOwner {
+		if targetIndex < 0 {
 			return Decision{}, reject(ErrorParticipantMissing, "participant cannot be removed")
 		}
 		if command.OccurredAt.IsZero() {
 			return Decision{}, reject(ErrorInvalidCommand, "removal time is required")
+		}
+		replacementParticipantID := ""
+		if next.Participants[targetIndex].Role == RoleOwner {
+			replacementIndex := next.replacementOwnerIndex(command.ParticipantID, command.ReplacementParticipantID)
+			if replacementIndex < 0 {
+				return Decision{}, reject(ErrorOwnerCannotLeave, "owner cannot leave without a replacement")
+			}
+			next.Participants[replacementIndex].Role = RoleOwner
+			next.OwnerSessionID = next.Participants[replacementIndex].SessionID
+			replacementParticipantID = next.Participants[replacementIndex].ID
 		}
 		leftAt := command.OccurredAt.UTC()
 		next.Participants[targetIndex].LeftAt = &leftAt
 		if seat, seated := next.seatForParticipant(command.ParticipantID); seated {
 			delete(next.Seats, seat)
 		}
-		events = []Event{{Type: "PARTICIPANT_REMOVED", Payload: map[string]any{"participantId": command.ParticipantID}}}
+		eventType := "PARTICIPANT_REMOVED"
+		if command.Name == CommandExpireParticipant {
+			eventType = "PARTICIPANT_TIMED_OUT"
+		}
+		payload := map[string]any{"participantId": command.ParticipantID}
+		if replacementParticipantID != "" {
+			payload["ownerParticipantId"] = replacementParticipantID
+		}
+		events = []Event{{Type: eventType, Payload: payload}}
 	case CommandStartGame:
 		if participant.Role != RoleOwner {
 			return Decision{}, reject(ErrorOwnerRequired, "only the owner can start a board")
@@ -382,10 +404,10 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 }
 
 func decideJoin(aggregate Aggregate, command Command) (Decision, *DomainError) {
-	if aggregate.State != StateWaiting {
-		return Decision{}, reject(ErrorInvalidState, "joining requires a waiting table")
+	if aggregate.State != StateWaiting && aggregate.State != StateActive && aggregate.State != StateBetweenBoards {
+		return Decision{}, reject(ErrorInvalidState, "joining requires an open table")
 	}
-	if aggregate.Locked {
+	if aggregate.State == StateWaiting && aggregate.Locked {
 		return Decision{}, reject(ErrorTableLocked, "table is locked")
 	}
 	if command.Participant == nil {
@@ -504,6 +526,28 @@ func (aggregate Aggregate) seatForParticipant(participantID string) (bridge.Seat
 		}
 	}
 	return "", false
+}
+
+func (aggregate Aggregate) replacementOwnerIndex(ownerParticipantID string, preferredParticipantID string) int {
+	if preferredParticipantID != "" {
+		preferredIndex := slices.IndexFunc(aggregate.Participants, func(participant Participant) bool {
+			return participant.ID == preferredParticipantID && participant.ID != ownerParticipantID && participant.LeftAt == nil
+		})
+		if preferredIndex >= 0 {
+			return preferredIndex
+		}
+	}
+	for _index, participant := range aggregate.Participants {
+		if participant.ID == ownerParticipantID || participant.LeftAt != nil {
+			continue
+		}
+		if _, seated := aggregate.seatForParticipant(participant.ID); seated {
+			return _index
+		}
+	}
+	return slices.IndexFunc(aggregate.Participants, func(participant Participant) bool {
+		return participant.ID != ownerParticipantID && participant.LeftAt == nil
+	})
 }
 
 func (aggregate Aggregate) clone() Aggregate {

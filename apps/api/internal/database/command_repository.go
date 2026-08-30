@@ -122,7 +122,7 @@ func persistAcceptedDecision(
 		return table.CommandResult{}, fmt.Errorf("validate next command state: %w", err)
 	}
 	rows, err := queries.UpdateTableAfterCommand(ctx, dbgen.UpdateTableAfterCommandParams{
-		State: string(next.State), Locked: next.Locked, NextRevision: next.Revision, NextSeq: next.LastSeq + 1,
+		State: string(next.State), Locked: next.Locked, OwnerSessionID: next.OwnerSessionID, NextRevision: next.Revision, NextSeq: next.LastSeq + 1,
 		OccurredAt: timestamptz(occurredAt), ID: next.ID, ExpectedRevision: current.Revision,
 	})
 	if err != nil {
@@ -190,6 +190,11 @@ func insertProcessedOutcome(
 
 func syncRelationalAggregate(ctx context.Context, queries *dbgen.Queries, aggregate table.Aggregate, occurredAt time.Time) error {
 	for _, participant := range aggregate.Participants {
+		if err := queries.SyncParticipantRole(ctx, dbgen.SyncParticipantRoleParams{
+			Role: string(participant.Role), TableID: aggregate.ID, ParticipantID: participant.ID,
+		}); err != nil {
+			return fmt.Errorf("sync participant role: %w", err)
+		}
 		if participant.LeftAt == nil {
 			continue
 		}

@@ -304,21 +304,41 @@ func (q *Queries) SyncParticipantLeftAt(ctx context.Context, arg SyncParticipant
 	return err
 }
 
+const syncParticipantRole = `-- name: SyncParticipantRole :exec
+UPDATE bridgeyok.table_participants
+SET role = $1
+WHERE table_id = $2
+  AND id = $3
+`
+
+type SyncParticipantRoleParams struct {
+	Role          string `json:"role"`
+	TableID       string `json:"table_id"`
+	ParticipantID string `json:"participant_id"`
+}
+
+func (q *Queries) SyncParticipantRole(ctx context.Context, arg SyncParticipantRoleParams) error {
+	_, err := q.db.Exec(ctx, syncParticipantRole, arg.Role, arg.TableID, arg.ParticipantID)
+	return err
+}
+
 const updateTableAfterCommand = `-- name: UpdateTableAfterCommand :execrows
 UPDATE bridgeyok.tables
 SET state = $1,
     locked = $2,
-    revision = $3,
-    next_seq = $4,
-    meaningful_at = $5,
-    finished_at = CASE WHEN $1 = 'FINISHED' THEN $5 ELSE finished_at END
-WHERE id = $6
-  AND revision = $7
+    owner_session_id = $3,
+    revision = $4,
+    next_seq = $5,
+    meaningful_at = $6,
+    finished_at = CASE WHEN $1 = 'FINISHED' THEN $6 ELSE finished_at END
+WHERE id = $7
+  AND revision = $8
 `
 
 type UpdateTableAfterCommandParams struct {
 	State            string             `json:"state"`
 	Locked           bool               `json:"locked"`
+	OwnerSessionID   string             `json:"owner_session_id"`
 	NextRevision     int64              `json:"next_revision"`
 	NextSeq          int64              `json:"next_seq"`
 	OccurredAt       pgtype.Timestamptz `json:"occurred_at"`
@@ -330,6 +350,7 @@ func (q *Queries) UpdateTableAfterCommand(ctx context.Context, arg UpdateTableAf
 	result, err := q.db.Exec(ctx, updateTableAfterCommand,
 		arg.State,
 		arg.Locked,
+		arg.OwnerSessionID,
 		arg.NextRevision,
 		arg.NextSeq,
 		arg.OccurredAt,
