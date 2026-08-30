@@ -71,6 +71,7 @@ function presenceLabel(presence: ParticipantPresence | undefined, now: number, i
   if (presence === undefined) return "Status belum tersedia";
   if (presence.online) return "Online";
   if (presence.expiresAt === undefined) return "Offline";
+  if (now === 0) return "Offline · menghitung…";
   const remainingSeconds = Math.max(0, Math.ceil((Date.parse(presence.expiresAt) - now) / 1000));
   if (remainingSeconds === 0) return isOwner ? "Offline · menunggu master baru" : "Offline · segera keluar";
   return `Offline · 0:${String(remainingSeconds).padStart(2, "0")}`;
@@ -253,7 +254,7 @@ export default function BridgeTable({ expectedTableId }: { expectedTableId: stri
   const { openTable, sendCommand } = session;
   const attemptedTableIdRef = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [presenceNow, setPresenceNow] = useState(Date.now());
+  const [presenceNow, setPresenceNow] = useState(0);
   const table = session.tableState.table;
   const game = table?.game;
   const hasPendingCommand = Object.keys(session.tableState.pending).length > 0;
@@ -264,10 +265,13 @@ export default function BridgeTable({ expectedTableId }: { expectedTableId: stri
   const hasPresenceCountdown = Object.values(session.tableState.presence).some((presence) => !presence.online && presence.expiresAt !== undefined);
 
   useEffect(() => {
-    setPresenceNow(Date.now());
     if (!hasPresenceCountdown) return;
+    const initialTick = window.setTimeout(() => setPresenceNow(Date.now()), 0);
     const interval = window.setInterval(() => setPresenceNow(Date.now()), 1000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(initialTick);
+      window.clearInterval(interval);
+    };
   }, [hasPresenceCountdown]);
 
   useEffect(() => {
