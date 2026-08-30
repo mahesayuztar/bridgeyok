@@ -70,6 +70,11 @@ func (handler tableHTTPHandler) joinTable(writer http.ResponseWriter, request *h
 		handler.identity.writeError(writer, request, http.StatusNotFound, "TABLE_UNAVAILABLE", "table.error.unavailable", false)
 		return
 	}
+	var domainError *table.DomainError
+	if errors.As(err, &domainError) && (domainError.Code == table.ErrorTableFull || domainError.Code == table.ErrorTableLocked) {
+		handler.identity.writeError(writer, request, http.StatusConflict, string(domainError.Code), tableMessageKey(domainError.Code), domainError.Code == table.ErrorTableLocked)
+		return
+	}
 	if err != nil {
 		handler.writeInternalError(writer, request, "table_join_failed", err)
 		return
@@ -205,6 +210,10 @@ func tableView(projection table.Projection) (apigen.TableView, error) {
 
 func tableMessageKey(code table.ErrorCode) string {
 	switch code {
+	case table.ErrorTableFull:
+		return "table.error.full"
+	case table.ErrorTableLocked:
+		return "table.error.locked"
 	case table.ErrorOwnerCannotLeave:
 		return "table.error.owner_cannot_leave"
 	case table.ErrorInvalidState:

@@ -90,7 +90,7 @@ func TestTableRepositoryLifecycleAndJoinCapacity(t *testing.T) {
 
 	joined := make([]identity.Session, 0, 3)
 	successCount := 0
-	unavailableCount := 0
+	fullCount := 0
 	for result := range results {
 		if result.err == nil {
 			successCount++
@@ -105,14 +105,15 @@ func TestTableRepositoryLifecycleAndJoinCapacity(t *testing.T) {
 			}
 			continue
 		}
-		if errors.Is(result.err, table.ErrTableUnavailable) {
-			unavailableCount++
+		var domainError *table.DomainError
+		if errors.As(result.err, &domainError) && domainError.Code == table.ErrorTableFull {
+			fullCount++
 			continue
 		}
 		t.Fatalf("Join() unexpected error = %v", result.err)
 	}
-	if successCount != 3 || unavailableCount != 1 || len(joined) != 3 {
-		t.Fatalf("join results: success=%d unavailable=%d identified=%d", successCount, unavailableCount, len(joined))
+	if successCount != 3 || fullCount != 1 || len(joined) != 3 {
+		t.Fatalf("join results: success=%d full=%d identified=%d", successCount, fullCount, len(joined))
 	}
 
 	if err := tableService.Leave(ctx, created.Projection.TableID, joined[0]); err != nil {

@@ -32,6 +32,7 @@ type ProjectedGame struct {
 	Board           bridge.BoardMetadata `json:"board"`
 	Phase           bridge.Phase         `json:"phase"`
 	Auction         bridge.Auction       `json:"auction"`
+	LegalCalls      []bridge.Call        `json:"legalCalls,omitempty"`
 	Turn            bridge.Seat          `json:"turn,omitempty"`
 	DummyRevealed   bool                 `json:"dummyRevealed"`
 	CurrentTrick    bridge.Trick         `json:"currentTrick"`
@@ -91,6 +92,9 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 		TricksEW:        game.TricksEW,
 		Result:          projectResult(game.Result),
 		OwnHand:         bridge.Hand{},
+	}
+	if game.Phase == bridge.PhaseAuction {
+		projectedGame.LegalCalls = append([]bridge.Call(nil), game.Auction.LegalCalls()...)
 	}
 	for _index, trick := range game.CompletedTricks {
 		projectedGame.CompletedTricks[_index] = projectTrick(trick)

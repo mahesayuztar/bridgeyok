@@ -47,6 +47,9 @@ func TestProjectHidesOpponentHands(t *testing.T) {
 		if projection.Game == nil {
 			t.Fatal("active projection omitted game")
 		}
+		if len(projection.Game.LegalCalls) == 0 {
+			t.Fatal("auction projection omitted engine-authoritative legal calls")
+		}
 		wantHand := aggregate.Game.Deal.Hand(projection.ViewerSeat)
 		if !reflect.DeepEqual(projection.Game.OwnHand, wantHand) {
 			t.Fatalf("own hand = %+v, want %+v", projection.Game.OwnHand, wantHand)
@@ -124,6 +127,7 @@ func TestProjectReturnsDefensiveCopies(t *testing.T) {
 	}
 	projection.Game.OwnHand[0] = bridge.Card{}
 	projection.Game.Auction.Calls[0].Call = bridge.Pass()
+	projection.Game.LegalCalls[0] = bridge.Double()
 	if !reflect.DeepEqual(aggregate, before) {
 		t.Fatal("mutating projection changed authoritative aggregate")
 	}

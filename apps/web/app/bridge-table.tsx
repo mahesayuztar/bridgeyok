@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import IssueNotice from "./issue-notice";
 import { playableHand, type Call, type Card, type LiveTableProjection, type Seat, type Suit } from "./table-state";
 import { useTableSession } from "./use-table-session";
 
@@ -209,7 +210,7 @@ export default function BridgeTable({ initialInviteCode = "", expectedTableId }:
           <input id="nickname" name="nickname" autoComplete="nickname" maxLength={128} required value={identityName} onChange={(event) => setIdentityName(event.target.value)} />
           <button className="primary-button" type="submit" disabled={session.busy}>Masuk sebagai tamu</button>
         </form>
-        {session.tableState.message === null ? null : <p className="form-message" role="alert">{session.tableState.message}</p>}
+        {session.tableState.issue === null ? null : <IssueNotice issue={session.tableState.issue} onDismiss={session.dismissIssue} />}
       </section>
     );
   }
@@ -239,7 +240,7 @@ export default function BridgeTable({ initialInviteCode = "", expectedTableId }:
             <button className="secondary-button" type="submit" disabled={session.busy}>Masuk</button>
           </form>
         </div>
-        {session.tableState.message === null ? null : <p className="form-message" role="alert">{session.tableState.message}</p>}
+        {session.tableState.issue === null ? null : <IssueNotice issue={session.tableState.issue} onDismiss={session.dismissIssue} />}
       </section>
     );
   }
@@ -266,7 +267,7 @@ export default function BridgeTable({ initialInviteCode = "", expectedTableId }:
         </div>
       </header>
 
-      {session.tableState.message === null ? null : <p className="table-message" role="alert">{session.tableState.message}</p>}
+      {session.tableState.issue === null ? null : <IssueNotice compact issue={session.tableState.issue} onDismiss={session.dismissIssue} />}
 
       <div className="table-layout">
         <aside className="table-sidebar">

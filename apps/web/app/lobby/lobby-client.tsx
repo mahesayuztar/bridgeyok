@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import IssueNotice from "../issue-notice";
 import { useTableSession } from "../use-table-session";
 
 export default function LobbyClient({ initialInviteCode = "" }: { initialInviteCode?: string }) {
@@ -82,7 +83,23 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
               <button className="secondary-button" type="submit" disabled={session.busy}>Masuk</button>
             </form>
           </div>
-          {session.tableState.message === null ? null : <p className="form-message" role="alert">{session.tableState.message}</p>}
+          {session.tableState.issue === null ? null : (
+            <IssueNotice
+              issue={session.tableState.issue}
+              onDismiss={session.dismissIssue}
+              onAction={(action) => {
+                if (action === "editInvite") {
+                  document.querySelector<HTMLInputElement>("#invite-code")?.focus();
+                } else if (action === "backToLobby") {
+                  session.dismissIssue();
+                } else if (action === "signInAgain") {
+                  void logout();
+                } else if (action === "retry" && joinCode.length > 0) {
+                  void session.joinTable(joinCode).then((tableId) => tableId === null ? undefined : router.push(`/table/${tableId}`));
+                }
+              }}
+            />
+          )}
         </section>
       </main>
     </div>

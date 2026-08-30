@@ -3,6 +3,7 @@
 import type { components } from "@bridgeyok/contracts/openapi";
 import type { MutationCommandEnvelope } from "@bridgeyok/contracts/realtime";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { issueFromFailure, issueFromServer, type ClientIssue } from "./client-issue";
 import {
   createEmptyTableState,
   reduceTableState,
@@ -26,36 +27,14 @@ const IDENTITY_KEY = "bridgeyok.identity.v1";
 const ACCESS_KEY = "bridgeyok.access.v1";
 const TABLE_KEY = "bridgeyok.table.v1";
 
-const ERROR_MESSAGES: Record<string, string> = {
-  access_revoked: "Akses ke meja ini sudah dicabut.",
-  already_seated: "Kamu sudah duduk di kursi lain.",
-  card_not_held: "Kartu itu tidak ada di tangan yang sedang dimainkan.",
-  duplicate_request_mismatch: "Permintaan lama tidak cocok. Muat ulang keadaan meja.",
-  declarer_controls_dummy: "Kartu dummy dimainkan oleh declarer.",
-  forbidden: "Aksi ini tidak diizinkan untuk peranmu.",
-  illegal_call: "Call itu belum legal pada urutan lelang ini.",
-  invalid_command: "Perintah tidak cocok dengan keadaan meja saat ini.",
-  must_follow_suit: "Kamu masih memiliki kartu dengan suit yang dipimpin.",
-  not_your_turn: "Belum giliranmu.",
-  owner_cannot_leave: "Pemilik perlu mengakhiri meja, bukan meninggalkannya.",
-  owner_required: "Hanya pemilik yang dapat melakukan aksi ini.",
-  seat_required: "Pilih kursi terlebih dahulu.",
-  seat_taken: "Kursi itu baru saja ditempati pemain lain.",
-  stale_controller: "Kendali kursi berpindah perangkat. Ambil alih kursi untuk melanjutkan.",
-  state_changed: "Meja berubah lebih dulu. Keadaan terbaru sedang dimuat.",
-  revision_conflict: "Meja berubah lebih dulu. Keadaan terbaru sedang dimuat.",
-  table_full: "Meja sudah penuh.",
-  table_locked: "Meja sedang dikunci pemilik.",
-  table_not_ready: "Empat kursi harus terisi dan siap sebelum board dimulai.",
-  validation_failed: "Periksa kembali isian atau pilihanmu."
-};
-
 class ApiError extends Error {
   code: string | undefined;
+  issue: ClientIssue;
 
-  constructor(message: string, code?: string) {
-    super(message);
+  constructor(issue: ClientIssue, code?: string) {
+    super(issue.title);
     this.code = code;
+    this.issue = issue;
   }
 }
 
@@ -83,23 +62,29 @@ function persistCredentials(credentials: GuestCredentials) {
   sessionStorage.setItem(ACCESS_KEY, JSON.stringify(access));
 }
 
-function friendlyError(code: string | undefined, fallback: string) {
-  return code === undefined ? fallback : (ERROR_MESSAGES[code.toLowerCase()] ?? fallback);
-}
-
-async function readProblem(response: Response, fallback: string): Promise<ApiError> {
+async function readProblem(response: Response): Promise<ApiError> {
   try {
     const problem = (await response.json()) as Problem;
-    return new ApiError(friendlyError(problem.code, problem.title || fallback), problem.code);
+    return new ApiError(issueFromServer({
+      status: response.status,
+      source: "rest",
+      ...(problem.code === undefined ? {} : { code: problem.code }),
+      ...(problem.retryable === undefined ? {} : { retryable: problem.retryable })
+    }), problem.code);
   } catch {
-    return new ApiError(fallback);
+    return new ApiError(issueFromServer({ status: response.status, source: "rest" }));
   }
 }
 
 async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(new URL(path, API_BASE_URL), init);
+  let response: Response;
+  try {
+    response = await fetch(new URL(path, API_BASE_URL), { ...init, signal: init.signal ?? AbortSignal.timeout(8000) });
+  } catch (error) {
+    throw new ApiError(issueFromFailure(error, "rest"));
+  }
   if (!response.ok) {
-    throw await readProblem(response, "Layanan belum dapat memproses permintaan.");
+    throw await readProblem(response);
   }
   return (await response.json()) as T;
 }
@@ -128,6 +113,10 @@ function socketUrl(ticket: string) {
   return url;
 }
 
+function issueForError(error: unknown): ClientIssue {
+  return error instanceof ApiError ? error.issue : issueFromFailure(error, "rest");
+}
+
 export type TableSession = {
   initializing: boolean;
   busy: boolean;
@@ -142,6 +131,8 @@ export type TableSession = {
   openTable: (tableId: string) => Promise<boolean>;
   leaveTable: () => Promise<void>;
   reconnect: () => void;
+  resync: () => void;
+  dismissIssue: () => void;
   sendCommand: (name: CommandName, payload?: Record<string, unknown>) => void;
 };
 
@@ -158,6 +149,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionGenerationRef = useRef(0);
   const refreshPromiseRef = useRef<Promise<GuestCredentials> | null>(null);
+  const beginConnectionRef = useRef<((tableId: string) => void) | null>(null);
 
   useEffect(() => {
     tableStateRef.current = tableState;
@@ -169,7 +161,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     }
     const storedIdentity = identity ?? readStoredValue<StoredIdentity>(localStorage, IDENTITY_KEY);
     if (storedIdentity === null) {
-      throw new ApiError("Sesi tamu tidak ditemukan.");
+      throw new ApiError(issueFromServer({ code: "SESSION_INVALID", source: "rest" }), "SESSION_INVALID");
     }
     const promise = requestJson<GuestCredentials>("/v1/guest-sessions/refresh", {
       method: "POST",
@@ -199,20 +191,31 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
   const authenticatedRequest = useCallback(
     async <T,>(path: string, init: RequestInit = {}): Promise<T> => {
       let accessToken = await ensureAccessToken();
-      let response = await fetch(new URL(path, API_BASE_URL), {
-        ...init,
-        headers: { ...init.headers, Authorization: `Bearer ${accessToken}` }
-      });
+      let response: Response;
+      try {
+        response = await fetch(new URL(path, API_BASE_URL), {
+          ...init,
+          headers: { ...init.headers, Authorization: `Bearer ${accessToken}` },
+          signal: init.signal ?? AbortSignal.timeout(8000)
+        });
+      } catch (error) {
+        throw new ApiError(issueFromFailure(error, "rest"));
+      }
       if (response.status === 401) {
         credentialsRef.current = null;
         accessToken = (await refreshCredentials()).accessToken;
-        response = await fetch(new URL(path, API_BASE_URL), {
-          ...init,
-          headers: { ...init.headers, Authorization: `Bearer ${accessToken}` }
-        });
+        try {
+          response = await fetch(new URL(path, API_BASE_URL), {
+            ...init,
+            headers: { ...init.headers, Authorization: `Bearer ${accessToken}` },
+            signal: init.signal ?? AbortSignal.timeout(8000)
+          });
+        } catch (error) {
+          throw new ApiError(issueFromFailure(error, "rest"));
+        }
       }
       if (!response.ok) {
-        throw await readProblem(response, "Permintaan ke meja gagal.");
+        throw await readProblem(response);
       }
       if (response.status === 204) {
         return undefined as T;
@@ -239,6 +242,23 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     setConnectionState("idle");
     dispatch({ type: "clear" });
   }, [stopConnection]);
+
+  const requestResync = useCallback((tableId: string) => {
+    const socket = socketRef.current;
+    if (socket === null || socket.readyState !== WebSocket.OPEN) {
+      beginConnectionRef.current?.(tableId);
+      return;
+    }
+    setConnectionState("syncing");
+    socket.send(JSON.stringify({
+      v: 1,
+      kind: "command",
+      name: "table.resume",
+      request_id: `req_${crypto.randomUUID().replaceAll("-", "")}`,
+      table_id: tableId,
+      payload: { last_seen_seq: tableStateRef.current.lastSeenSeq }
+    }));
+  }, []);
 
   const openConnection = useCallback(
     async function connect(tableId: string, generation: number, attempt: number): Promise<void> {
@@ -294,16 +314,30 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           } else if (envelope.kind === "event") {
             const payload = envelope.payload as Record<string, unknown> | undefined;
             if (payload !== undefined && isLiveTableProjection(payload.table)) {
-              dispatch({ type: "event", tableId, seq: Number(envelope.seq), table: payload.table });
+              const eventType = typeof payload.eventType === "string" ? payload.eventType : undefined;
+              dispatch({
+                type: "event",
+                tableId,
+                seq: Number(envelope.seq),
+                table: payload.table,
+                ...(eventType === undefined ? {} : { eventType })
+              });
               setConnectionState("connected");
             }
           } else if (envelope.kind === "error") {
             const code = typeof envelope.code === "string" ? envelope.code : undefined;
-            const messageText = friendlyError(code, "Aksi ditolak oleh meja.");
-            if (typeof envelope.request_id === "string") {
-              dispatch({ type: "settled", requestId: envelope.request_id, message: messageText });
+            const issue = issueFromServer({
+              retryable: envelope.retryable === true,
+              source: "websocket",
+              ...(code === undefined ? {} : { code })
+            });
+            if (code === "STALE_CONTROLLER" || code === "STATE_CHANGED" || code === "REVISION_CONFLICT") {
+              dispatch({ type: "conflict", issue });
+              requestResync(tableId);
+            } else if (typeof envelope.request_id === "string") {
+              dispatch({ type: "settled", requestId: envelope.request_id, issue });
             } else {
-              dispatch({ type: "message", message: messageText });
+              dispatch({ type: "issue", issue });
             }
           } else if (envelope.kind === "control" && envelope.name === "table.access_revoked") {
             clearTable();
@@ -318,7 +352,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           }
           socketRef.current = null;
           setConnectionState(navigator.onLine ? "degraded" : "offline");
-          dispatch({ type: "connectionLost", message: "Koneksi terputus. Perintah yang belum dijawab tidak dikirim ulang." });
+          dispatch({ type: "connectionLost", issue: issueFromFailure(new TypeError("socket closed"), "websocket") });
           const delay = Math.min(10_000, 500 * 2 ** attempt) + Math.floor(Math.random() * 300);
           reconnectTimerRef.current = setTimeout(() => void connect(tableId, generation, attempt + 1), delay);
         };
@@ -327,12 +361,12 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           return;
         }
         setConnectionState(navigator.onLine ? "degraded" : "offline");
-        dispatch({ type: "connectionLost", message: error instanceof Error ? error.message : "Koneksi meja gagal." });
+        dispatch({ type: "connectionLost", issue: issueForError(error) });
         const delay = Math.min(10_000, 500 * 2 ** attempt) + Math.floor(Math.random() * 300);
         reconnectTimerRef.current = setTimeout(() => void connect(tableId, generation, attempt + 1), delay);
       }
     },
-    [authenticatedRequest, clearTable]
+    [authenticatedRequest, clearTable, requestResync]
   );
 
   const beginConnection = useCallback(
@@ -343,6 +377,13 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     },
     [openConnection, stopConnection]
   );
+
+  useEffect(() => {
+    beginConnectionRef.current = beginConnection;
+    return () => {
+      beginConnectionRef.current = null;
+    };
+  }, [beginConnection]);
 
   useEffect(() => {
     let active = true;
@@ -372,12 +413,12 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           }
         }
       } catch (error) {
-        if (error instanceof ApiError && error.code === "session_invalid") {
+        if (error instanceof ApiError && (error.code === "SESSION_INVALID" || error.code === "SESSION_INACTIVE")) {
           localStorage.removeItem(IDENTITY_KEY);
           sessionStorage.removeItem(ACCESS_KEY);
           setNickname(null);
         } else {
-          dispatch({ type: "message", message: error instanceof Error ? error.message : "Sesi gagal dipulihkan." });
+          dispatch({ type: "issue", issue: issueForError(error) });
         }
       } finally {
         if (active) {
@@ -422,10 +463,10 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       credentialsRef.current = credentials;
       persistCredentials(credentials);
       setNickname(credentials.nickname);
-      dispatch({ type: "message", message: null });
+      dispatch({ type: "issue", issue: null });
       return true;
     } catch (error) {
-      dispatch({ type: "message", message: error instanceof Error ? error.message : "Nama tamu gagal dibuat." });
+      dispatch({ type: "issue", issue: issueForError(error) });
       return false;
     } finally {
       setBusy(false);
@@ -454,7 +495,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     try {
       const created = await authenticatedRequest<CreateTableResponse>("/v1/tables", { method: "POST" });
       if (!isLiveTableProjection(created.table)) {
-        throw new ApiError("Data meja tidak dikenali.");
+        throw new ApiError(issueFromServer({ source: "rest" }));
       }
       clearTable();
       localStorage.setItem(TABLE_KEY, JSON.stringify({ tableId: created.table.tableId, inviteCode: created.inviteCode }));
@@ -463,7 +504,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       beginConnection(created.table.tableId);
       return created.table.tableId;
     } catch (error) {
-      dispatch({ type: "message", message: error instanceof Error ? error.message : "Meja gagal dibuat." });
+      dispatch({ type: "issue", issue: issueForError(error) });
       return null;
     } finally {
       setBusy(false);
@@ -473,11 +514,25 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
   const joinTable = useCallback(
     async (rawInviteCode: string) => {
       const normalizedInviteCode = rawInviteCode.trim().toUpperCase();
+      if (!/^[A-Z2-7]{26}$/.test(normalizedInviteCode)) {
+        dispatch({
+          type: "issue",
+          issue: {
+            kind: "validation",
+            title: "Kode undangan tidak valid",
+            detail: "Masukkan 26 karakter yang terdapat pada tautan undangan.",
+            retryable: false,
+            action: "editInvite",
+            source: "browser"
+          }
+        });
+        return null;
+      }
       setBusy(true);
       try {
         const table = await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(normalizedInviteCode)}/join`, { method: "POST" });
         if (!isLiveTableProjection(table)) {
-          throw new ApiError("Data meja tidak dikenali.");
+          throw new ApiError(issueFromServer({ source: "rest" }));
         }
         clearTable();
         localStorage.setItem(TABLE_KEY, JSON.stringify({ tableId: table.tableId, inviteCode: normalizedInviteCode }));
@@ -486,7 +541,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
         beginConnection(table.tableId);
         return table.tableId;
       } catch (error) {
-        dispatch({ type: "message", message: error instanceof Error ? error.message : "Meja tidak dapat dimasuki." });
+        dispatch({ type: "issue", issue: issueForError(error) });
         return null;
       } finally {
         setBusy(false);
@@ -503,7 +558,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     try {
       const table = await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(tableId)}`);
       if (!isLiveTableProjection(table)) {
-        throw new ApiError("Data meja tidak dikenali.");
+        throw new ApiError(issueFromServer({ source: "rest" }));
       }
       clearTable();
       localStorage.setItem(TABLE_KEY, JSON.stringify({ tableId }));
@@ -511,7 +566,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       beginConnection(table.tableId);
       return true;
     } catch (error) {
-      dispatch({ type: "message", message: error instanceof Error ? error.message : "Meja tidak dapat dibuka." });
+      dispatch({ type: "issue", issue: issueForError(error) });
       return false;
     } finally {
       setBusy(false);
@@ -528,13 +583,13 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       if (table.state === "FINISHED") {
         clearTable();
       } else if (table.state === "WAITING") {
-        await authenticatedRequest<void>(`/v1/tables/${encodeURIComponent(table.tableId)}`, { method: "DELETE" });
+        await authenticatedRequest<void>(`/v1/tables/${encodeURIComponent(table.tableId)}/leave`, { method: "POST" });
         clearTable();
       } else {
-        dispatch({ type: "message", message: "Akhiri permainan dari kontrol meja sebelum meninggalkannya." });
+        dispatch({ type: "issue", issue: issueFromServer({ source: "rest" }) });
       }
     } catch (error) {
-      dispatch({ type: "message", message: error instanceof Error ? error.message : "Belum dapat meninggalkan meja." });
+      dispatch({ type: "issue", issue: issueForError(error) });
     } finally {
       setBusy(false);
     }
@@ -547,11 +602,37 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     }
   }, [beginConnection]);
 
+  const resync = useCallback(() => {
+    const tableId = tableStateRef.current.activeTableId;
+    if (tableId !== null) {
+      requestResync(tableId);
+    }
+  }, [requestResync]);
+
+  const dismissIssue = useCallback(() => {
+    dispatch({ type: "issue", issue: null });
+  }, []);
+
   const sendCommand = useCallback((name: CommandName, payload: Record<string, unknown> = {}) => {
     const socket = socketRef.current;
     const table = tableStateRef.current.table;
     if (socket === null || socket.readyState !== WebSocket.OPEN || table === null) {
-      dispatch({ type: "message", message: "Tunggu hingga koneksi meja pulih sebelum mencoba lagi." });
+      dispatch({ type: "issue", issue: issueFromFailure(new TypeError("socket unavailable"), "websocket") });
+      return;
+    }
+    const controllerState = tableStateRef.current.controllerState;
+    if ((name === "table.takeover" && controllerState !== "readyToTakeover") || (name !== "table.takeover" && controllerState !== "current")) {
+      dispatch({
+        type: "issue",
+        issue: {
+          kind: "conflict",
+          title: "Meja masih diselaraskan",
+          detail: "Tunggu keadaan terbaru sebelum mengirim aksi berikutnya.",
+          retryable: true,
+          action: controllerState === "readyToTakeover" ? "takeover" : "resync",
+          source: "websocket"
+        }
+      });
       return;
     }
     const requestId = `req_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -569,8 +650,8 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     dispatch({ type: "pending", requestId, commandName: name });
     try {
       socket.send(JSON.stringify(command));
-    } catch {
-      dispatch({ type: "settled", requestId, message: "Perintah tidak terkirim. Silakan coba kembali." });
+    } catch (error) {
+      dispatch({ type: "settled", requestId, issue: issueFromFailure(error, "websocket") });
     }
   }, []);
 
@@ -588,6 +669,8 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     openTable,
     leaveTable,
     reconnect,
+    resync,
+    dismissIssue,
     sendCommand
   };
 }

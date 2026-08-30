@@ -126,6 +126,8 @@ func TestTableHTTPHandlerJoinAndGet(t *testing.T) {
 	}{
 		{name: "join", method: http.MethodPost, path: "/v1/tables/" + testInviteCode + "/join", service: &tableServiceFake{}, wantStatus: http.StatusOK},
 		{name: "join unavailable", method: http.MethodPost, path: "/v1/tables/" + testInviteCode + "/join", service: &tableServiceFake{joinError: table.ErrTableUnavailable}, wantStatus: http.StatusNotFound, wantCode: "TABLE_UNAVAILABLE"},
+		{name: "join full", method: http.MethodPost, path: "/v1/tables/" + testInviteCode + "/join", service: &tableServiceFake{joinError: &table.DomainError{Code: table.ErrorTableFull, Message: "full"}}, wantStatus: http.StatusConflict, wantCode: "TABLE_FULL"},
+		{name: "join locked", method: http.MethodPost, path: "/v1/tables/" + testInviteCode + "/join", service: &tableServiceFake{joinError: &table.DomainError{Code: table.ErrorTableLocked, Message: "locked"}}, wantStatus: http.StatusConflict, wantCode: "TABLE_LOCKED"},
 		{name: "get", method: http.MethodGet, path: "/v1/tables/" + testTableID, service: &tableServiceFake{}, wantStatus: http.StatusOK},
 		{name: "get missing", method: http.MethodGet, path: "/v1/tables/" + testTableID, service: &tableServiceFake{getError: table.ErrTableNotFound}, wantStatus: http.StatusNotFound, wantCode: "TABLE_NOT_FOUND"},
 	}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import IssueNotice from "./issue-notice";
 import { useTableSession } from "./use-table-session";
 
 export default function GuestEntry({ initialInviteCode = "" }: { initialInviteCode?: string }) {
@@ -39,7 +40,7 @@ export default function GuestEntry({ initialInviteCode = "" }: { initialInviteCo
         <input id="nickname" name="nickname" autoComplete="nickname" maxLength={128} required value={nickname} onChange={(event) => setNickname(event.target.value)} />
         <button className="primary-button" type="submit" disabled={session.busy || session.initializing}>Masuk sebagai tamu</button>
       </form>
-      {session.tableState.message === null ? null : <p className="form-message" role="alert">{session.tableState.message}</p>}
+      {session.tableState.issue === null ? null : <IssueNotice issue={session.tableState.issue} onDismiss={session.dismissIssue} />}
     </section>
   );
 }

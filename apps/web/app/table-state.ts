@@ -1,4 +1,5 @@
 import type { MutationCommandEnvelope, TableProjection } from "@bridgeyok/contracts/realtime";
+import type { ClientIssue } from "./client-issue";
 
 export type Seat = "N" | "E" | "S" | "W";
 export type Suit = "C" | "D" | "H" | "S";
@@ -60,6 +61,7 @@ export type GameProjection = {
     passedOut: boolean;
     contract?: Contract;
   };
+  legalCalls?: Call[];
   turn?: Seat;
   dummyRevealed: boolean;
   currentTrick: Trick;
@@ -81,22 +83,30 @@ export type LiveTableProjection = Omit<TableProjection, "game"> & {
   game?: GameProjection;
 };
 
+export type VisualPosition = "top" | "right" | "bottom" | "left";
+export type TableOrientation = Record<VisualPosition, Seat>;
+export type AuctionRow = Partial<Record<Seat, CallRecord>>;
+
 export type TableClientState = {
   activeTableId: string | null;
   table: LiveTableProjection | null;
   lastSeenSeq: number;
   pending: Record<string, CommandName>;
-  message: string | null;
+  issue: ClientIssue | null;
+  notice: string | null;
+  controllerState: "current" | "resyncing" | "readyToTakeover" | "takeoverPending";
 };
 
 export type TableAction =
   | { type: "enter"; table: LiveTableProjection }
   | { type: "snapshot"; tableId: string; seq: number; table: LiveTableProjection }
-  | { type: "event"; tableId: string; seq: number; table: LiveTableProjection }
+  | { type: "event"; tableId: string; seq: number; table: LiveTableProjection; eventType?: string }
   | { type: "pending"; requestId: string; commandName: CommandName }
-  | { type: "settled"; requestId: string; message?: string }
-  | { type: "connectionLost"; message: string }
-  | { type: "message"; message: string | null }
+  | { type: "settled"; requestId: string; issue?: ClientIssue }
+  | { type: "conflict"; issue: ClientIssue }
+  | { type: "connectionLost"; issue: ClientIssue }
+  | { type: "issue"; issue: ClientIssue | null }
+  | { type: "dismissNotice" }
   | { type: "clear" };
 
 export function createEmptyTableState(): TableClientState {
@@ -105,7 +115,9 @@ export function createEmptyTableState(): TableClientState {
     table: null,
     lastSeenSeq: 0,
     pending: {},
-    message: null
+    issue: null,
+    notice: null,
+    controllerState: "current"
   };
 }
 
@@ -117,7 +129,9 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         table: action.table,
         lastSeenSeq: action.table.lastSeq,
         pending: {},
-        message: null
+        issue: null,
+        notice: null,
+        controllerState: "current"
       };
     case "snapshot":
       if (state.activeTableId !== action.tableId || action.table.tableId !== action.tableId || action.seq < state.lastSeenSeq) {
@@ -128,7 +142,15 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         table: action.table,
         lastSeenSeq: Math.max(action.seq, action.table.lastSeq),
         pending: {},
-        message: null
+        issue: state.controllerState === "resyncing" ? {
+          kind: "conflict",
+          title: "Meja sudah selaras",
+          detail: "Keadaan terbaru sudah diterima. Ambil alih bila kamu ingin mengendalikan kursi dari perangkat ini.",
+          retryable: true,
+          action: "takeover",
+          source: "websocket"
+        } : null,
+        controllerState: state.controllerState === "resyncing" && action.table.viewerSeat !== undefined ? "readyToTakeover" : "current"
       };
     case "event":
       if (state.activeTableId !== action.tableId || action.table.tableId !== action.tableId || action.seq <= state.lastSeenSeq) {
@@ -139,19 +161,46 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         table: action.table,
         lastSeenSeq: Math.max(action.seq, action.table.lastSeq),
         pending: {},
-        message: null
+        issue: action.eventType === "CONTROLLER_REPLACED" && state.controllerState === "takeoverPending" ? null : state.issue,
+        notice: action.eventType === "CONTROLLER_REPLACED" && state.controllerState === "takeoverPending" ? "Kendali sudah berpindah ke perangkat ini." : state.notice,
+        controllerState: action.eventType === "CONTROLLER_REPLACED" && state.controllerState === "takeoverPending"
+          ? "current"
+          : state.controllerState === "resyncing" && action.table.viewerSeat !== undefined
+            ? "readyToTakeover"
+            : state.controllerState
       };
     case "pending":
-      return { ...state, pending: { ...state.pending, [action.requestId]: action.commandName }, message: null };
+      return {
+        ...state,
+        pending: { ...state.pending, [action.requestId]: action.commandName },
+        issue: null,
+        notice: null,
+        controllerState: action.commandName === "table.takeover" ? "takeoverPending" : state.controllerState
+      };
     case "settled": {
       const pending = { ...state.pending };
+      const commandName = pending[action.requestId];
       delete pending[action.requestId];
-      return { ...state, pending, message: action.message ?? null };
+      return {
+        ...state,
+        pending,
+        issue: action.issue ?? null,
+        controllerState: commandName === "table.takeover" && action.issue !== undefined ? "readyToTakeover" : state.controllerState
+      };
     }
+    case "conflict":
+      return { ...state, pending: {}, issue: action.issue, notice: null, controllerState: "resyncing" };
     case "connectionLost":
-      return { ...state, pending: {}, message: action.message };
-    case "message":
-      return { ...state, message: action.message };
+      return {
+        ...state,
+        pending: {},
+        issue: action.issue,
+        controllerState: state.controllerState === "takeoverPending" ? "resyncing" : state.controllerState
+      };
+    case "issue":
+      return { ...state, issue: action.issue };
+    case "dismissNotice":
+      return { ...state, notice: null };
     case "clear":
       return createEmptyTableState();
   }
@@ -174,7 +223,7 @@ export function playableHand(table: LiveTableProjection): { hand: Card[]; source
   if (hand === undefined) {
     return null;
   }
-  const ledSuit = game.currentTrick.plays[0]?.card.suit;
+  const ledSuit = game?.currentTrick?.plays?.[0]?.card.suit;
   if (ledSuit === undefined || !hand.some((card) => card.suit === ledSuit)) {
     return { hand, source };
   }
@@ -192,4 +241,43 @@ export function oppositeSeat(seat: Seat): Seat {
     case "W":
       return "E";
   }
+}
+
+export function tableOrientation(viewerSeat: Seat = "S"): TableOrientation {
+  const clockwiseSeats: Seat[] = ["N", "E", "S", "W"];
+  const viewerIndex = clockwiseSeats.indexOf(viewerSeat);
+  return {
+    top: clockwiseSeats[(viewerIndex + 2) % 4]!,
+    right: clockwiseSeats[(viewerIndex + 3) % 4]!,
+    bottom: viewerSeat,
+    left: clockwiseSeats[(viewerIndex + 1) % 4]!
+  };
+}
+
+export function visualPositionForSeat(orientation: TableOrientation, seat: Seat): VisualPosition {
+  const entry = Object.entries(orientation).find(([, actualSeat]) => actualSeat === seat);
+  return (entry?.[0] as VisualPosition | undefined) ?? "bottom";
+}
+
+export function auctionRows(dealer: Seat, calls: CallRecord[]): AuctionRow[] {
+  const columns: Seat[] = ["W", "N", "E", "S"];
+  const dealerIndex = columns.indexOf(dealer);
+  const rowCount = Math.max(1, Math.ceil((dealerIndex + calls.length) / columns.length));
+  const rows = Array.from({ length: rowCount }, () => ({} as AuctionRow));
+  calls.forEach((record, _index) => {
+    const slot = dealerIndex + _index;
+    rows[Math.floor(slot / columns.length)]![columns[slot % columns.length]!] = record;
+  });
+  return rows;
+}
+
+export function boardResultLabel(result: BoardResult): string {
+  if (result.passedOut || result.contract === undefined) {
+    return "Passed out";
+  }
+  const difference = result.tricksDeclarer - (6 + result.contract.level);
+  if (difference === 0) {
+    return "Tepat kontrak";
+  }
+  return difference > 0 ? `+${difference}` : String(difference);
 }

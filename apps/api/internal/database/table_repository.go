@@ -107,7 +107,7 @@ func (postgres *Postgres) JoinTable(ctx context.Context, inviteCodeHash []byte, 
 		}
 		decision, domainError := table.Decide(aggregate, table.Command{Name: table.CommandJoinTable, Participant: &participant})
 		if domainError != nil {
-			return table.ErrTableUnavailable
+			return domainError
 		}
 		if err := queries.CreateTableParticipant(ctx, dbgen.CreateTableParticipantParams{
 			ID:        participant.ID,
