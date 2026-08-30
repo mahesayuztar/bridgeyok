@@ -9,8 +9,8 @@ import (
 )
 
 type BridgeyokAbuseReport struct {
-	ID                pgtype.UUID        `json:"id"`
-	ReporterSessionID pgtype.UUID        `json:"reporter_session_id"`
+	ID                string             `json:"id"`
+	ReporterSessionID string             `json:"reporter_session_id"`
 	TableID           pgtype.UUID        `json:"table_id"`
 	Category          string             `json:"category"`
 	Context           string             `json:"context"`
@@ -29,8 +29,8 @@ type BridgeyokAuditLog struct {
 }
 
 type BridgeyokBoard struct {
-	ID             pgtype.UUID        `json:"id"`
-	TableID        pgtype.UUID        `json:"table_id"`
+	ID             string             `json:"id"`
+	TableID        string             `json:"table_id"`
 	BoardNumber    int32              `json:"board_number"`
 	Dealer         string             `json:"dealer"`
 	Vulnerability  string             `json:"vulnerability"`
@@ -43,7 +43,7 @@ type BridgeyokBoard struct {
 }
 
 type BridgeyokGameEvent struct {
-	TableID    pgtype.UUID        `json:"table_id"`
+	TableID    string             `json:"table_id"`
 	Seq        int64              `json:"seq"`
 	Revision   int64              `json:"revision"`
 	EventType  string             `json:"event_type"`
@@ -52,7 +52,7 @@ type BridgeyokGameEvent struct {
 }
 
 type BridgeyokGameSnapshot struct {
-	TableID       pgtype.UUID        `json:"table_id"`
+	TableID       string             `json:"table_id"`
 	BoardID       pgtype.UUID        `json:"board_id"`
 	SchemaVersion int32              `json:"schema_version"`
 	Revision      int64              `json:"revision"`
@@ -62,7 +62,7 @@ type BridgeyokGameSnapshot struct {
 }
 
 type BridgeyokGuestSession struct {
-	ID             pgtype.UUID        `json:"id"`
+	ID             string             `json:"id"`
 	CredentialHash []byte             `json:"credential_hash"`
 	Nickname       string             `json:"nickname"`
 	Status         string             `json:"status"`
@@ -72,8 +72,8 @@ type BridgeyokGuestSession struct {
 }
 
 type BridgeyokProcessedCommand struct {
-	TableID     pgtype.UUID        `json:"table_id"`
-	SessionID   pgtype.UUID        `json:"session_id"`
+	TableID     string             `json:"table_id"`
+	SessionID   string             `json:"session_id"`
 	RequestID   string             `json:"request_id"`
 	CommandName string             `json:"command_name"`
 	Outcome     []byte             `json:"outcome"`
@@ -85,15 +85,15 @@ type BridgeyokProcessedCommand struct {
 
 type BridgeyokRealtimeTicket struct {
 	TicketHash []byte             `json:"ticket_hash"`
-	SessionID  pgtype.UUID        `json:"session_id"`
+	SessionID  string             `json:"session_id"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
 	UsedAt     pgtype.Timestamptz `json:"used_at"`
 }
 
 type BridgeyokTable struct {
-	ID             pgtype.UUID        `json:"id"`
-	OwnerSessionID pgtype.UUID        `json:"owner_session_id"`
+	ID             string             `json:"id"`
+	OwnerSessionID string             `json:"owner_session_id"`
 	InviteCodeHash []byte             `json:"invite_code_hash"`
 	State          string             `json:"state"`
 	Locked         bool               `json:"locked"`
@@ -105,18 +105,18 @@ type BridgeyokTable struct {
 }
 
 type BridgeyokTableParticipant struct {
-	ID        pgtype.UUID        `json:"id"`
-	TableID   pgtype.UUID        `json:"table_id"`
-	SessionID pgtype.UUID        `json:"session_id"`
+	ID        string             `json:"id"`
+	TableID   string             `json:"table_id"`
+	SessionID string             `json:"session_id"`
 	Role      string             `json:"role"`
 	JoinedAt  pgtype.Timestamptz `json:"joined_at"`
 	LeftAt    pgtype.Timestamptz `json:"left_at"`
 }
 
 type BridgeyokTableSeat struct {
-	TableID         pgtype.UUID        `json:"table_id"`
+	TableID         string             `json:"table_id"`
 	Seat            string             `json:"seat"`
-	ParticipantID   pgtype.UUID        `json:"participant_id"`
+	ParticipantID   string             `json:"participant_id"`
 	Ready           bool               `json:"ready"`
 	ControllerEpoch int64              `json:"controller_epoch"`
 	RecoveryHash    []byte             `json:"recovery_hash"`
