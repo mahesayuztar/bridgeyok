@@ -24,7 +24,7 @@ import { useTableSession, type TableSession } from "./use-table-session";
 
 const SEATS: Seat[] = ["N", "E", "S", "W"];
 const AUCTION_SEATS: Seat[] = ["W", "N", "E", "S"];
-const STRAINS: Array<"C" | "D" | "H" | "S" | "NT"> = ["C", "D", "H", "S", "NT"];
+const STRAINS: Array<"C" | "D" | "H" | "S" | "NT"> = ["S", "H", "D", "C", "NT"];
 const SUIT_LABELS: Record<Suit, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
 const SEAT_LABELS: Record<Seat, string> = { N: "Utara", E: "Timur", S: "Selatan", W: "Barat" };
 const VULNERABILITY_LABELS = { NONE: "Tidak ada", NS: "NS", EW: "EW", BOTH: "Keduanya" };
@@ -168,7 +168,9 @@ function AuctionTable({ game }: { game: NonNullable<LiveTableProjection["game"]>
 }
 
 function BiddingBox({ legalCalls, disabled, onCall }: { legalCalls: Call[]; disabled: boolean; onCall: (call: Call) => void }) {
+  const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const legalKeys = new Set(legalCalls.map(callKey));
+  const legalLevels = new Set(legalCalls.filter((call) => call.kind === "BID").map((call) => call.level));
   const actionCalls: Array<{ label: string; call: Call; shortcut: string }> = [
     { label: "Pass", call: { kind: "PASS" }, shortcut: "P" },
     { label: "X", call: { kind: "DOUBLE" }, shortcut: "X" },
@@ -176,11 +178,12 @@ function BiddingBox({ legalCalls, disabled, onCall }: { legalCalls: Call[]; disa
   ];
   return (
     <section className="bidding-box" aria-label="Kotak lelang">
-      <div className="call-actions">{actionCalls.map(({ label, call, shortcut }) => <button type="button" key={label} disabled={disabled || !legalKeys.has(callKey(call))} onClick={() => onCall(call)}>{label}<kbd>{shortcut}</kbd></button>)}</div>
-      <div className="bid-matrix">{STRAINS.map((strain) => [1, 2, 3, 4, 5, 6, 7].map((level) => {
-        const call: Call = { kind: "BID", level, strain };
-        return <button className={strain === "H" || strain === "D" ? "red-call" : ""} type="button" key={`${level}${strain}`} disabled={disabled || !legalKeys.has(callKey(call))} onClick={() => onCall(call)}><span>{level}</span>{strain === "NT" ? "NT" : SUIT_LABELS[strain]}</button>;
-      }))}</div>
+      <div className="call-actions">{actionCalls.map(({ label, call, shortcut }) => <button type="button" key={label} disabled={disabled || !legalKeys.has(callKey(call))} onClick={() => { setSelectedLevel(null); onCall(call); }}>{label}<kbd>{shortcut}</kbd></button>)}</div>
+      <div className="bid-levels" aria-label="Pilih level bid">{[1, 2, 3, 4, 5, 6, 7].map((level) => <button type="button" key={level} aria-pressed={selectedLevel === level} disabled={disabled || !legalLevels.has(level)} onClick={() => setSelectedLevel(level)}>{level}</button>)}</div>
+      {selectedLevel === null ? <p className="bid-hint">Pilih level, lalu pilih strain.</p> : <div className="bid-strains" aria-label={`Pilih strain untuk level ${selectedLevel}`}>{STRAINS.map((strain) => {
+        const call: Call = { kind: "BID", level: selectedLevel, strain };
+        return <button className={strain === "H" || strain === "D" ? "red-call" : ""} type="button" key={strain} disabled={disabled || !legalKeys.has(callKey(call))} onClick={() => { setSelectedLevel(null); onCall(call); }}><span className="sr-only">Bid {selectedLevel} </span>{strain === "NT" ? "NT" : SUIT_LABELS[strain]}</button>;
+      })}</div>}
     </section>
   );
 }

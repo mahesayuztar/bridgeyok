@@ -235,10 +235,13 @@ h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; text-
 .call-actions { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: .35rem; margin-bottom: .45rem; }
 .call-actions button { display: flex; min-height: 2.25rem; align-items: center; justify-content: space-between; border-color: #9c9588; background: var(--card); font-weight: 700; }
 kbd { color: var(--muted); font-size: .6rem; font-weight: 400; }
-.bid-matrix { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .28rem; }
-.bid-matrix button { display: flex; min-width: 0; min-height: 2.15rem; align-items: center; justify-content: center; gap: .1rem; padding: .25rem; border-color: #9c9588; background: var(--card); font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
-.bid-matrix button span { color: var(--foreground); font-size: .7rem; }
-.call-actions button:hover:not(:disabled), .bid-matrix button:hover:not(:disabled) { background: var(--surface-strong); }
+.bid-levels, .bid-strains { display: grid; gap: .28rem; }
+.bid-levels { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.bid-strains { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: .4rem; }
+.bid-levels button, .bid-strains button { display: grid; min-width: 0; min-height: 2.15rem; place-items: center; padding: .25rem; border-color: #9c9588; background: var(--card); font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
+.bid-levels button[aria-pressed="true"] { border-color: var(--accent-strong); background: var(--surface-strong); color: var(--accent-strong); }
+.bid-hint { margin: .45rem 0 0; color: var(--muted); font-size: .68rem; text-align: center; }
+.call-actions button:hover:not(:disabled), .bid-levels button:hover:not(:disabled), .bid-strains button:hover:not(:disabled) { background: var(--surface-strong); }
 
 .bridge-hand { min-width: 0; }
 .bridge-hand h3 { margin: 0 0 .25rem; color: var(--table-ink); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-align: center; text-transform: uppercase; }
@@ -326,8 +329,8 @@ button.physical-card:disabled { opacity: .82; }
   .auction-table th, .auction-table td { height: 1.4rem; font-size: .7rem; }
   .bidding-box { padding: .35rem; }
   .call-actions { margin-bottom: .3rem; }
-  .call-actions button, .bid-matrix button { min-height: 1.9rem; padding: .15rem; font-size: .75rem; }
-  .bid-matrix { gap: .2rem; }
+  .call-actions button, .bid-levels button, .bid-strains button { min-height: 1.9rem; padding: .15rem; font-size: .75rem; }
+  .bid-levels, .bid-strains { gap: .2rem; }
   .player-position { max-width: 8.6rem; padding: .25rem .35rem; }
   .player-seat { flex-basis: 1.3rem; width: 1.3rem; height: 1.3rem; font-size: .7rem; }
   .player-copy strong { font-size: .65rem; }
