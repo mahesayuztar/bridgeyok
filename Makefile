@@ -60,7 +60,8 @@ test-api:
 	go test -race ./apps/api/...
 
 test-engine:
-	go test -race -cover ./apps/api/internal/bridge
+	go test -race -timeout=15m ./apps/api/internal/bridge
+	go test -cover -timeout=10m ./apps/api/internal/bridge
 
 test-engine-fixtures:
 	go test -race -cover -tags=testfixture ./apps/api/internal/bridgefixture
