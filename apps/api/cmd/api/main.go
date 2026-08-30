@@ -44,6 +44,21 @@ func main() {
 		logger.Error("table initialization failed", "error", err)
 		os.Exit(1)
 	}
+	commandProcessor, err := table.NewCommandProcessor(postgres, nil, logger, time.Now)
+	if err != nil {
+		logger.Error("command processor initialization failed", "error", err)
+		os.Exit(1)
+	}
+	actorRegistry, err := table.NewActorRegistry(postgres, commandProcessor, table.ActorRegistryOptions{
+		QueueCapacity: appConfig.TableActorQueueCapacity,
+		IdleTimeout:   appConfig.TableActorIdleTimeout,
+		Logger:        logger,
+		Now:           time.Now,
+	})
+	if err != nil {
+		logger.Error("table actor initialization failed", "error", err)
+		os.Exit(1)
+	}
 
 	handler := httpapi.NewRouter(httpapi.Options{
 		Logger:         logger,
@@ -54,8 +69,16 @@ func main() {
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if err := httpserver.Run(ctx, appConfig, handler, logger); err != nil {
-		logger.Error("http server failed", "error", err)
+	serverErr := httpserver.Run(ctx, appConfig, handler, logger)
+	drainCtx, cancelDrain := context.WithTimeout(context.Background(), appConfig.ShutdownTimeout)
+	drainErr := actorRegistry.Drain(drainCtx)
+	cancelDrain()
+	if serverErr != nil {
+		logger.Error("http server failed", "error", serverErr)
+		os.Exit(1)
+	}
+	if drainErr != nil {
+		logger.Error("table actor drain failed", "error", drainErr)
 		os.Exit(1)
 	}
 }

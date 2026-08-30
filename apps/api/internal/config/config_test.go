@@ -31,21 +31,26 @@ func TestLoad(t *testing.T) {
 				if config.ShutdownTimeout != 10*time.Second {
 					t.Fatalf("ShutdownTimeout = %s, want 10s", config.ShutdownTimeout)
 				}
+				if config.TableActorQueueCapacity != 64 || config.TableActorIdleTimeout != 10*time.Minute {
+					t.Fatalf("actor defaults = %d and %s, want 64 and 10m", config.TableActorQueueCapacity, config.TableActorIdleTimeout)
+				}
 			},
 		},
 		{
 			name: "production exact origins",
 			values: map[string]string{
-				"APP_ENV":          "production",
-				"DATABASE_URL":     "postgresql://bridgeyok:secret@db.example.com:5432/bridgeyok?sslmode=require",
-				"ALLOWED_ORIGINS":  "https://bridgeyok.example, https://www.bridgeyok.example/",
-				"PORT":             "10000",
-				"LOG_LEVEL":        "warn",
-				"SHUTDOWN_TIMEOUT": "20s",
+				"APP_ENV":                    "production",
+				"DATABASE_URL":               "postgresql://bridgeyok:secret@db.example.com:5432/bridgeyok?sslmode=require",
+				"ALLOWED_ORIGINS":            "https://bridgeyok.example, https://www.bridgeyok.example/",
+				"PORT":                       "10000",
+				"LOG_LEVEL":                  "warn",
+				"SHUTDOWN_TIMEOUT":           "20s",
+				"TABLE_ACTOR_QUEUE_CAPACITY": "128",
+				"TABLE_ACTOR_IDLE_TIMEOUT":   "15m",
 			},
 			assertions: func(t *testing.T, config Config) {
 				t.Helper()
-				if config.Port != 10000 || len(config.AllowedOrigins) != 2 || config.ShutdownTimeout != 20*time.Second {
+				if config.Port != 10000 || len(config.AllowedOrigins) != 2 || config.ShutdownTimeout != 20*time.Second || config.TableActorQueueCapacity != 128 || config.TableActorIdleTimeout != 15*time.Minute {
 					t.Fatalf("unexpected production config: %+v", config)
 				}
 			},
@@ -109,6 +114,22 @@ func TestLoad(t *testing.T) {
 				"READ_TIMEOUT": "0s",
 			},
 			wantErr: "READ_TIMEOUT must be a positive duration",
+		},
+		{
+			name: "invalid actor queue capacity",
+			values: map[string]string{
+				"DATABASE_URL":               "postgresql://bridgeyok:secret@localhost:5432/bridgeyok",
+				"TABLE_ACTOR_QUEUE_CAPACITY": "0",
+			},
+			wantErr: "TABLE_ACTOR_QUEUE_CAPACITY must be an integer",
+		},
+		{
+			name: "invalid actor idle timeout",
+			values: map[string]string{
+				"DATABASE_URL":             "postgresql://bridgeyok:secret@localhost:5432/bridgeyok",
+				"TABLE_ACTOR_IDLE_TIMEOUT": "never",
+			},
+			wantErr: "TABLE_ACTOR_IDLE_TIMEOUT must be a positive duration",
 		},
 	}
 

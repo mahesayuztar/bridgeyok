@@ -21,6 +21,8 @@ services:
       READ_HEADER_TIMEOUT: 5s
       READ_TIMEOUT: 15s
       SHUTDOWN_TIMEOUT: 10s
+      TABLE_ACTOR_IDLE_TIMEOUT: 10m
+      TABLE_ACTOR_QUEUE_CAPACITY: 64
       WRITE_TIMEOUT: 15s
     labels:
       io.bridgeyok.release: ${LOCAL_GATE_RELEASE:-current}

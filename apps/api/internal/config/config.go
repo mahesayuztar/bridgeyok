@@ -12,19 +12,21 @@ import (
 )
 
 type Config struct {
-	Environment       string
-	Host              string
-	Port              int
-	DatabaseURL       string
-	DatabaseMaxConns  int32
-	AuthSecret        []byte
-	AllowedOrigins    []string
-	LogLevel          slog.Level
-	ReadHeaderTimeout time.Duration
-	ReadTimeout       time.Duration
-	WriteTimeout      time.Duration
-	IdleTimeout       time.Duration
-	ShutdownTimeout   time.Duration
+	Environment             string
+	Host                    string
+	Port                    int
+	DatabaseURL             string
+	DatabaseMaxConns        int32
+	TableActorQueueCapacity int
+	TableActorIdleTimeout   time.Duration
+	AuthSecret              []byte
+	AllowedOrigins          []string
+	LogLevel                slog.Level
+	ReadHeaderTimeout       time.Duration
+	ReadTimeout             time.Duration
+	WriteTimeout            time.Duration
+	IdleTimeout             time.Duration
+	ShutdownTimeout         time.Duration
 }
 
 type lookupFunc func(string) (string, bool)
@@ -56,6 +58,14 @@ func load(lookup lookupFunc) (Config, error) {
 		return Config{}, err
 	}
 	databaseMaxConns, err := integerValue(lookup, "DATABASE_MAX_CONNS", 5, 1, 50)
+	if err != nil {
+		return Config{}, err
+	}
+	tableActorQueueCapacity, err := integerValue(lookup, "TABLE_ACTOR_QUEUE_CAPACITY", 64, 1, 1024)
+	if err != nil {
+		return Config{}, err
+	}
+	tableActorIdleTimeout, err := durationValue(lookup, "TABLE_ACTOR_IDLE_TIMEOUT", 10*time.Minute)
 	if err != nil {
 		return Config{}, err
 	}
@@ -93,19 +103,21 @@ func load(lookup lookupFunc) (Config, error) {
 	}
 
 	return Config{
-		Environment:       environment,
-		Host:              valueOrDefault(lookup, "API_HOST", "0.0.0.0"),
-		Port:              port,
-		DatabaseURL:       databaseURL,
-		DatabaseMaxConns:  int32(databaseMaxConns),
-		AuthSecret:        []byte(authSecret),
-		AllowedOrigins:    allowedOrigins,
-		LogLevel:          logLevel,
-		ReadHeaderTimeout: readHeaderTimeout,
-		ReadTimeout:       readTimeout,
-		WriteTimeout:      writeTimeout,
-		IdleTimeout:       idleTimeout,
-		ShutdownTimeout:   shutdownTimeout,
+		Environment:             environment,
+		Host:                    valueOrDefault(lookup, "API_HOST", "0.0.0.0"),
+		Port:                    port,
+		DatabaseURL:             databaseURL,
+		DatabaseMaxConns:        int32(databaseMaxConns),
+		TableActorQueueCapacity: tableActorQueueCapacity,
+		TableActorIdleTimeout:   tableActorIdleTimeout,
+		AuthSecret:              []byte(authSecret),
+		AllowedOrigins:          allowedOrigins,
+		LogLevel:                logLevel,
+		ReadHeaderTimeout:       readHeaderTimeout,
+		ReadTimeout:             readTimeout,
+		WriteTimeout:            writeTimeout,
+		IdleTimeout:             idleTimeout,
+		ShutdownTimeout:         shutdownTimeout,
 	}, nil
 }
 
