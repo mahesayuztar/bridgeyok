@@ -12,13 +12,14 @@ MIGRATION_DATABASE_URL ?= $(DATABASE_URL)
 export DATABASE_URL
 export MIGRATION_DATABASE_URL
 
-.PHONY: help install require-database-url migrate-up migrate-down migrate-status migrate-validate generate generate-db generate-contracts generate-api test-api test-api-integration test-engine test-engine-fixtures fuzz-engine vet-api vet-engine lint-api lint-engine security-api security-engine gate-engine build-api run-api smoke-api gate-local gate-local-down bootstrap
+.PHONY: help install require-database-url migrate-up migrate-down migrate-status migrate-validate generate generate-db generate-contracts generate-api test-api test-api-integration test-engine test-engine-stress test-engine-fixtures fuzz-engine vet-api vet-engine lint-api lint-engine security-api security-engine gate-engine build-api run-api smoke-api gate-local gate-local-down bootstrap
 
 help:
 	@echo "make bootstrap             Install, migrate Supabase, and generate sources"
 	@echo "make run-api               Run the local API against Supabase"
 	@echo "make test-api              Run API unit tests with the race detector"
 	@echo "make gate-engine           Run the complete local Phase 2 engine gate"
+	@echo "make test-engine-stress    Run the manual 10,000-board race stress test"
 	@echo "make test-engine-fixtures  Run test-only fixture serialization tests"
 	@echo "make fuzz-engine           Run bounded card, decision, and fixture fuzzing"
 	@echo "make test-api-integration  Run database integration tests"
@@ -62,6 +63,9 @@ test-api:
 test-engine:
 	go test -race -timeout=15m ./apps/api/internal/bridge
 	go test -cover -timeout=10m ./apps/api/internal/bridge
+
+test-engine-stress:
+	BRIDGE_ENGINE_STRESS=1 go test -race -timeout=15m ./apps/api/internal/bridge -run '^TestRandomizedLegalGames$$' -count=1
 
 test-engine-fixtures:
 	go test -race -cover -tags=testfixture ./apps/api/internal/bridgefixture
