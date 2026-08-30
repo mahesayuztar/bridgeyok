@@ -158,6 +158,9 @@ func Decide(state State, command Command) (Decision, *DomainError) {
 	if err := state.ValidateInvariants(); err != nil {
 		return Decision{}, reject(ErrorInvalidState, err.Error())
 	}
+	if err := state.validateCommandBoundary(); err != nil {
+		return Decision{}, reject(ErrorInvalidState, err.Error())
+	}
 
 	var events []Event
 	var domainError *DomainError
@@ -178,6 +181,20 @@ func Decide(state State, command Command) (Decision, *DomainError) {
 		return Decision{}, reject(ErrorInvalidState, err.Error())
 	}
 	return Decision{NextState: nextState, Events: events}, nil
+}
+
+func (state State) validateCommandBoundary() error {
+	switch state.Phase {
+	case PhaseOpeningLead:
+		if len(state.CurrentTrick.Plays) != 0 {
+			return fmt.Errorf("opening lead transition is incomplete")
+		}
+	case PhasePlay:
+		if len(state.CurrentTrick.Plays) == 4 || len(state.CompletedTricks) == 13 {
+			return fmt.Errorf("derived play transition is incomplete")
+		}
+	}
+	return nil
 }
 
 func decideCall(state State, command Command) ([]Event, *DomainError) {

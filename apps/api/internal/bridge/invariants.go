@@ -29,14 +29,14 @@ func (state State) ValidateInvariants() error {
 
 	switch state.Phase {
 	case PhaseAuction:
-		if state.Auction.Complete || state.Turn != state.Auction.Turn || state.DummyRevealed || len(state.CurrentTrick.Plays) != 0 || len(state.CompletedTricks) != 0 || state.Result != nil {
+		if state.Auction.Complete || state.Turn != state.Auction.Turn || state.DummyRevealed || state.CurrentTrick.Leader != "" || len(state.CurrentTrick.Plays) != 0 || len(state.CompletedTricks) != 0 || state.Result != nil {
 			return fmt.Errorf("auction phase contains play or terminal state")
 		}
 		if err := state.Deal.Validate(); err != nil {
 			return fmt.Errorf("auction deal: %w", err)
 		}
 	case PhaseOpeningLead:
-		if !state.hasActiveContract() || state.DummyRevealed || len(state.CurrentTrick.Plays) > 1 || state.Result != nil {
+		if !state.hasActiveContract() || state.DummyRevealed || len(state.CurrentTrick.Plays) > 1 || len(state.CompletedTricks) != 0 || state.Result != nil {
 			return fmt.Errorf("opening-lead phase is inconsistent")
 		}
 	case PhasePlay:
@@ -60,7 +60,7 @@ func (state State) ValidateInvariants() error {
 			if err := state.Deal.Validate(); err != nil {
 				return fmt.Errorf("passed-out deal: %w", err)
 			}
-		} else if len(state.CompletedTricks) != 13 || state.Result.TricksNS != state.TricksNS || state.Result.TricksEW != state.TricksEW || !reflect.DeepEqual(state.Result.Contract, state.Auction.Contract) {
+		} else if !state.DummyRevealed || len(state.CompletedTricks) != 13 || state.Result.TricksNS != state.TricksNS || state.Result.TricksEW != state.TricksEW || !reflect.DeepEqual(state.Result.Contract, state.Auction.Contract) {
 			return fmt.Errorf("played result does not match board state")
 		}
 	default:
@@ -144,6 +144,60 @@ func (state State) validateCardsAndTricks() error {
 	}
 	if cardCount != 52 || len(seen) != 52 {
 		return fmt.Errorf("card locations contain %d cards and %d unique cards, want 52", cardCount, len(seen))
+	}
+	if state.Auction.Contract != nil && !state.Auction.PassedOut {
+		firstLeader := state.CurrentTrick.Leader
+		if len(state.CompletedTricks) > 0 {
+			firstLeader = state.CompletedTricks[0].Leader
+		}
+		if firstLeader != state.Auction.Contract.OpeningLeader() {
+			return fmt.Errorf("first trick leader %s does not match opening leader %s", firstLeader, state.Auction.Contract.OpeningLeader())
+		}
+	}
+	if err := state.validatePlayHistory(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (state State) validatePlayHistory() error {
+	reconstructed := state.Deal.clone()
+	for _, trick := range state.CompletedTricks {
+		for _, play := range trick.Plays {
+			reconstructed.setHand(play.Seat, append(reconstructed.hand(play.Seat), play.Card))
+		}
+	}
+	for _, play := range state.CurrentTrick.Plays {
+		reconstructed.setHand(play.Seat, append(reconstructed.hand(play.Seat), play.Card))
+	}
+	if err := reconstructed.Validate(); err != nil {
+		return fmt.Errorf("reconstructed deal: %w", err)
+	}
+
+	for _trickIndex, trick := range state.CompletedTricks {
+		if err := consumeLegalPlays(&reconstructed, trick); err != nil {
+			return fmt.Errorf("completed trick %d: %w", _trickIndex, err)
+		}
+	}
+	if err := consumeLegalPlays(&reconstructed, state.CurrentTrick); err != nil {
+		return fmt.Errorf("current trick: %w", err)
+	}
+	return nil
+}
+
+func consumeLegalPlays(hands *Deal, trick Trick) error {
+	if len(trick.Plays) == 0 {
+		return nil
+	}
+	ledSuit := trick.Plays[0].Card.Suit
+	for _playIndex, play := range trick.Plays {
+		hand := hands.hand(play.Seat)
+		if _playIndex > 0 && play.Card.Suit != ledSuit && hand.hasSuit(ledSuit) {
+			return fmt.Errorf("seat %s did not follow suit %s", play.Seat, ledSuit)
+		}
+		if !hands.removeCard(play.Seat, play.Card) {
+			return fmt.Errorf("seat %s did not hold card %s", play.Seat, play.Card)
+		}
 	}
 	return nil
 }
