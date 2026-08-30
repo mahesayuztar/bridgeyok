@@ -1,6 +1,6 @@
 import type { components } from "@bridgeyok/contracts/openapi";
 import Link from "next/link";
-import BridgeTable from "./bridge-table";
+import GuestEntry from "./guest-entry";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8080";
 
@@ -66,7 +66,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               Buat meja, undang tiga teman, lalu mainkan lelang dan kartu bersama secara langsung. BridgeYok tetap ringan
               dan menjaga permainan saat koneksi tidak sempurna.
             </p>
-            <a className="text-link" href="#play">
+            <a className="text-link" href="#mulai">
               Mulai bermain <span aria-hidden="true">↓</span>
             </a>
           </div>
@@ -93,9 +93,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </div>
         </section>
 
-        <div id="play">
-          <BridgeTable initialInviteCode={initialInviteCode} />
-        </div>
+        <GuestEntry initialInviteCode={initialInviteCode} />
       </main>
 
       <footer className="site-footer">

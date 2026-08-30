@@ -135,16 +135,17 @@ export type TableSession = {
   connectionState: ConnectionState;
   inviteCode: string | null;
   tableState: TableClientState;
-  createIdentity: (nickname: string) => Promise<void>;
+  createIdentity: (nickname: string) => Promise<boolean>;
   logout: () => Promise<void>;
-  createTable: () => Promise<void>;
-  joinTable: (inviteCode: string) => Promise<void>;
+  createTable: () => Promise<string | null>;
+  joinTable: (inviteCode: string) => Promise<string | null>;
+  openTable: (tableId: string) => Promise<boolean>;
   leaveTable: () => Promise<void>;
   reconnect: () => void;
   sendCommand: (name: CommandName, payload?: Record<string, unknown>) => void;
 };
 
-export function useTableSession(): TableSession {
+export function useTableSession({ restoreTable = true }: { restoreTable?: boolean } = {}): TableSession {
   const [tableState, dispatch] = useReducer(reduceTableState, undefined, createEmptyTableState);
   const [initializing, setInitializing] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -170,7 +171,7 @@ export function useTableSession(): TableSession {
     if (storedIdentity === null) {
       throw new ApiError("Sesi tamu tidak ditemukan.");
     }
-    const promise = requestJson<GuestCredentials>(`/v1/guest-sessions/${encodeURIComponent(storedIdentity.sessionId)}/refresh`, {
+    const promise = requestJson<GuestCredentials>("/v1/guest-sessions/refresh", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deviceCredential: storedIdentity.deviceCredential })
@@ -359,7 +360,7 @@ export function useTableSession(): TableSession {
         } else {
           await refreshCredentials(identity);
         }
-        const storedTable = readStoredValue<StoredTable>(localStorage, TABLE_KEY);
+        const storedTable = restoreTable ? readStoredValue<StoredTable>(localStorage, TABLE_KEY) : null;
         if (storedTable !== null && active) {
           const table = await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(storedTable.tableId)}`);
           if (isLiveTableProjection(table)) {
@@ -389,7 +390,7 @@ export function useTableSession(): TableSession {
       active = false;
       stopConnection();
     };
-  }, [authenticatedRequest, beginConnection, refreshCredentials, stopConnection]);
+  }, [authenticatedRequest, beginConnection, refreshCredentials, restoreTable, stopConnection]);
 
   useEffect(() => {
     function handleOnline() {
@@ -422,8 +423,10 @@ export function useTableSession(): TableSession {
       persistCredentials(credentials);
       setNickname(credentials.nickname);
       dispatch({ type: "message", message: null });
+      return true;
     } catch (error) {
       dispatch({ type: "message", message: error instanceof Error ? error.message : "Nama tamu gagal dibuat." });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -434,7 +437,7 @@ export function useTableSession(): TableSession {
     clearTable();
     try {
       if (credentialsRef.current !== null) {
-        await authenticatedRequest<void>(`/v1/guest-sessions/${encodeURIComponent(credentialsRef.current.sessionId)}`, { method: "DELETE" });
+        await authenticatedRequest<void>("/v1/guest-sessions/current", { method: "DELETE" });
       }
     } catch {
     } finally {
@@ -458,8 +461,10 @@ export function useTableSession(): TableSession {
       setInviteCode(created.inviteCode);
       dispatch({ type: "enter", table: created.table });
       beginConnection(created.table.tableId);
+      return created.table.tableId;
     } catch (error) {
       dispatch({ type: "message", message: error instanceof Error ? error.message : "Meja gagal dibuat." });
+      return null;
     } finally {
       setBusy(false);
     }
@@ -479,14 +484,39 @@ export function useTableSession(): TableSession {
         setInviteCode(normalizedInviteCode);
         dispatch({ type: "enter", table });
         beginConnection(table.tableId);
+        return table.tableId;
       } catch (error) {
         dispatch({ type: "message", message: error instanceof Error ? error.message : "Meja tidak dapat dimasuki." });
+        return null;
       } finally {
         setBusy(false);
       }
     },
     [authenticatedRequest, beginConnection, clearTable]
   );
+
+  const openTable = useCallback(async (tableId: string) => {
+    if (tableStateRef.current.activeTableId === tableId && tableStateRef.current.table !== null) {
+      return true;
+    }
+    setBusy(true);
+    try {
+      const table = await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(tableId)}`);
+      if (!isLiveTableProjection(table)) {
+        throw new ApiError("Data meja tidak dikenali.");
+      }
+      clearTable();
+      localStorage.setItem(TABLE_KEY, JSON.stringify({ tableId }));
+      dispatch({ type: "enter", table });
+      beginConnection(table.tableId);
+      return true;
+    } catch (error) {
+      dispatch({ type: "message", message: error instanceof Error ? error.message : "Meja tidak dapat dibuka." });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [authenticatedRequest, beginConnection, clearTable]);
 
   const leaveTable = useCallback(async () => {
     const table = tableStateRef.current.table;
@@ -555,6 +585,7 @@ export function useTableSession(): TableSession {
     logout,
     createTable,
     joinTable,
+    openTable,
     leaveTable,
     reconnect,
     sendCommand

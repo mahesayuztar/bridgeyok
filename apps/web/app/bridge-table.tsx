@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { playableHand, type Call, type Card, type LiveTableProjection, type Seat, type Suit } from "./table-state";
 import { useTableSession } from "./use-table-session";
@@ -121,7 +122,8 @@ function SeatPosition({ table, seat, disabled, onCommand }: {
   );
 }
 
-export default function BridgeTable({ initialInviteCode = "" }: { initialInviteCode?: string }) {
+export default function BridgeTable({ initialInviteCode = "", expectedTableId }: { initialInviteCode?: string; expectedTableId?: string }) {
+  const router = useRouter();
   const session = useTableSession();
   const [identityName, setIdentityName] = useState("");
   const [joinCode, setJoinCode] = useState(initialInviteCode.toUpperCase());
@@ -132,6 +134,19 @@ export default function BridgeTable({ initialInviteCode = "" }: { initialInviteC
   const commandDisabled = session.connectionState !== "connected" || hasPendingCommand;
   const game = table?.game;
   const legalPlay = table === null ? null : playableHand(table);
+
+  useEffect(() => {
+    if (session.initializing) {
+      return;
+    }
+    if (session.nickname === null) {
+      router.replace("/");
+      return;
+    }
+    if (expectedTableId !== undefined && table?.tableId !== expectedTableId && !session.busy) {
+      void session.openTable(expectedTableId);
+    }
+  }, [expectedTableId, router, session, table?.tableId]);
 
   useEffect(() => {
     function handleAuctionKeyboard(event: KeyboardEvent) {
@@ -332,7 +347,7 @@ export default function BridgeTable({ initialInviteCode = "" }: { initialInviteC
               <div>
                 <p className="eyebrow">Lelang · dealer {game.auction.dealer}</p>
                 <div className="auction-history" aria-label="Riwayat lelang">
-                  {game.auction.calls.length === 0 ? <span>Belum ada call</span> : game.auction.calls.map((record, _index) => (
+                  {game.auction?.calls?.length == 0 ? <span>Belum ada call</span> : game.auction.calls.map((record, _index) => (
                     <span key={`${record.seat}-${_index}`}><small>{record.seat}</small>{callLabel(record.call)}</span>
                   ))}
                 </div>
@@ -364,7 +379,7 @@ export default function BridgeTable({ initialInviteCode = "" }: { initialInviteC
               {game.dummyHand === undefined ? null : <Hand title="Dummy" cards={game.dummyHand} playableCards={legalPlay?.source === "dummy" ? legalPlay.hand : []} disabled={commandDisabled} onPlay={(card) => session.sendCommand("game.play_card", { card })} />}
               <div className="current-trick" aria-label="Trick saat ini">
                 <h3>Trick saat ini</h3>
-                <div>{game.currentTrick.plays.length === 0 ? <span>Menunggu lead</span> : game.currentTrick.plays.map((play) => <span className={`trick-card suit-${play.card.suit.toLowerCase()}`} key={play.seat}><small>{play.seat}</small>{play.card.rank}{SUIT_LABELS[play.card.suit]}</span>)}</div>
+                <div>{game?.currentTrick?.plays?.length == 0 ? <span>Menunggu lead</span> : game.currentTrick.plays.map((play) => <span className={`trick-card suit-${play.card.suit.toLowerCase()}`} key={play.seat}><small>{play.seat}</small>{play.card.rank}{SUIT_LABELS[play.card.suit]}</span>)}</div>
               </div>
               <Hand title={`Kartu kamu${legalPlay?.source === "own" ? " · giliranmu" : ""}`} cards={game.ownHand} playableCards={legalPlay?.source === "own" ? legalPlay.hand : []} disabled={commandDisabled} onPlay={(card) => session.sendCommand("game.play_card", { card })} />
             </div>
