@@ -109,6 +109,8 @@ test("controller recovery waits for fresh projection and replacement event", () 
   const fresh = reduceTableState(syncing, { type: "snapshot", tableId: "table-a", seq: 5, table: freshProjection });
   assert.equal(fresh.controllerState, "readyToTakeover");
   assert.equal(fresh.issue.action, "takeover");
+  const repeatedSnapshot = reduceTableState(fresh, { type: "snapshot", tableId: "table-a", seq: 5, table: freshProjection });
+  assert.equal(repeatedSnapshot.controllerState, "readyToTakeover");
 
   const takeover = reduceTableState(fresh, { type: "pending", requestId: "takeover", commandName: "table.takeover" });
   assert.equal(takeover.controllerState, "takeoverPending");

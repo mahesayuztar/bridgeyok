@@ -133,16 +133,18 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         notice: null,
         controllerState: "current"
       };
-    case "snapshot":
+    case "snapshot": {
       if (state.activeTableId !== action.tableId || action.table.tableId !== action.tableId || action.seq < state.lastSeenSeq) {
         return state;
       }
+      const resyncComplete = state.controllerState === "resyncing";
+      const readyToTakeover = action.table.viewerSeat !== undefined && (resyncComplete || state.controllerState === "readyToTakeover");
       return {
         ...state,
         table: action.table,
         lastSeenSeq: Math.max(action.seq, action.table.lastSeq),
         pending: {},
-        issue: state.controllerState === "resyncing" ? {
+        issue: readyToTakeover ? {
           kind: "conflict",
           title: "Meja sudah selaras",
           detail: "Keadaan terbaru sudah diterima. Ambil alih bila kamu ingin mengendalikan kursi dari perangkat ini.",
@@ -150,8 +152,9 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
           action: "takeover",
           source: "websocket"
         } : null,
-        controllerState: state.controllerState === "resyncing" && action.table.viewerSeat !== undefined ? "readyToTakeover" : "current"
+        controllerState: readyToTakeover ? "readyToTakeover" : "current"
       };
+    }
     case "event":
       if (state.activeTableId !== action.tableId || action.table.tableId !== action.tableId || action.seq <= state.lastSeenSeq) {
         return state;

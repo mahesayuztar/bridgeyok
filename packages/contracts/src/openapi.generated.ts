@@ -569,6 +569,7 @@ export interface operations {
             };
             401: components["responses"]["ProblemResponse"];
             404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
         };
     };
     getTable: {

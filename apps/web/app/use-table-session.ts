@@ -133,6 +133,7 @@ export type TableSession = {
   reconnect: () => void;
   resync: () => void;
   dismissIssue: () => void;
+  dismissNotice: () => void;
   sendCommand: (name: CommandName, payload?: Record<string, unknown>) => void;
 };
 
@@ -613,6 +614,10 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     dispatch({ type: "issue", issue: null });
   }, []);
 
+  const dismissNotice = useCallback(() => {
+    dispatch({ type: "dismissNotice" });
+  }, []);
+
   const sendCommand = useCallback((name: CommandName, payload: Record<string, unknown> = {}) => {
     const socket = socketRef.current;
     const table = tableStateRef.current.table;
@@ -671,6 +676,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     reconnect,
     resync,
     dismissIssue,
+    dismissNotice,
     sendCommand
   };
 }

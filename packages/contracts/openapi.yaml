@@ -186,6 +186,8 @@ paths:
           $ref: "#/components/responses/ProblemResponse"
         "404":
           $ref: "#/components/responses/ProblemResponse"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
   /v1/tables/{tableId}:
     parameters:
       - $ref: "#/components/parameters/TableId"
