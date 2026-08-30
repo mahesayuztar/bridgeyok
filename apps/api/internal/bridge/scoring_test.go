@@ -18,6 +18,12 @@ type goldenScoreCase struct {
 	ExpectedScoreNS int           `json:"scoreNS"`
 }
 
+type goldenScoreMatrix struct {
+	SourceURL string            `json:"sourceUrl"`
+	Law       string            `json:"law"`
+	Cases     []goldenScoreCase `json:"cases"`
+}
+
 func TestScoreContractGoldenMatrix(t *testing.T) {
 	t.Parallel()
 
@@ -25,10 +31,14 @@ func TestScoreContractGoldenMatrix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
-	var tests []goldenScoreCase
-	if err := json.Unmarshal(data, &tests); err != nil {
+	var matrix goldenScoreMatrix
+	if err := json.Unmarshal(data, &matrix); err != nil {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
+	if matrix.SourceURL != "https://www.worldbridge.org/wp-content/uploads/2017/03/2017LawsofDuplicateBridge-nohighlights.pdf" || matrix.Law != "77" {
+		t.Fatalf("golden matrix provenance = %q Law %q", matrix.SourceURL, matrix.Law)
+	}
+	tests := matrix.Cases
 	if len(tests) < 30 {
 		t.Fatalf("golden matrix has %d cases, want at least 30", len(tests))
 	}
