@@ -15,6 +15,7 @@ import (
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpserver"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/observability"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/realtime"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
 )
 
@@ -59,6 +60,30 @@ func main() {
 		logger.Error("table actor initialization failed", "error", err)
 		os.Exit(1)
 	}
+	realtimeServer, err := realtime.NewServer(realtime.Options{
+		Logger:                   logger,
+		AllowedOrigins:           appConfig.AllowedOrigins,
+		Identity:                 identityService,
+		Tables:                   actorRegistry,
+		Events:                   postgres,
+		Random:                   rand.Reader,
+		Now:                      time.Now,
+		ReadLimitBytes:           appConfig.RealtimeReadLimitBytes,
+		OutboundQueueCapacity:    appConfig.RealtimeOutboundQueueCapacity,
+		OutboundQueueBytes:       appConfig.RealtimeOutboundQueueBytes,
+		WriteTimeout:             appConfig.RealtimeWriteTimeout,
+		PingInterval:             appConfig.RealtimePingInterval,
+		PongTimeout:              appConfig.RealtimePongTimeout,
+		MaxConnections:           appConfig.RealtimeMaxConnections,
+		MaxConnectionsPerSession: appConfig.RealtimeMaxConnectionsPerSession,
+		MessageRate:              appConfig.RealtimeMessageRate,
+		MessageBurst:             appConfig.RealtimeMessageBurst,
+		RecoveryLimit:            appConfig.RealtimeRecoveryLimit,
+	})
+	if err != nil {
+		logger.Error("realtime initialization failed", "error", err)
+		os.Exit(1)
+	}
 
 	handler := httpapi.NewRouter(httpapi.Options{
 		Logger:         logger,
@@ -66,10 +91,11 @@ func main() {
 		Readiness:      postgres,
 		Identity:       identityService,
 		Table:          tableService,
+		Realtime:       realtimeServer,
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	serverErr := httpserver.Run(ctx, appConfig, handler, logger)
+	serverErr := httpserver.Run(ctx, appConfig, handler, logger, realtimeServer.Drain)
 	drainCtx, cancelDrain := context.WithTimeout(context.Background(), appConfig.ShutdownTimeout)
 	drainErr := actorRegistry.Drain(drainCtx)
 	cancelDrain()

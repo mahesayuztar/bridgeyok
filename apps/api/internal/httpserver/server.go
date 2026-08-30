@@ -10,7 +10,10 @@ import (
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/config"
 )
 
-func Run(ctx context.Context, appConfig config.Config, handler http.Handler, logger *slog.Logger) error {
+// ShutdownHook drains a hijacked or background subsystem after HTTP admission stops.
+type ShutdownHook func(context.Context) error
+
+func Run(ctx context.Context, appConfig config.Config, handler http.Handler, logger *slog.Logger, shutdownHooks ...ShutdownHook) error {
 	server := &http.Server{
 		Addr:              appConfig.Address(),
 		Handler:           handler,
@@ -42,6 +45,11 @@ func Run(ctx context.Context, appConfig config.Config, handler http.Handler, log
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		_ = server.Close()
 		return fmt.Errorf("shutdown HTTP server: %w", err)
+	}
+	for _, shutdownHook := range shutdownHooks {
+		if err := shutdownHook(shutdownCtx); err != nil {
+			return fmt.Errorf("run shutdown hook: %w", err)
+		}
 	}
 
 	if err := <-serverErrors; err != nil && !errors.Is(err, http.ErrServerClosed) {

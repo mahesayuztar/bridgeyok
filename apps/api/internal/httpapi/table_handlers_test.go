@@ -29,6 +29,18 @@ type tableServiceFake struct {
 	leftSession  string
 }
 
+type realtimeServiceFake struct {
+	changedTableIDs []string
+}
+
+func (service *realtimeServiceFake) ServeHTTP(writer http.ResponseWriter, _ *http.Request) {
+	writer.WriteHeader(http.StatusNoContent)
+}
+
+func (service *realtimeServiceFake) TableChanged(_ context.Context, tableID string) {
+	service.changedTableIDs = append(service.changedTableIDs, tableID)
+}
+
 func (service *tableServiceFake) Create(_ context.Context, session identity.Session) (table.CreatedTable, error) {
 	return table.CreatedTable{InviteCode: testInviteCode, Projection: testTableProjection(session)}, nil
 }
@@ -171,6 +183,41 @@ func TestTableHTTPHandlerLeave(t *testing.T) {
 				t.Fatalf("Leave() received table=%q session=%q", test.service.leftTableID, test.service.leftSession)
 			}
 		})
+	}
+}
+
+func TestTableHTTPHandlerNotifiesRealtimeOnlyAfterLifecycleMutation(t *testing.T) {
+	t.Parallel()
+
+	service := &tableServiceFake{}
+	realtimeService := &realtimeServiceFake{}
+	handler := NewRouter(Options{
+		Logger:         observability.NewLoggerWithWriter(slog.LevelDebug, &strings.Builder{}),
+		AllowedOrigins: []string{"https://app.example"},
+		Readiness:      readinessFunc(func(context.Context) error { return nil }),
+		Identity:       &identityServiceFake{},
+		Table:          service,
+		Realtime:       realtimeService,
+	})
+	requests := []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodPost, path: "/v1/tables/" + testInviteCode + "/join"},
+		{method: http.MethodGet, path: "/v1/tables/" + testTableID},
+		{method: http.MethodPost, path: "/v1/tables/" + testTableID + "/leave"},
+	}
+	for _, scriptedRequest := range requests {
+		request := httptest.NewRequest(scriptedRequest.method, scriptedRequest.path, nil)
+		request.Header.Set("Authorization", "Bearer valid-access")
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code < 200 || response.Code >= 300 {
+			t.Fatalf("%s %s status = %d", scriptedRequest.method, scriptedRequest.path, response.Code)
+		}
+	}
+	if len(realtimeService.changedTableIDs) != 2 || realtimeService.changedTableIDs[0] != testTableID || realtimeService.changedTableIDs[1] != testTableID {
+		t.Fatalf("realtime notifications = %v, want join and leave only", realtimeService.changedTableIDs)
 	}
 }
 

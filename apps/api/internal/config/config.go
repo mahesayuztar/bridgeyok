@@ -12,21 +12,32 @@ import (
 )
 
 type Config struct {
-	Environment             string
-	Host                    string
-	Port                    int
-	DatabaseURL             string
-	DatabaseMaxConns        int32
-	TableActorQueueCapacity int
-	TableActorIdleTimeout   time.Duration
-	AuthSecret              []byte
-	AllowedOrigins          []string
-	LogLevel                slog.Level
-	ReadHeaderTimeout       time.Duration
-	ReadTimeout             time.Duration
-	WriteTimeout            time.Duration
-	IdleTimeout             time.Duration
-	ShutdownTimeout         time.Duration
+	Environment                      string
+	Host                             string
+	Port                             int
+	DatabaseURL                      string
+	DatabaseMaxConns                 int32
+	TableActorQueueCapacity          int
+	TableActorIdleTimeout            time.Duration
+	RealtimeReadLimitBytes           int64
+	RealtimeOutboundQueueCapacity    int
+	RealtimeOutboundQueueBytes       int
+	RealtimeWriteTimeout             time.Duration
+	RealtimePingInterval             time.Duration
+	RealtimePongTimeout              time.Duration
+	RealtimeMaxConnections           int
+	RealtimeMaxConnectionsPerSession int
+	RealtimeMessageRate              int
+	RealtimeMessageBurst             int
+	RealtimeRecoveryLimit            int
+	AuthSecret                       []byte
+	AllowedOrigins                   []string
+	LogLevel                         slog.Level
+	ReadHeaderTimeout                time.Duration
+	ReadTimeout                      time.Duration
+	WriteTimeout                     time.Duration
+	IdleTimeout                      time.Duration
+	ShutdownTimeout                  time.Duration
 }
 
 type lookupFunc func(string) (string, bool)
@@ -69,6 +80,50 @@ func load(lookup lookupFunc) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	realtimeReadLimitBytes, err := integerValue(lookup, "REALTIME_READ_LIMIT_BYTES", 8<<10, 1024, 64<<10)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimeOutboundQueueCapacity, err := integerValue(lookup, "REALTIME_OUTBOUND_QUEUE_CAPACITY", 64, 1, 1024)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimeOutboundQueueBytes, err := integerValue(lookup, "REALTIME_OUTBOUND_QUEUE_BYTES", 256<<10, 8<<10, 4<<20)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimeWriteTimeout, err := durationValue(lookup, "REALTIME_WRITE_TIMEOUT", 5*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimePingInterval, err := durationValue(lookup, "REALTIME_PING_INTERVAL", 20*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimePongTimeout, err := durationValue(lookup, "REALTIME_PONG_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimeMaxConnections, err := integerValue(lookup, "REALTIME_MAX_CONNECTIONS", 256, 1, 10000)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimeMaxConnectionsPerSession, err := integerValue(lookup, "REALTIME_MAX_CONNECTIONS_PER_SESSION", 3, 1, 10)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimeMessageRate, err := integerValue(lookup, "REALTIME_MESSAGE_RATE", 10, 1, 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimeMessageBurst, err := integerValue(lookup, "REALTIME_MESSAGE_BURST", 20, 1, 2000)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimeRecoveryLimit, err := integerValue(lookup, "REALTIME_RECOVERY_LIMIT", 128, 1, 255)
+	if err != nil {
+		return Config{}, err
+	}
 	authSecret, ok := lookup("AUTH_SECRET")
 	if !ok || len(authSecret) < 32 {
 		return Config{}, fmt.Errorf("AUTH_SECRET must contain at least 32 characters")
@@ -103,21 +158,32 @@ func load(lookup lookupFunc) (Config, error) {
 	}
 
 	return Config{
-		Environment:             environment,
-		Host:                    valueOrDefault(lookup, "API_HOST", "0.0.0.0"),
-		Port:                    port,
-		DatabaseURL:             databaseURL,
-		DatabaseMaxConns:        int32(databaseMaxConns),
-		TableActorQueueCapacity: tableActorQueueCapacity,
-		TableActorIdleTimeout:   tableActorIdleTimeout,
-		AuthSecret:              []byte(authSecret),
-		AllowedOrigins:          allowedOrigins,
-		LogLevel:                logLevel,
-		ReadHeaderTimeout:       readHeaderTimeout,
-		ReadTimeout:             readTimeout,
-		WriteTimeout:            writeTimeout,
-		IdleTimeout:             idleTimeout,
-		ShutdownTimeout:         shutdownTimeout,
+		Environment:                      environment,
+		Host:                             valueOrDefault(lookup, "API_HOST", "0.0.0.0"),
+		Port:                             port,
+		DatabaseURL:                      databaseURL,
+		DatabaseMaxConns:                 int32(databaseMaxConns),
+		TableActorQueueCapacity:          tableActorQueueCapacity,
+		TableActorIdleTimeout:            tableActorIdleTimeout,
+		RealtimeReadLimitBytes:           int64(realtimeReadLimitBytes),
+		RealtimeOutboundQueueCapacity:    realtimeOutboundQueueCapacity,
+		RealtimeOutboundQueueBytes:       realtimeOutboundQueueBytes,
+		RealtimeWriteTimeout:             realtimeWriteTimeout,
+		RealtimePingInterval:             realtimePingInterval,
+		RealtimePongTimeout:              realtimePongTimeout,
+		RealtimeMaxConnections:           realtimeMaxConnections,
+		RealtimeMaxConnectionsPerSession: realtimeMaxConnectionsPerSession,
+		RealtimeMessageRate:              realtimeMessageRate,
+		RealtimeMessageBurst:             realtimeMessageBurst,
+		RealtimeRecoveryLimit:            realtimeRecoveryLimit,
+		AuthSecret:                       []byte(authSecret),
+		AllowedOrigins:                   allowedOrigins,
+		LogLevel:                         logLevel,
+		ReadHeaderTimeout:                readHeaderTimeout,
+		ReadTimeout:                      readTimeout,
+		WriteTimeout:                     writeTimeout,
+		IdleTimeout:                      idleTimeout,
+		ShutdownTimeout:                  shutdownTimeout,
 	}, nil
 }
 

@@ -30,6 +30,12 @@ type Options struct {
 	Readiness      ReadinessChecker
 	Identity       IdentityService
 	Table          TableService
+	Realtime       RealtimeService
+}
+
+type RealtimeService interface {
+	http.Handler
+	TableChanged(context.Context, string)
 }
 
 type IdentityService interface {
@@ -74,11 +80,14 @@ func NewRouter(options Options) http.Handler {
 		writeJSON(writer, http.StatusOK, apigen.HealthResponse{Status: apigen.Ready, Service: "api"})
 	})
 	identityHandler := identityHTTPHandler{service: options.Identity, logger: options.Logger}
-	tableHandler := tableHTTPHandler{service: options.Table, identity: identityHandler, logger: options.Logger}
+	tableHandler := tableHTTPHandler{service: options.Table, identity: identityHandler, realtime: options.Realtime, logger: options.Logger}
 	router.Post("/v1/guest-sessions", identityHandler.createSession)
 	router.Post("/v1/guest-sessions/refresh", identityHandler.refreshSession)
 	router.Delete("/v1/guest-sessions/current", identityHandler.revokeSession)
 	router.Post("/v1/realtime/tickets", identityHandler.createRealtimeTicket)
+	if options.Realtime != nil {
+		router.Get("/v1/ws", options.Realtime.ServeHTTP)
+	}
 	router.Post("/v1/tables", tableHandler.createTable)
 	router.Get("/v1/tables/{inviteCode}/preview", tableHandler.previewTable)
 	router.Post("/v1/tables/{inviteCode}/join", tableHandler.joinTable)

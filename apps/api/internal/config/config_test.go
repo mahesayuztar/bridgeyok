@@ -34,6 +34,12 @@ func TestLoad(t *testing.T) {
 				if config.TableActorQueueCapacity != 64 || config.TableActorIdleTimeout != 10*time.Minute {
 					t.Fatalf("actor defaults = %d and %s, want 64 and 10m", config.TableActorQueueCapacity, config.TableActorIdleTimeout)
 				}
+				if config.RealtimeReadLimitBytes != 8<<10 || config.RealtimeOutboundQueueCapacity != 64 || config.RealtimeOutboundQueueBytes != 256<<10 || config.RealtimeRecoveryLimit != 128 {
+					t.Fatalf("unexpected realtime bounds: %+v", config)
+				}
+				if config.RealtimeWriteTimeout != 5*time.Second || config.RealtimePingInterval != 20*time.Second || config.RealtimePongTimeout != 10*time.Second {
+					t.Fatalf("unexpected realtime timeouts: %+v", config)
+				}
 			},
 		},
 		{
@@ -130,6 +136,22 @@ func TestLoad(t *testing.T) {
 				"TABLE_ACTOR_IDLE_TIMEOUT": "never",
 			},
 			wantErr: "TABLE_ACTOR_IDLE_TIMEOUT must be a positive duration",
+		},
+		{
+			name: "invalid realtime frame limit",
+			values: map[string]string{
+				"DATABASE_URL":              "postgresql://bridgeyok:secret@localhost:5432/bridgeyok",
+				"REALTIME_READ_LIMIT_BYTES": "512",
+			},
+			wantErr: "REALTIME_READ_LIMIT_BYTES must be an integer",
+		},
+		{
+			name: "invalid realtime recovery limit",
+			values: map[string]string{
+				"DATABASE_URL":            "postgresql://bridgeyok:secret@localhost:5432/bridgeyok",
+				"REALTIME_RECOVERY_LIMIT": "256",
+			},
+			wantErr: "REALTIME_RECOVERY_LIMIT must be an integer",
 		},
 	}
 

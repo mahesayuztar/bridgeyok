@@ -14,6 +14,7 @@ import (
 type tableHTTPHandler struct {
 	service  TableService
 	identity identityHTTPHandler
+	realtime RealtimeService
 	logger   *slog.Logger
 }
 
@@ -73,6 +74,9 @@ func (handler tableHTTPHandler) joinTable(writer http.ResponseWriter, request *h
 		handler.writeInternalError(writer, request, "table_join_failed", err)
 		return
 	}
+	if handler.realtime != nil {
+		handler.realtime.TableChanged(request.Context(), projection.TableID)
+	}
 	handler.writeProjection(writer, request, http.StatusOK, projection)
 }
 
@@ -111,6 +115,9 @@ func (handler tableHTTPHandler) leaveTable(writer http.ResponseWriter, request *
 	if err != nil {
 		handler.writeInternalError(writer, request, "table_leave_failed", err)
 		return
+	}
+	if handler.realtime != nil {
+		handler.realtime.TableChanged(request.Context(), request.PathValue("tableId"))
 	}
 	writer.Header().Set("Cache-Control", "private, no-store")
 	writer.WriteHeader(http.StatusNoContent)
