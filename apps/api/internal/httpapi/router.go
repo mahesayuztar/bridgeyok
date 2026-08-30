@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpapi/apigen"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
 )
 
 const requestIDHeader = "X-Request-ID"
@@ -26,6 +27,15 @@ type Options struct {
 	Logger         *slog.Logger
 	AllowedOrigins []string
 	Readiness      ReadinessChecker
+	Identity       IdentityService
+}
+
+type IdentityService interface {
+	CreateSession(context.Context, string) (identity.CredentialSet, error)
+	Refresh(context.Context, string) (identity.CredentialSet, error)
+	Authenticate(context.Context, string) (identity.Session, error)
+	Revoke(context.Context, string) error
+	IssueTicket(context.Context, identity.Session) (string, time.Time, error)
 }
 
 type contextKey string
@@ -53,6 +63,11 @@ func NewRouter(options Options) http.Handler {
 		}
 		writeJSON(writer, http.StatusOK, apigen.HealthResponse{Status: apigen.Ready, Service: "api"})
 	})
+	identityHandler := identityHTTPHandler{service: options.Identity, logger: options.Logger}
+	router.Post("/v1/guest-sessions", identityHandler.createSession)
+	router.Post("/v1/guest-sessions/refresh", identityHandler.refreshSession)
+	router.Delete("/v1/guest-sessions/current", identityHandler.revokeSession)
+	router.Post("/v1/realtime/tickets", identityHandler.createRealtimeTicket)
 	router.NotFound(func(writer http.ResponseWriter, request *http.Request) {
 		writeProblem(writer, request, http.StatusNotFound, "Resource not found")
 	})
@@ -163,7 +178,9 @@ func requestIDFromContext(ctx context.Context) string {
 }
 
 func writeJSON(writer http.ResponseWriter, status int, response any) {
-	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if writer.Header().Get("Content-Type") == "" {
+		writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+	}
 	writer.WriteHeader(status)
 	_ = json.NewEncoder(writer).Encode(response)
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -12,6 +13,7 @@ import (
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/database"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpapi"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpserver"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/observability"
 )
 
@@ -31,11 +33,17 @@ func main() {
 		os.Exit(1)
 	}
 	defer postgres.Close()
+	identityService, err := identity.NewService(postgres, appConfig.AuthSecret, rand.Reader, time.Now)
+	if err != nil {
+		logger.Error("identity initialization failed", "error", err)
+		os.Exit(1)
+	}
 
 	handler := httpapi.NewRouter(httpapi.Options{
 		Logger:         logger,
 		AllowedOrigins: appConfig.AllowedOrigins,
 		Readiness:      postgres,
+		Identity:       identityService,
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
