@@ -74,6 +74,7 @@ func main() {
 		WriteTimeout:             appConfig.RealtimeWriteTimeout,
 		PingInterval:             appConfig.RealtimePingInterval,
 		PongTimeout:              appConfig.RealtimePongTimeout,
+		PresenceGracePeriod:      appConfig.RealtimePresenceGracePeriod,
 		MaxConnections:           appConfig.RealtimeMaxConnections,
 		MaxConnectionsPerSession: appConfig.RealtimeMaxConnectionsPerSession,
 		MessageRate:              appConfig.RealtimeMessageRate,

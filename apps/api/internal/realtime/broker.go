@@ -7,26 +7,35 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
 )
 
 type broker struct {
-	logger *slog.Logger
-	mutex  sync.Mutex
-	rooms  map[string]map[*connection]struct{}
+	logger            *slog.Logger
+	gracePeriod       time.Duration
+	now               func() time.Time
+	expireParticipant func(context.Context, string, string, uint64)
+	mutex             sync.Mutex
+	rooms             map[string]map[*connection]struct{}
+	presence          map[string]map[string]*presenceEntry
 }
 
-func newBroker(logger *slog.Logger) *broker {
-	return &broker{logger: logger, rooms: make(map[string]map[*connection]struct{})}
+func newBroker(logger *slog.Logger, gracePeriod time.Duration, now func() time.Time, expireParticipant func(context.Context, string, string, uint64)) *broker {
+	return &broker{
+		logger: logger, gracePeriod: gracePeriod, now: now, expireParticipant: expireParticipant,
+		rooms: make(map[string]map[*connection]struct{}), presence: make(map[string]map[string]*presenceEntry),
+	}
 }
 
-func (broker *broker) subscribe(client *connection, tableID string, initialFrames [][]byte) bool {
+func (broker *broker) subscribe(client *connection, tableID string, initialFrames [][]byte, participants []table.Participant, participantID string) bool {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	if currentTableID := client.subscription(); currentTableID != "" {
+	if currentTableID, _ := client.subscriptionInfo(); currentTableID != "" {
 		broker.removeLocked(client, currentTableID)
 	}
+	broker.syncParticipantsLocked(tableID, participants)
 	for _, frame := range initialFrames {
 		if !client.enqueue(outboundFrame{message: frame}) {
 			client.closeSlowConsumer()
@@ -39,25 +48,30 @@ func (broker *broker) subscribe(client *connection, tableID string, initialFrame
 		broker.rooms[tableID] = room
 	}
 	room[client] = struct{}{}
-	client.setSubscription(tableID)
+	client.setSubscription(tableID, participantID)
+	broker.markOnlineLocked(client, tableID, participantID)
+	if frame, err := broker.presenceSnapshotFrameLocked(tableID); err == nil {
+		client.enqueue(outboundFrame{message: frame})
+	}
 	return true
 }
 
 func (broker *broker) unsubscribe(client *connection) {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	tableID := client.subscription()
+	tableID, _ := client.subscriptionInfo()
 	if tableID == "" {
 		return
 	}
 	broker.removeLocked(client, tableID)
-	client.setSubscription("")
+	client.setSubscription("", "")
 }
 
 func (broker *broker) publishResult(ctx context.Context, result table.CommandResult) error {
 	if result.Duplicate || result.Outcome.Status != table.CommandStatusAccepted || len(result.Events) == 0 {
 		return nil
 	}
+	broker.reconcileParticipants(result.Aggregate)
 	connections := broker.connections(result.Aggregate.ID)
 	projectionFrames := make(map[string][][]byte)
 	for _, connection := range connections {
@@ -98,6 +112,7 @@ func (broker *broker) publishResult(ctx context.Context, result table.CommandRes
 }
 
 func (broker *broker) publishSnapshot(ctx context.Context, aggregate table.Aggregate) error {
+	broker.reconcileParticipants(aggregate)
 	connections := broker.connections(aggregate.ID)
 	projectionFrames := make(map[string][]byte)
 	for _, connection := range connections {
@@ -126,6 +141,7 @@ func (broker *broker) publishSnapshot(ctx context.Context, aggregate table.Aggre
 			connection.closeSlowConsumer()
 		}
 	}
+	broker.publishPresenceSnapshot(aggregate.ID, connections)
 	return nil
 }
 
@@ -146,6 +162,20 @@ func (broker *broker) removeLocked(client *connection, tableID string) {
 	if len(room) == 0 {
 		delete(broker.rooms, tableID)
 	}
+	_, participantID := client.subscriptionInfo()
+	broker.markOfflineLocked(client, tableID, participantID)
+}
+
+func (broker *broker) drain() {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	for _, entries := range broker.presence {
+		for _, entry := range entries {
+			broker.cancelExpiryLocked(entry)
+		}
+	}
+	broker.rooms = make(map[string]map[*connection]struct{})
+	broker.presence = make(map[string]map[string]*presenceEntry)
 }
 
 func eventFrames(events []table.PersistedEvent, projection table.Projection) ([][]byte, error) {

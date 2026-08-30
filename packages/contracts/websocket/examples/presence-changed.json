@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "kind": "control",
+  "name": "presence.changed",
+  "table_id": "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31",
+  "payload": {
+    "participant": {
+      "participantId": "99ef3682-3ba8-42db-9c33-17238bfb2207",
+      "online": true
+    }
+  }
+}

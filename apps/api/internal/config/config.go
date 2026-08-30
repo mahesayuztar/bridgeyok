@@ -25,6 +25,7 @@ type Config struct {
 	RealtimeWriteTimeout             time.Duration
 	RealtimePingInterval             time.Duration
 	RealtimePongTimeout              time.Duration
+	RealtimePresenceGracePeriod      time.Duration
 	RealtimeMaxConnections           int
 	RealtimeMaxConnectionsPerSession int
 	RealtimeMessageRate              int
@@ -104,6 +105,10 @@ func load(lookup lookupFunc) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	realtimePresenceGracePeriod, err := durationValue(lookup, "REALTIME_PRESENCE_GRACE_PERIOD", time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
 	realtimeMaxConnections, err := integerValue(lookup, "REALTIME_MAX_CONNECTIONS", 256, 1, 10000)
 	if err != nil {
 		return Config{}, err
@@ -171,6 +176,7 @@ func load(lookup lookupFunc) (Config, error) {
 		RealtimeWriteTimeout:             realtimeWriteTimeout,
 		RealtimePingInterval:             realtimePingInterval,
 		RealtimePongTimeout:              realtimePongTimeout,
+		RealtimePresenceGracePeriod:      realtimePresenceGracePeriod,
 		RealtimeMaxConnections:           realtimeMaxConnections,
 		RealtimeMaxConnectionsPerSession: realtimeMaxConnectionsPerSession,
 		RealtimeMessageRate:              realtimeMessageRate,

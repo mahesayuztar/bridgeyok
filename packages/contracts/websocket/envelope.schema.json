@@ -84,6 +84,31 @@
         "role": { "enum": ["OWNER", "PARTICIPANT"] }
       }
     },
+    "presenceParticipant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["participantId", "online"],
+      "properties": {
+        "participantId": { "type": "string", "format": "uuid" },
+        "online": { "type": "boolean" },
+        "offlineSince": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "presenceSnapshotPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["participants"],
+      "properties": {
+        "participants": { "type": "array", "items": { "$ref": "#/$defs/presenceParticipant" } }
+      }
+    },
+    "presenceChangedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["participant"],
+      "properties": { "participant": { "$ref": "#/$defs/presenceParticipant" } }
+    },
     "seatAssignment": {
       "type": "object",
       "additionalProperties": false,
@@ -366,7 +391,29 @@
         "request_id": { "$ref": "#/$defs/requestId" },
         "table_id": { "$ref": "#/$defs/tableId" },
         "payload": { "$ref": "#/$defs/payload" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "name": { "const": "presence.snapshot" } }, "required": ["name"] },
+          "then": {
+            "required": ["table_id"],
+            "properties": {
+              "table_id": { "$ref": "#/$defs/tableId" },
+              "payload": { "$ref": "#/$defs/presenceSnapshotPayload" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "name": { "const": "presence.changed" } }, "required": ["name"] },
+          "then": {
+            "required": ["table_id"],
+            "properties": {
+              "table_id": { "$ref": "#/$defs/tableId" },
+              "payload": { "$ref": "#/$defs/presenceChangedPayload" }
+            }
+          }
+        }
+      ]
     }
   }
 }

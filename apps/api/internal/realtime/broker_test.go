@@ -22,8 +22,11 @@ func TestBrokerProjectsEventsForEachRecipient(t *testing.T) {
 	server := &Server{options: Options{OutboundQueueBytes: 128 << 10}}
 	north := projectedConnection(server, sessions[bridge.North])
 	east := projectedConnection(server, sessions[bridge.East])
-	roomBroker := newBroker(slog.New(slog.NewJSONHandler(io.Discard, nil)))
-	if !roomBroker.subscribe(north, aggregate.ID, nil) || !roomBroker.subscribe(east, aggregate.ID, nil) {
+	roomBroker := newBroker(slog.New(slog.NewJSONHandler(io.Discard, nil)), time.Hour, time.Now, nil)
+	t.Cleanup(roomBroker.drain)
+	northParticipant, _ := activeParticipantForSession(aggregate, sessions[bridge.North])
+	eastParticipant, _ := activeParticipantForSession(aggregate, sessions[bridge.East])
+	if !roomBroker.subscribe(north, aggregate.ID, nil, aggregate.Participants, northParticipant.ID) || !roomBroker.subscribe(east, aggregate.ID, nil, aggregate.Participants, eastParticipant.ID) {
 		t.Fatal("subscribe() rejected test connections")
 	}
 	result := table.CommandResult{
@@ -49,6 +52,51 @@ func TestBrokerProjectsEventsForEachRecipient(t *testing.T) {
 	}
 	if reflect.DeepEqual(northProjection.Game.OwnHand, eastProjection.Game.OwnHand) || northProjection.Game.FullDeal != nil || eastProjection.Game.FullDeal != nil {
 		t.Fatal("recipient projection exposed another hand or the full deal")
+	}
+}
+
+func TestBrokerPresenceExpiresAfterLastConnection(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	owner := table.Participant{ID: "dd681310-2bad-4251-b9a8-c74d496a18f9", SessionID: "01d180b4-2dbd-4280-981b-c69c20da25cc", Nickname: "Owner", Role: table.RoleOwner, JoinedAt: now}
+	guest := table.Participant{ID: "418e80c2-574e-45e9-bad9-a71267c1f69c", SessionID: "944d1d7b-425f-454f-82aa-dae40e000760", Nickname: "Guest", Role: table.RoleParticipant, JoinedAt: now}
+	aggregate, err := table.NewAggregate(realtimeTableID, owner)
+	if err != nil {
+		t.Fatalf("NewAggregate() error = %v", err)
+	}
+	decision, domainError := table.Decide(aggregate, table.Command{Name: table.CommandJoinTable, Participant: &guest})
+	if domainError != nil {
+		t.Fatalf("join setup error = %v", domainError)
+	}
+	aggregate = decision.NextState
+	expired := make(chan string, 2)
+	roomBroker := newBroker(slog.New(slog.NewJSONHandler(io.Discard, nil)), 20*time.Millisecond, time.Now, func(_ context.Context, _ string, participantID string, _ uint64) {
+		expired <- participantID
+	})
+	t.Cleanup(roomBroker.drain)
+	server := &Server{options: Options{OutboundQueueBytes: 128 << 10}}
+	ownerConnection := projectedConnection(server, owner.SessionID)
+	firstGuestConnection := projectedConnection(server, guest.SessionID)
+	secondGuestConnection := projectedConnection(server, guest.SessionID)
+	roomBroker.subscribe(ownerConnection, aggregate.ID, nil, aggregate.Participants, owner.ID)
+	roomBroker.subscribe(firstGuestConnection, aggregate.ID, nil, aggregate.Participants, guest.ID)
+	roomBroker.subscribe(secondGuestConnection, aggregate.ID, nil, aggregate.Participants, guest.ID)
+
+	roomBroker.unsubscribe(firstGuestConnection)
+	select {
+	case participantID := <-expired:
+		t.Fatalf("participant %s expired while another connection remained", participantID)
+	case <-time.After(40 * time.Millisecond):
+	}
+	roomBroker.unsubscribe(secondGuestConnection)
+	select {
+	case participantID := <-expired:
+		if participantID != guest.ID {
+			t.Fatalf("expired participant = %s, want %s", participantID, guest.ID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("offline participant did not expire")
 	}
 }
 
@@ -157,11 +205,22 @@ func projectedConnection(server *Server, sessionID string) *connection {
 
 func projectedTableFromQueue(t *testing.T, connection *connection) table.Projection {
 	t.Helper()
-	frame := <-connection.outbound
-	connection.releaseQueuedBytes(len(frame.message))
-	var envelope eventEnvelope
-	if err := json.Unmarshal(frame.message, &envelope); err != nil {
-		t.Fatalf("decode event envelope: %v", err)
+	for {
+		frame := <-connection.outbound
+		connection.releaseQueuedBytes(len(frame.message))
+		var kind struct {
+			Kind string `json:"kind"`
+		}
+		if err := json.Unmarshal(frame.message, &kind); err != nil {
+			t.Fatalf("decode queued envelope: %v", err)
+		}
+		if kind.Kind != "event" {
+			continue
+		}
+		var envelope eventEnvelope
+		if err := json.Unmarshal(frame.message, &envelope); err != nil {
+			t.Fatalf("decode event envelope: %v", err)
+		}
+		return envelope.Payload.Table
 	}
-	return envelope.Payload.Table
 }

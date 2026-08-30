@@ -1,0 +1,16 @@
+{
+  "v": 1,
+  "kind": "control",
+  "name": "presence.snapshot",
+  "table_id": "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31",
+  "payload": {
+    "participants": [
+      {
+        "participantId": "99ef3682-3ba8-42db-9c33-17238bfb2207",
+        "online": false,
+        "offlineSince": "2026-08-31T10:00:00Z",
+        "expiresAt": "2026-08-31T10:01:00Z"
+      }
+    ]
+  }
+}

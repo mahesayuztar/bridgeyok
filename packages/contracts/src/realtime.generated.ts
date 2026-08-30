@@ -36,6 +36,14 @@ export type MutationCommandEnvelope = {
 };
 export type Revision = number;
 export type MessageName = string;
+export type ControlEnvelope = {
+  v: Version;
+  kind: "control";
+  name: MessageName;
+  request_id?: RequestId;
+  table_id?: TableId;
+  payload: Payload;
+};
 
 export interface SubscriptionCommandEnvelope {
   v: Version;
@@ -132,12 +140,4 @@ export interface SnapshotEnvelope {
   revision: Revision;
   seq: Sequence;
   payload: TableProjection;
-}
-export interface ControlEnvelope {
-  v: Version;
-  kind: "control";
-  name: MessageName;
-  request_id?: RequestId;
-  table_id?: TableId;
-  payload: Payload;
 }

@@ -253,8 +253,9 @@ func TestServerSubscribesAndBroadcastsAckBeforeProjectedEvent(t *testing.T) {
 	})
 	ack, _ := readScripted(t, client)
 	snapshot, _ := readScripted(t, client)
-	if ack.Kind != "ack" || ack.Name != "table.subscribed" || snapshot.Kind != "snapshot" {
-		t.Fatalf("subscription frames = %+v then %+v", ack, snapshot)
+	presence, _ := readScripted(t, client)
+	if ack.Kind != "ack" || ack.Name != "table.subscribed" || snapshot.Kind != "snapshot" || presence.Name != "presence.snapshot" {
+		t.Fatalf("subscription frames = %+v, %+v, %+v", ack, snapshot, presence)
 	}
 
 	writeScripted(t, client, map[string]any{
@@ -410,6 +411,43 @@ func TestServerRejectsTableSubscriptionForNonParticipant(t *testing.T) {
 	}
 }
 
+func TestServerOwnerExpiryPromotesOnlineParticipant(t *testing.T) {
+	t.Parallel()
+
+	aggregate := realtimeAggregate(t)
+	guest := table.Participant{
+		ID: "91eeb013-54a1-4287-92cc-715904206f65", SessionID: "482f6524-66c1-4313-886c-e6bfd07fe58f",
+		Nickname: "Replacement", Role: table.RoleParticipant, JoinedAt: time.Now().UTC(),
+	}
+	decision, domainError := table.Decide(aggregate, table.Command{Name: table.CommandJoinTable, Participant: &guest})
+	if domainError != nil {
+		t.Fatalf("join setup error = %v", domainError)
+	}
+	aggregate = decision.NextState
+	server, _, runtime := scriptedServer(t, aggregate, nil)
+	ownerConnection := projectedConnection(server, realtimeSessionID)
+	guestConnection := projectedConnection(server, guest.SessionID)
+	server.broker.subscribe(ownerConnection, aggregate.ID, nil, aggregate.Participants, realtimeParticipantID)
+	server.broker.subscribe(guestConnection, aggregate.ID, nil, aggregate.Participants, guest.ID)
+	server.broker.unsubscribe(ownerConnection)
+	server.broker.mutex.Lock()
+	generation := server.broker.presence[aggregate.ID][realtimeParticipantID].generation
+	server.broker.mutex.Unlock()
+
+	server.expireParticipant(t.Context(), aggregate.ID, realtimeParticipantID, generation)
+	updated, err := runtime.Snapshot(t.Context(), aggregate.ID)
+	if err != nil {
+		t.Fatalf("Snapshot() error = %v", err)
+	}
+	if updated.OwnerSessionID != guest.SessionID {
+		t.Fatalf("owner session = %s, want %s", updated.OwnerSessionID, guest.SessionID)
+	}
+	owner, exists := activeParticipantByID(updated, guest.ID)
+	if !exists || owner.Role != table.RoleOwner {
+		t.Fatalf("replacement owner = %+v", owner)
+	}
+}
+
 func TestServerTakeoverFencesOldControllerEpoch(t *testing.T) {
 	t.Parallel()
 
@@ -431,6 +469,7 @@ func TestServerTakeoverFencesOldControllerEpoch(t *testing.T) {
 		"v": 1, "kind": "command", "name": "table.subscribe", "request_id": "subscribe_02",
 		"table_id": realtimeTableID, "payload": map[string]any{"last_seen_seq": 1},
 	})
+	readScripted(t, client)
 	readScripted(t, client)
 	readScripted(t, client)
 
@@ -595,11 +634,13 @@ func scriptedServer(t *testing.T, aggregate table.Aggregate, events []table.Pers
 		Identity: identityService, Tables: runtime, Events: runtime, Random: rand.Reader, Now: time.Now,
 		ReadLimitBytes: 8 << 10, OutboundQueueCapacity: 32, OutboundQueueBytes: 128 << 10,
 		WriteTimeout: time.Second, PingInterval: time.Hour, PongTimeout: time.Second,
-		MaxConnections: 8, MaxConnectionsPerSession: 3, MessageRate: 100, MessageBurst: 100, RecoveryLimit: 16,
+		PresenceGracePeriod: time.Hour,
+		MaxConnections:      8, MaxConnectionsPerSession: 3, MessageRate: 100, MessageBurst: 100, RecoveryLimit: 16,
 	})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
 	}
+	t.Cleanup(server.broker.drain)
 	return server, identityService, runtime
 }
 

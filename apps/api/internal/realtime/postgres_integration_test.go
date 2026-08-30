@@ -79,7 +79,8 @@ func TestPostgresWebSocketCommandAndResume(t *testing.T) {
 		Logger: logger, AllowedOrigins: []string{realtimeOrigin}, Identity: identityService, Tables: actors, Events: postgres,
 		Random: rand.Reader, Now: time.Now, ReadLimitBytes: 8 << 10, OutboundQueueCapacity: 32, OutboundQueueBytes: 128 << 10,
 		WriteTimeout: time.Second, PingInterval: time.Hour, PongTimeout: time.Second,
-		MaxConnections: 8, MaxConnectionsPerSession: 3, MessageRate: 100, MessageBurst: 100, RecoveryLimit: 16,
+		PresenceGracePeriod: time.Hour,
+		MaxConnections:      8, MaxConnectionsPerSession: 3, MessageRate: 100, MessageBurst: 100, RecoveryLimit: 16,
 	})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
@@ -96,6 +97,7 @@ func TestPostgresWebSocketCommandAndResume(t *testing.T) {
 		"v": 1, "kind": "command", "name": "table.subscribe", "request_id": "subscribe_db_01",
 		"table_id": created.Projection.TableID, "payload": map[string]any{"last_seen_seq": 0},
 	})
+	readScripted(t, first)
 	readScripted(t, first)
 	readScripted(t, first)
 	writeScripted(t, first, map[string]any{
