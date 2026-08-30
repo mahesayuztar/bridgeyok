@@ -14,6 +14,7 @@ import {
   type Call,
   type Card,
   type LiveTableProjection,
+  type ParticipantPresence,
   type Seat,
   type Suit,
   type TableOrientation,
@@ -66,6 +67,15 @@ function cardKey(card: Card) {
   return `${card.suit}${card.rank}`;
 }
 
+function presenceLabel(presence: ParticipantPresence | undefined, now: number, isOwner: boolean) {
+  if (presence === undefined) return "Status belum tersedia";
+  if (presence.online) return "Online";
+  if (presence.expiresAt === undefined) return "Offline";
+  const remainingSeconds = Math.max(0, Math.ceil((Date.parse(presence.expiresAt) - now) / 1000));
+  if (remainingSeconds === 0) return isOwner ? "Offline · menunggu master baru" : "Offline · segera keluar";
+  return `Offline · 0:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 function PlayingCard({ card, variant, disabled = false, playable = false, onPlay }: {
   card: Card;
   variant: "hand" | "dummy" | "trick";
@@ -105,8 +115,10 @@ function BridgeHand({ cards, title, variant = "hand", playableCards = [], disabl
   );
 }
 
-function PlayerPosition({ table, seat, position, disabled, turn, onCommand, onRemove }: {
+function PlayerPosition({ table, presence, now, seat, position, disabled, turn, onCommand, onRemove }: {
   table: LiveTableProjection;
+  presence: Record<string, ParticipantPresence>;
+  now: number;
   seat: Seat;
   position: VisualPosition;
   disabled: boolean;
@@ -117,16 +129,21 @@ function PlayerPosition({ table, seat, position, disabled, turn, onCommand, onRe
   const assignment = table.seats[seat];
   const isViewer = table.viewerParticipantId === assignment?.participantId;
   const name = participantName(table, assignment?.participantId);
+  const participant = table.participants.find((candidate) => candidate.id === assignment?.participantId);
+  const participantPresence = assignment === undefined ? undefined : presence[assignment.participantId];
+  const canTakeSeat = table.state === "WAITING" || table.viewerSeat === undefined && (table.state === "ACTIVE" || table.state === "BETWEEN_BOARDS");
+  const canRemove = onRemove !== undefined && (!isViewer || table.participants.length > 1);
   return (
-    <div className={`player-position player-${position}`} data-occupied={assignment !== undefined} data-turn={turn}>
+    <div className={`player-position player-${position}`} data-occupied={assignment !== undefined} data-turn={turn} data-presence={participantPresence === undefined ? "unknown" : participantPresence.online ? "online" : "offline"}>
       <span className="player-seat">{seat}</span>
       {assignment === undefined ? (
-        <button type="button" disabled={disabled || table.state !== "WAITING"} onClick={() => onCommand("table.take_seat", { seat })}>Duduk <span className="seat-name">di {SEAT_LABELS[seat]}</span></button>
+        <button type="button" disabled={disabled || !canTakeSeat} onClick={() => onCommand("table.take_seat", { seat })}>Duduk <span className="seat-name">di {SEAT_LABELS[seat]}</span></button>
       ) : (
         <div className="player-copy">
-          <strong>{name}{isViewer ? " · kamu" : ""}</strong>
+          <strong>{name}{isViewer ? " · kamu" : ""}{participant?.role === "OWNER" ? " · master" : ""}</strong>
           <span>{table.state === "WAITING" ? assignment.ready ? "Siap" : "Belum siap" : turn ? "Giliran" : SEAT_LABELS[seat]}</span>
-          {onRemove === undefined || isViewer ? null : <button type="button" disabled={disabled} onClick={() => onRemove(assignment.participantId)}>Keluarkan</button>}
+          <span className="player-presence"><span className="presence-mark" />{presenceLabel(participantPresence, now, participant?.role === "OWNER")}</span>
+          {!canRemove ? null : <button type="button" disabled={disabled} onClick={() => onRemove(assignment.participantId)}>{isViewer ? "Serahkan & keluar" : "Keluarkan"}</button>}
         </div>
       )}
     </div>
@@ -176,19 +193,21 @@ function CurrentTrick({ game, orientation }: { game: NonNullable<LiveTableProjec
   );
 }
 
-function TableSurface({ table, orientation, commandDisabled, children }: { table: LiveTableProjection; orientation: TableOrientation; commandDisabled: boolean; children: ReactNode }) {
+function TableSurface({ table, orientation, session, presenceNow, commandDisabled, children }: { table: LiveTableProjection; orientation: TableOrientation; session: TableSession; presenceNow: number; commandDisabled: boolean; children: ReactNode }) {
+  const isOwner = table.viewerRole === "OWNER";
   return (
     <div className="table-surface">
-      {(Object.entries(orientation) as Array<[VisualPosition, Seat]>).map(([position, seat]) => <PlayerPosition key={seat} table={table} seat={seat} position={position} disabled={commandDisabled} turn={table.game?.turn === seat} onCommand={() => undefined} />)}
+      {(Object.entries(orientation) as Array<[VisualPosition, Seat]>).map(([position, seat]) => <PlayerPosition key={seat} table={table} presence={session.tableState.presence} now={presenceNow} seat={seat} position={position} disabled={commandDisabled} turn={table.game?.turn === seat} onCommand={session.sendCommand} {...(isOwner ? { onRemove: (participantId: string) => session.sendCommand("table.remove_participant", { participant_id: participantId }) } : {})} />)}
       {children}
     </div>
   );
 }
 
-function WaitingRoom({ table, orientation, session, commandDisabled, shareUrl, copied, onCopy }: {
+function WaitingRoom({ table, orientation, session, presenceNow, commandDisabled, shareUrl, copied, onCopy }: {
   table: LiveTableProjection;
   orientation: TableOrientation;
   session: TableSession;
+  presenceNow: number;
   commandDisabled: boolean;
   shareUrl: string;
   copied: boolean;
@@ -205,12 +224,12 @@ function WaitingRoom({ table, orientation, session, commandDisabled, shareUrl, c
         {session.inviteCode === null ? null : <div className="invite-inline"><span>Kode undangan</span><strong>{session.inviteCode}</strong><button type="button" onClick={onCopy}>{copied ? "Tautan disalin" : "Salin tautan"}</button><span className="sr-only">{shareUrl}</span></div>}
       </div>
       <div className="waiting-table table-surface">
-        {(Object.entries(orientation) as Array<[VisualPosition, Seat]>).map(([position, seat]) => <PlayerPosition key={seat} table={table} seat={seat} position={position} disabled={commandDisabled} turn={false} onCommand={session.sendCommand} {...(isOwner ? { onRemove: (participantId: string) => session.sendCommand("table.remove_participant", { participant_id: participantId }) } : {})} />)}
+        {(Object.entries(orientation) as Array<[VisualPosition, Seat]>).map(([position, seat]) => <PlayerPosition key={seat} table={table} presence={session.tableState.presence} now={presenceNow} seat={seat} position={position} disabled={commandDisabled} turn={false} onCommand={session.sendCommand} {...(isOwner ? { onRemove: (participantId: string) => session.sendCommand("table.remove_participant", { participant_id: participantId }) } : {})} />)}
         <div className="waiting-center"><strong>{table.locked ? "Meja dikunci" : "Meja terbuka"}</strong><span>{SEATS.filter((seat) => table.seats[seat]?.ready).length}/4 siap</span></div>
       </div>
       <div className="waiting-controls">
         {table.viewerSeat === undefined ? <p>Pilih kursi kosong pada meja.</p> : <><button className="primary-button" type="button" disabled={commandDisabled} onClick={() => session.sendCommand("table.set_ready", { ready: !viewerAssignment?.ready })}>{viewerAssignment?.ready ? "Batalkan siap" : "Saya siap"}</button><button type="button" disabled={commandDisabled} onClick={() => session.sendCommand("table.leave_seat")}>Berdiri dari kursi</button></>}
-        {isOwner ? <><button type="button" disabled={commandDisabled} onClick={() => session.sendCommand("table.lock", { locked: !table.locked })}>{table.locked ? "Buka meja" : "Kunci meja"}</button><button className="start-board-button" type="button" disabled={commandDisabled || !allReady} onClick={() => session.sendCommand("table.start_game")}>Mulai board</button><button type="button" disabled={commandDisabled} onClick={() => session.sendCommand("table.finish")}>Akhiri meja</button></> : null}
+        {isOwner ? <><button type="button" disabled={commandDisabled} onClick={() => session.sendCommand("table.lock", { locked: !table.locked })}>{table.locked ? "Buka meja" : "Kunci meja"}</button><button className="start-board-button" type="button" disabled={commandDisabled || !allReady} onClick={() => session.sendCommand("table.start_game")}>Mulai board</button><button type="button" disabled={commandDisabled} onClick={() => session.sendCommand("table.finish")}>Akhiri meja</button>{table.viewerSeat !== undefined || table.participants.length < 2 ? null : <button type="button" disabled={commandDisabled} onClick={() => session.sendCommand("table.remove_participant", { participant_id: table.viewerParticipantId })}>Serahkan master & keluar</button>}</> : null}
       </div>
     </div>
   );
@@ -234,6 +253,7 @@ export default function BridgeTable({ expectedTableId }: { expectedTableId: stri
   const { openTable, sendCommand } = session;
   const attemptedTableIdRef = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [presenceNow, setPresenceNow] = useState(Date.now());
   const table = session.tableState.table;
   const game = table?.game;
   const hasPendingCommand = Object.keys(session.tableState.pending).length > 0;
@@ -241,6 +261,14 @@ export default function BridgeTable({ expectedTableId }: { expectedTableId: stri
   const orientation = useMemo(() => tableOrientation(table?.viewerSeat), [table?.viewerSeat]);
   const legalPlay = table === null ? null : playableHand(table);
   const viewerTurn = game?.turn === table?.viewerSeat;
+  const hasPresenceCountdown = Object.values(session.tableState.presence).some((presence) => !presence.online && presence.expiresAt !== undefined);
+
+  useEffect(() => {
+    setPresenceNow(Date.now());
+    if (!hasPresenceCountdown) return;
+    const interval = window.setInterval(() => setPresenceNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [hasPresenceCountdown]);
 
   useEffect(() => {
     if (session.initializing) return;
@@ -306,7 +334,7 @@ export default function BridgeTable({ expectedTableId }: { expectedTableId: stri
           if (action === "retry") session.reconnect();
           else if (action === "resync") session.resync();
         }} />}
-        <WaitingRoom table={table} orientation={orientation} session={session} commandDisabled={commandDisabled} shareUrl={shareUrl} copied={copied} onCopy={() => void copyInvite()} />
+        <WaitingRoom table={table} orientation={orientation} session={session} presenceNow={presenceNow} commandDisabled={commandDisabled} shareUrl={shareUrl} copied={copied} onCopy={() => void copyInvite()} />
         {table.viewerRole === "PARTICIPANT" ? <button className="leave-table-button" type="button" disabled={session.busy} onClick={() => void returnToLobby()}>Tinggalkan meja</button> : null}
       </main>
     );
@@ -333,7 +361,7 @@ export default function BridgeTable({ expectedTableId }: { expectedTableId: stri
         {session.tableState.notice === null ? null : <div className="success-notice" role="status"><span>{session.tableState.notice}</span><button type="button" onClick={session.dismissNotice} aria-label="Tutup konfirmasi">×</button></div>}
       </div>
 
-      <TableSurface table={table} orientation={orientation} commandDisabled={commandDisabled}>
+      <TableSurface table={table} orientation={orientation} session={session} presenceNow={presenceNow} commandDisabled={commandDisabled}>
         {game?.phase === "AUCTION" ? <div className="auction-workspace"><AuctionTable game={game} /><BiddingBox legalCalls={game.legalCalls ?? []} disabled={commandDisabled || !viewerTurn} onCall={(call) => session.sendCommand("game.make_call", { call })} /></div> : null}
         {game !== undefined && (game.phase === "OPENING_LEAD" || game.phase === "PLAY") ? <>{game.dummyHand === undefined || dummyPosition === undefined ? null : <BridgeHand className={`dummy-hand dummy-${dummyPosition}`} title={`Dummy · ${dummySeat}`} variant="dummy" cards={game.dummyHand} playableCards={legalPlay?.source === "dummy" ? legalPlay.hand : []} disabled={commandDisabled} onPlay={(card) => session.sendCommand("game.play_card", { card })} />}<CurrentTrick game={game} orientation={orientation} /></> : null}
         {game?.result === undefined && table.state !== "FINISHED" ? null : table.state === "FINISHED" ? <section className="board-result finished-result"><p>Meja selesai</p><h2>Terima kasih sudah bermain.</h2><button className="primary-button" type="button" disabled={session.busy} onClick={() => void returnToLobby()}>Kembali ke lobby</button></section> : <BoardResult table={table} session={session} commandDisabled={commandDisabled} />}

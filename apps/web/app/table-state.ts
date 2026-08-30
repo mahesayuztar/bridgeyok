@@ -83,6 +83,13 @@ export type LiveTableProjection = Omit<TableProjection, "game"> & {
   game?: GameProjection;
 };
 
+export type ParticipantPresence = {
+  participantId: string;
+  online: boolean;
+  offlineSince?: string;
+  expiresAt?: string;
+};
+
 export type VisualPosition = "top" | "right" | "bottom" | "left";
 export type TableOrientation = Record<VisualPosition, Seat>;
 export type AuctionRow = Partial<Record<Seat, CallRecord>>;
@@ -92,6 +99,7 @@ export type TableClientState = {
   table: LiveTableProjection | null;
   lastSeenSeq: number;
   pending: Record<string, CommandName>;
+  presence: Record<string, ParticipantPresence>;
   issue: ClientIssue | null;
   notice: string | null;
   controllerState: "current" | "resyncing" | "readyToTakeover" | "takeoverPending";
@@ -101,6 +109,8 @@ export type TableAction =
   | { type: "enter"; table: LiveTableProjection }
   | { type: "snapshot"; tableId: string; seq: number; table: LiveTableProjection }
   | { type: "event"; tableId: string; seq: number; table: LiveTableProjection; eventType?: string }
+  | { type: "presenceSnapshot"; tableId: string; participants: ParticipantPresence[] }
+  | { type: "presenceChanged"; tableId: string; participant: ParticipantPresence }
   | { type: "pending"; requestId: string; commandName: CommandName }
   | { type: "settled"; requestId: string; issue?: ClientIssue }
   | { type: "conflict"; issue: ClientIssue }
@@ -115,6 +125,7 @@ export function createEmptyTableState(): TableClientState {
     table: null,
     lastSeenSeq: 0,
     pending: {},
+    presence: {},
     issue: null,
     notice: null,
     controllerState: "current"
@@ -129,6 +140,7 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         table: action.table,
         lastSeenSeq: action.table.lastSeq,
         pending: {},
+        presence: {},
         issue: null,
         notice: null,
         controllerState: "current"
@@ -144,6 +156,7 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         table: action.table,
         lastSeenSeq: Math.max(action.seq, action.table.lastSeq),
         pending: {},
+        presence: retainActivePresence(state.presence, action.table),
         issue: readyToTakeover ? {
           kind: "conflict",
           title: "Meja sudah selaras",
@@ -155,23 +168,48 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         controllerState: readyToTakeover ? "readyToTakeover" : "current"
       };
     }
-    case "event":
+    case "event": {
       if (state.activeTableId !== action.tableId || action.table.tableId !== action.tableId || action.seq <= state.lastSeenSeq) {
         return state;
       }
+      const becameOwner = state.table?.viewerRole === "PARTICIPANT" && action.table.viewerRole === "OWNER";
+      const controllerReplaced = action.eventType === "CONTROLLER_REPLACED" && state.controllerState === "takeoverPending";
       return {
         ...state,
         table: action.table,
         lastSeenSeq: Math.max(action.seq, action.table.lastSeq),
         pending: {},
-        issue: action.eventType === "CONTROLLER_REPLACED" && state.controllerState === "takeoverPending" ? null : state.issue,
-        notice: action.eventType === "CONTROLLER_REPLACED" && state.controllerState === "takeoverPending" ? "Kendali sudah berpindah ke perangkat ini." : state.notice,
-        controllerState: action.eventType === "CONTROLLER_REPLACED" && state.controllerState === "takeoverPending"
+        presence: retainActivePresence(state.presence, action.table),
+        issue: controllerReplaced ? null : state.issue,
+        notice: becameOwner
+          ? "Kamu sekarang menjadi master meja."
+          : controllerReplaced
+            ? "Kendali sudah berpindah ke perangkat ini."
+            : action.eventType === "PARTICIPANT_TIMED_OUT"
+              ? "Pemain offline sudah dikeluarkan dari meja."
+              : state.notice,
+        controllerState: controllerReplaced
           ? "current"
           : state.controllerState === "resyncing" && action.table.viewerSeat !== undefined
             ? "readyToTakeover"
             : state.controllerState
       };
+    }
+    case "presenceSnapshot": {
+      if (state.activeTableId !== action.tableId || state.table === null) {
+        return state;
+      }
+      const activeParticipantIds = new Set(state.table.participants.map((participant) => participant.id));
+      return {
+        ...state,
+        presence: Object.fromEntries(action.participants.filter((participant) => activeParticipantIds.has(participant.participantId)).map((participant) => [participant.participantId, participant]))
+      };
+    }
+    case "presenceChanged":
+      if (state.activeTableId !== action.tableId || state.table === null || !state.table.participants.some((participant) => participant.id === action.participant.participantId)) {
+        return state;
+      }
+      return { ...state, presence: { ...state.presence, [action.participant.participantId]: action.participant } };
     case "pending":
       return {
         ...state,
@@ -207,6 +245,11 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
     case "clear":
       return createEmptyTableState();
   }
+}
+
+function retainActivePresence(presence: Record<string, ParticipantPresence>, table: LiveTableProjection) {
+  const activeParticipantIds = new Set(table.participants.map((participant) => participant.id));
+  return Object.fromEntries(Object.entries(presence).filter(([participantId]) => activeParticipantIds.has(participantId)));
 }
 
 export function playableHand(table: LiveTableProjection): { hand: Card[]; source: "own" | "dummy" } | null {

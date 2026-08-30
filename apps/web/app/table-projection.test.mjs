@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeLiveTableProjection } from "./table-projection.ts";
+import { normalizeLiveTableProjection, normalizeParticipantPresence, normalizePresenceSnapshot } from "./table-projection.ts";
 
 function activeProjection() {
   return {
@@ -48,4 +48,17 @@ test("rejects malformed nested projection items instead of exposing them to rend
   projection.game.auction.calls = [null];
 
   assert.equal(normalizeLiveTableProjection(projection), null);
+});
+
+test("normalizes presence snapshots and rejects malformed timestamps", () => {
+  const offline = {
+    participantId: "participant-1",
+    online: false,
+    offlineSince: "2026-08-31T10:00:00Z",
+    expiresAt: "2026-08-31T10:01:00Z"
+  };
+  assert.deepEqual(normalizeParticipantPresence(offline), offline);
+  assert.deepEqual(normalizePresenceSnapshot({ participants: [offline] }), [offline]);
+  assert.equal(normalizeParticipantPresence({ ...offline, expiresAt: "not-a-date" }), null);
+  assert.deepEqual(normalizePresenceSnapshot({ participants: null }), []);
 });

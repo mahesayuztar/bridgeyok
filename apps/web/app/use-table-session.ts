@@ -5,7 +5,7 @@ import type { MutationCommandEnvelope } from "@bridgeyok/contracts/realtime";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { issueFromFailure, issueFromServer, type ClientIssue } from "./client-issue";
 import { createRequestId } from "./request-id";
-import { normalizeLiveTableProjection } from "./table-projection";
+import { normalizeLiveTableProjection, normalizeParticipantPresence, normalizePresenceSnapshot } from "./table-projection";
 import {
   createEmptyTableState,
   reduceTableState,
@@ -364,6 +364,25 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
             } else {
               dispatch({ type: "issue", issue });
             }
+          } else if (envelope.kind === "control" && envelope.name === "presence.snapshot") {
+            const participants = normalizePresenceSnapshot(envelope.payload);
+            if (participants === null) {
+              setConnectionState("degraded");
+              dispatch({ type: "issue", issue: issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "websocket" }) });
+              return;
+            }
+            dispatch({ type: "presenceSnapshot", tableId, participants });
+          } else if (envelope.kind === "control" && envelope.name === "presence.changed") {
+            const payload = envelope.payload !== null && typeof envelope.payload === "object" && !Array.isArray(envelope.payload)
+              ? envelope.payload as Record<string, unknown>
+              : null;
+            const participant = normalizeParticipantPresence(payload?.participant);
+            if (participant === null) {
+              setConnectionState("degraded");
+              dispatch({ type: "issue", issue: issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "websocket" }) });
+              return;
+            }
+            dispatch({ type: "presenceChanged", tableId, participant });
           } else if (envelope.kind === "control" && envelope.name === "table.access_revoked") {
             clearTable();
           } else if (envelope.kind === "control" && envelope.name === "server.draining") {

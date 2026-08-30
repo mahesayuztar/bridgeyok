@@ -55,6 +55,43 @@ test("table reducer converges to projected event sequence", () => {
   assert.deepEqual(next.pending, {});
 });
 
+test("table reducer tracks presence and removes departed participants", () => {
+  const projected = {
+    ...tableProjection("table-a", 1),
+    participants: [
+      { id: "owner", nickname: "Owner", role: "OWNER" },
+      { id: "guest", nickname: "Guest", role: "PARTICIPANT" }
+    ]
+  };
+  const entered = reduceTableState(createEmptyTableState(), { type: "enter", table: projected });
+  const presence = reduceTableState(entered, {
+    type: "presenceSnapshot",
+    tableId: "table-a",
+    participants: [
+      { participantId: "owner", online: true },
+      { participantId: "guest", online: false, offlineSince: "2026-08-31T10:00:00Z", expiresAt: "2026-08-31T10:01:00Z" },
+      { participantId: "unknown", online: true }
+    ]
+  });
+  assert.deepEqual(Object.keys(presence.presence).sort(), ["guest", "owner"]);
+  const online = reduceTableState(presence, {
+    type: "presenceChanged",
+    tableId: "table-a",
+    participant: { participantId: "guest", online: true }
+  });
+  assert.equal(online.presence.guest.online, true);
+
+  const afterTimeout = reduceTableState(online, {
+    type: "event",
+    tableId: "table-a",
+    seq: 2,
+    eventType: "PARTICIPANT_TIMED_OUT",
+    table: { ...projected, revision: 2, lastSeq: 2, participants: projected.participants.slice(0, 1) }
+  });
+  assert.deepEqual(Object.keys(afterTimeout.presence), ["owner"]);
+  assert.equal(afterTimeout.notice, "Pemain offline sudah dikeluarkan dari meja.");
+});
+
 test("playable hand supports declarer dummy control and follow suit", () => {
   const table = {
     ...tableProjection("table-a", 8),

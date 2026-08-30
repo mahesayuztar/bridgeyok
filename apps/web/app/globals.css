@@ -12,6 +12,8 @@
   --ready: #2f6a4f;
   --starting: #9a681f;
   --offline: #8a3d36;
+  --offline-on-dark: #ffd1ca;
+  --ready-on-dark: #b7e2cc;
   --focus: #235b9d;
   --table-felt: #12613c;
   --table-felt-dark: #0b3e29;
@@ -201,6 +203,7 @@ h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; text-
 .table-surface { position: relative; min-width: 0; min-height: 0; overflow: hidden; border: .45rem solid var(--table-felt-dark); background: var(--table-felt); color: var(--table-ink); }
 .player-position { position: absolute; z-index: 12; display: flex; max-width: 12rem; align-items: center; gap: .45rem; padding: .35rem .55rem; border: 1px solid rgb(255 255 255 / 18%); background: var(--table-felt-dark); color: var(--table-ink); }
 .player-position[data-turn="true"] { border-color: #f1c85a; }
+.player-position[data-presence="offline"] { border-color: var(--offline-on-dark); }
 .player-top { top: .55rem; left: 50%; transform: translateX(-50%); }
 .player-right { top: 50%; right: .55rem; transform: translateY(-50%); }
 .player-bottom { bottom: .55rem; left: 50%; transform: translateX(-50%); }
@@ -210,6 +213,10 @@ h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; text-
 .player-copy strong, .player-copy > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player-copy strong { font-size: .8rem; }
 .player-copy > span { color: rgb(255 255 255 / 68%); font-size: .65rem; }
+.player-copy > .player-presence { display: flex; align-items: center; gap: .3rem; color: var(--ready-on-dark); font-variant-numeric: tabular-nums; }
+.player-copy > .player-presence .presence-mark { width: .45rem; height: .45rem; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
+.player-position[data-presence="offline"] .player-presence { color: var(--offline-on-dark); }
+.player-position[data-presence="unknown"] .player-presence { color: rgb(255 255 255 / 55%); }
 .player-copy button { min-height: auto; padding: .1rem 0; border: 0; color: #ffd1ca; font-size: .63rem; }
 .player-position > button { min-height: auto; padding: .35rem .5rem; border-color: rgb(255 255 255 / 32%); color: var(--table-ink); font-size: .72rem; }
 .player-position > button:hover:not(:disabled) { background: rgb(255 255 255 / 12%); }
@@ -321,10 +328,11 @@ button.physical-card:disabled { opacity: .82; }
   .call-actions { margin-bottom: .3rem; }
   .call-actions button, .bid-matrix button { min-height: 1.9rem; padding: .15rem; font-size: .75rem; }
   .bid-matrix { gap: .2rem; }
-  .player-position { max-width: 7.2rem; padding: .25rem .35rem; }
+  .player-position { max-width: 8.6rem; padding: .25rem .35rem; }
   .player-seat { flex-basis: 1.3rem; width: 1.3rem; height: 1.3rem; font-size: .7rem; }
   .player-copy strong { font-size: .65rem; }
   .player-copy > span { font-size: .55rem; }
+  .player-copy > .player-presence { font-size: .52rem; }
   .player-top { top: .3rem; }
   .player-bottom { bottom: .3rem; }
   .player-left { left: .3rem; }

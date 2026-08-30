@@ -6,6 +6,7 @@ import type {
   Contract,
   GameProjection,
   LiveTableProjection,
+  ParticipantPresence,
   Seat,
   Suit,
   Trick
@@ -16,6 +17,10 @@ const SUITS: Suit[] = ["C", "D", "H", "S"];
 const RANKS: Card["rank"][] = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
 const STRAINS: Contract["strain"][] = ["C", "D", "H", "S", "NT"];
 const VULNERABILITIES: BoardResult["vulnerability"][] = ["NONE", "NS", "EW", "BOTH"];
+
+function isDateTime(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -294,4 +299,29 @@ export function normalizeLiveTableProjection(value: unknown): LiveTableProjectio
     seats,
     ...(game === undefined ? {} : { game })
   };
+}
+
+export function normalizeParticipantPresence(value: unknown): ParticipantPresence | null {
+  if (!isRecord(value) || typeof value.participantId !== "string" || typeof value.online !== "boolean") {
+    return null;
+  }
+  if (value.offlineSince !== undefined && !isDateTime(value.offlineSince)) {
+    return null;
+  }
+  if (value.expiresAt !== undefined && !isDateTime(value.expiresAt)) {
+    return null;
+  }
+  return {
+    participantId: value.participantId,
+    online: value.online,
+    ...(isDateTime(value.offlineSince) ? { offlineSince: value.offlineSince } : {}),
+    ...(isDateTime(value.expiresAt) ? { expiresAt: value.expiresAt } : {})
+  };
+}
+
+export function normalizePresenceSnapshot(value: unknown): ParticipantPresence[] | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  return normalizeArray(value.participants, normalizeParticipantPresence);
 }
