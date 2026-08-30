@@ -24,6 +24,19 @@ func TestNewAggregate(t *testing.T) {
 	}
 }
 
+func TestDomainError(t *testing.T) {
+	t.Parallel()
+
+	var nilError *DomainError
+	if nilError.Error() != "" {
+		t.Fatalf("nil DomainError.Error() = %q", nilError.Error())
+	}
+	domainError := &DomainError{Code: ErrorInvalidState, Message: "invalid state"}
+	if domainError.Error() != "invalid state" {
+		t.Fatalf("DomainError.Error() = %q", domainError.Error())
+	}
+}
+
 func TestDecideParticipantLifecycle(t *testing.T) {
 	t.Parallel()
 
@@ -132,6 +145,43 @@ func TestDecideSeatRaceAndOwnerControls(t *testing.T) {
 
 	_, domainError = Decide(aggregate, Command{Name: CommandLeaveTable, SessionID: "session-owner", OccurredAt: removedAt})
 	assertDomainError(t, domainError, ErrorOwnerCannotLeave)
+}
+
+func TestDecideWaitingSeatAndFinishCommands(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testAggregateWithGuests(t, 1)
+	ownerSessionID := aggregate.OwnerSessionID
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandTakeSeat, SessionID: ownerSessionID, Seat: bridge.North}).NextState
+	_, domainError := Decide(aggregate, Command{Name: CommandTakeSeat, SessionID: ownerSessionID, Seat: bridge.North})
+	assertDomainError(t, domainError, ErrorAlreadySeated)
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandSetReady, SessionID: ownerSessionID, Ready: true}).NextState
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandLeaveSeat, SessionID: ownerSessionID}).NextState
+	if _, occupied := aggregate.Seats[bridge.North]; occupied {
+		t.Fatal("leave seat retained assignment")
+	}
+	_, domainError = Decide(aggregate, Command{Name: CommandSetReady, SessionID: ownerSessionID, Ready: true})
+	assertDomainError(t, domainError, ErrorSeatRequired)
+
+	guest := aggregate.Participants[1]
+	_, domainError = Decide(aggregate, Command{
+		Name:          CommandRemoveParticipant,
+		SessionID:     ownerSessionID,
+		ParticipantID: guest.ID,
+	})
+	assertDomainError(t, domainError, ErrorInvalidCommand)
+	_, domainError = Decide(aggregate, Command{
+		Name:          CommandRemoveParticipant,
+		SessionID:     ownerSessionID,
+		ParticipantID: "participant-missing",
+		OccurredAt:    testJoinedAt.Add(time.Minute),
+	})
+	assertDomainError(t, domainError, ErrorParticipantMissing)
+
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandFinishTable, SessionID: ownerSessionID}).NextState
+	if aggregate.State != StateFinished {
+		t.Fatalf("state = %s, want %s", aggregate.State, StateFinished)
+	}
 }
 
 func TestDecideStartPassedOutAndFinish(t *testing.T) {

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
@@ -112,6 +114,36 @@ func TestServiceTableLifecycle(t *testing.T) {
 	}
 }
 
+func TestNewServiceRejectsInvalidDependencies(t *testing.T) {
+	t.Parallel()
+
+	validRepository := &serviceRepository{}
+	validPepper := []byte(strings.Repeat("p", 32))
+	validRandom := bytes.NewReader(make([]byte, 64))
+	validNow := func() time.Time { return testJoinedAt }
+	tests := []struct {
+		name       string
+		repository Repository
+		pepper     []byte
+		random     io.Reader
+		now        func() time.Time
+	}{
+		{name: "repository", pepper: validPepper, random: validRandom, now: validNow},
+		{name: "pepper", repository: validRepository, pepper: []byte("short"), random: validRandom, now: validNow},
+		{name: "random", repository: validRepository, pepper: validPepper, now: validNow},
+		{name: "clock", repository: validRepository, pepper: validPepper, random: validRandom},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := NewService(test.repository, test.pepper, test.random, test.now); err == nil {
+				t.Fatal("NewService() error = nil")
+			}
+		})
+	}
+}
+
 func TestServiceCreateRetriesInviteCollision(t *testing.T) {
 	t.Parallel()
 
@@ -123,6 +155,40 @@ func TestServiceCreateRetriesInviteCollision(t *testing.T) {
 	}
 	if repository.createCalls != 2 {
 		t.Fatalf("create calls = %d, want 2", repository.createCalls)
+	}
+}
+
+func TestServiceCreateFailureBehavior(t *testing.T) {
+	t.Parallel()
+
+	owner := identity.Session{ID: "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31", Nickname: "Owner"}
+	tests := []struct {
+		name       string
+		repository *serviceRepository
+		randomErr  error
+		wantError  error
+	}{
+		{name: "collision exhausted", repository: &serviceRepository{createErrors: []error{ErrInviteCollision, ErrInviteCollision, ErrInviteCollision}}, wantError: ErrInviteCollision},
+		{name: "repository failure", repository: &serviceRepository{createErrors: []error{errors.New("database unavailable")}}, wantError: errors.New("database unavailable")},
+		{name: "random failure", repository: &serviceRepository{}, randomErr: errors.New("random unavailable"), wantError: errors.New("random unavailable")},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var randomSource io.Reader = bytes.NewReader(bytes.Repeat([]byte{0xff}, 1024))
+			if test.randomErr != nil {
+				randomSource = iotest.ErrReader(test.randomErr)
+			}
+			service, err := NewService(test.repository, []byte(strings.Repeat("p", 32)), randomSource, func() time.Time { return testJoinedAt })
+			if err != nil {
+				t.Fatalf("NewService() error = %v", err)
+			}
+			_, err = service.Create(context.Background(), owner)
+			if err == nil || !strings.Contains(err.Error(), test.wantError.Error()) {
+				t.Fatalf("Create() error = %v, want containing %q", err, test.wantError)
+			}
+		})
 	}
 }
 
@@ -139,6 +205,9 @@ func TestServiceSafeLookupErrors(t *testing.T) {
 	}
 	if _, err := service.Get(context.Background(), "invalid", guest); !errors.Is(err, ErrTableNotFound) {
 		t.Fatalf("Get() error = %v, want %v", err, ErrTableNotFound)
+	}
+	if err := service.Leave(context.Background(), "invalid", guest); !errors.Is(err, ErrTableNotFound) {
+		t.Fatalf("Leave() error = %v, want %v", err, ErrTableNotFound)
 	}
 }
 
