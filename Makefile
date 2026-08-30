@@ -12,12 +12,13 @@ MIGRATION_DATABASE_URL ?= $(DATABASE_URL)
 export DATABASE_URL
 export MIGRATION_DATABASE_URL
 
-.PHONY: help install require-database-url migrate-up migrate-down migrate-status migrate-validate generate generate-db generate-contracts generate-api test-api test-api-integration test-engine-fixtures fuzz-engine vet-api lint-api security-api build-api run-api smoke-api gate-local gate-local-down bootstrap
+.PHONY: help install require-database-url migrate-up migrate-down migrate-status migrate-validate generate generate-db generate-contracts generate-api test-api test-api-integration test-engine test-engine-fixtures fuzz-engine vet-api vet-engine lint-api lint-engine security-api security-engine gate-engine build-api run-api smoke-api gate-local gate-local-down bootstrap
 
 help:
 	@echo "make bootstrap             Install, migrate Supabase, and generate sources"
 	@echo "make run-api               Run the local API against Supabase"
 	@echo "make test-api              Run API unit tests with the race detector"
+	@echo "make gate-engine           Run the complete local Phase 2 engine gate"
 	@echo "make test-engine-fixtures  Run test-only fixture serialization tests"
 	@echo "make fuzz-engine           Run bounded card, decision, and fixture fuzzing"
 	@echo "make test-api-integration  Run database integration tests"
@@ -58,6 +59,9 @@ generate: generate-db generate-contracts
 test-api:
 	go test -race ./apps/api/...
 
+test-engine:
+	go test -race -cover ./apps/api/internal/bridge
+
 test-engine-fixtures:
 	go test -race -cover -tags=testfixture ./apps/api/internal/bridgefixture
 
@@ -72,11 +76,23 @@ test-api-integration: require-database-url
 vet-api:
 	go vet ./apps/api/...
 
+vet-engine:
+	go vet ./apps/api/internal/bridge
+	go vet -tags=testfixture ./apps/api/internal/bridgefixture
+
 lint-api:
 	cd apps/api && GOWORK=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
 
+lint-engine:
+	cd apps/api && GOWORK=off go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --build-tags=testfixture ./internal/bridge ./internal/bridgefixture
+
 security-api:
 	cd apps/api && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
+
+security-engine:
+	cd apps/api && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -tags=testfixture ./internal/bridge ./internal/bridgefixture
+
+gate-engine: vet-engine lint-engine test-engine test-engine-fixtures fuzz-engine security-engine
 
 build-api:
 	go build -o bin/bridgeyok-api ./apps/api/cmd/api
