@@ -56,6 +56,14 @@ func TestLoad(t *testing.T) {
 			wantErr: "DATABASE_URL is required",
 		},
 		{
+			name: "short auth secret",
+			values: map[string]string{
+				"DATABASE_URL": "postgresql://bridgeyok:secret@localhost:5432/bridgeyok",
+				"AUTH_SECRET":  "too-short",
+			},
+			wantErr: "AUTH_SECRET must contain at least 32 characters",
+		},
+		{
 			name: "invalid database",
 			values: map[string]string{
 				"DATABASE_URL": "not-a-url",
@@ -141,6 +149,12 @@ func TestLoadDoesNotExposeDatabaseCredentials(t *testing.T) {
 
 func mapLookup(values map[string]string) lookupFunc {
 	return func(key string) (string, bool) {
+		if key == "AUTH_SECRET" {
+			if value, ok := values[key]; ok {
+				return value, true
+			}
+			return strings.Repeat("test-secret-", 3), true
+		}
 		value, ok := values[key]
 		return value, ok
 	}

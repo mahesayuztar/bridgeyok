@@ -17,6 +17,7 @@ type Config struct {
 	Port              int
 	DatabaseURL       string
 	DatabaseMaxConns  int32
+	AuthSecret        []byte
 	AllowedOrigins    []string
 	LogLevel          slog.Level
 	ReadHeaderTimeout time.Duration
@@ -58,6 +59,10 @@ func load(lookup lookupFunc) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	authSecret, ok := lookup("AUTH_SECRET")
+	if !ok || len(authSecret) < 32 {
+		return Config{}, fmt.Errorf("AUTH_SECRET must contain at least 32 characters")
+	}
 	allowedOrigins, err := originValues(lookup, environment)
 	if err != nil {
 		return Config{}, err
@@ -93,6 +98,7 @@ func load(lookup lookupFunc) (Config, error) {
 		Port:              port,
 		DatabaseURL:       databaseURL,
 		DatabaseMaxConns:  int32(databaseMaxConns),
+		AuthSecret:        []byte(authSecret),
 		AllowedOrigins:    allowedOrigins,
 		LogLevel:          logLevel,
 		ReadHeaderTimeout: readHeaderTimeout,

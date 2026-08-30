@@ -12,6 +12,7 @@ services:
       ALLOWED_ORIGINS: https://bridgeyok.localhost:${LOCAL_GATE_HTTPS_PORT:-8443}
       API_HOST: 0.0.0.0
       APP_ENV: preview
+      AUTH_SECRET: ${AUTH_SECRET:-local-gate-only-secret-change-before-public-use}
       DATABASE_MAX_CONNS: ${DATABASE_MAX_CONNS:-4}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must point to the Supabase session pooler}
       IDLE_TIMEOUT: 60s
