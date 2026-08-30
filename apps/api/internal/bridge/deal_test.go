@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"reflect"
@@ -44,6 +45,7 @@ func TestGenerateDealRejectsInvalidSource(t *testing.T) {
 	}{
 		{name: "nil", source: nil},
 		{name: "short", source: &failingReader{}},
+		{name: "permanently rejected", source: constantReader(0)},
 	}
 
 	for _, test := range tests {
@@ -53,6 +55,19 @@ func TestGenerateDealRejectsInvalidSource(t *testing.T) {
 				t.Fatal("GenerateDeal() error = nil")
 			}
 		})
+	}
+}
+
+func TestReadRandomIndexRetriesRejectedSample(t *testing.T) {
+	t.Parallel()
+
+	source := bytes.NewReader(append(make([]byte, 8), bytes.Repeat([]byte{0xff}, 8)...))
+	value, err := readRandomIndex(source, 3)
+	if err != nil {
+		t.Fatalf("readRandomIndex() error = %v", err)
+	}
+	if value != 0 {
+		t.Fatalf("readRandomIndex() = %d, want 0", value)
 	}
 }
 
