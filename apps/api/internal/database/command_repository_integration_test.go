@@ -208,6 +208,46 @@ func TestCommandRepositoryOrderingIdempotencyAndHydrate(t *testing.T) {
 	}
 }
 
+func TestCommandRepositoryPersistsOwnerTransfer(t *testing.T) {
+	environment := newCommandTestEnvironment(t, 2)
+	aggregate, err := environment.postgres.FindTable(environment.ctx, environment.tableID)
+	if err != nil {
+		t.Fatalf("FindTable() error = %v", err)
+	}
+	owner := aggregate.Participants[0]
+	replacement := aggregate.Participants[1]
+	result := environment.process(t, table.CommandRequest{
+		TableID: environment.tableID, SessionID: owner.SessionID, RequestID: "expire_owner_01",
+		ExpectedRevision: aggregate.Revision,
+		Command: table.Command{
+			Name: table.CommandExpireParticipant, ParticipantID: owner.ID,
+			ReplacementParticipantID: replacement.ID, OccurredAt: time.Now().UTC(),
+		},
+	})
+	if result.Outcome.Status != table.CommandStatusAccepted || result.Aggregate.OwnerSessionID != replacement.SessionID {
+		t.Fatalf("owner transfer result = %+v", result)
+	}
+
+	hydrated, err := environment.postgres.FindTable(environment.ctx, environment.tableID)
+	if err != nil {
+		t.Fatalf("FindTable() after transfer error = %v", err)
+	}
+	if hydrated.OwnerSessionID != replacement.SessionID {
+		t.Fatalf("hydrated owner session = %s, want %s", hydrated.OwnerSessionID, replacement.SessionID)
+	}
+	var storedOwnerSessionID string
+	var storedRole string
+	if err := environment.postgres.Pool().QueryRow(environment.ctx,
+		"SELECT tables.owner_session_id, table_participants.role FROM bridgeyok.tables JOIN bridgeyok.table_participants ON table_participants.table_id = tables.id WHERE tables.id = $1 AND table_participants.id = $2",
+		environment.tableID, replacement.ID,
+	).Scan(&storedOwnerSessionID, &storedRole); err != nil {
+		t.Fatalf("query persisted owner transfer: %v", err)
+	}
+	if storedOwnerSessionID != replacement.SessionID || storedRole != string(table.RoleOwner) {
+		t.Fatalf("persisted owner transfer = %s/%s", storedOwnerSessionID, storedRole)
+	}
+}
+
 func TestCommandRepositoryConcurrentRevisionFence(t *testing.T) {
 	environment := newCommandTestEnvironment(t, 2)
 	aggregate, err := environment.postgres.FindTable(environment.ctx, environment.tableID)
