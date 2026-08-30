@@ -106,6 +106,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a private waiting table */
+        post: operations["createTable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tables/{inviteCode}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inviteCode: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        /** Preview a private invite without joining */
+        get: operations["previewTable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tables/{inviteCode}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inviteCode: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join an available private table */
+        post: operations["joinTable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tables/{tableId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tableId: components["parameters"]["TableId"];
+            };
+            cookie?: never;
+        };
+        /** Get recipient-projected table state */
+        get: operations["getTable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tables/{tableId}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tableId: components["parameters"]["TableId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leave a waiting table and release its seat */
+        post: operations["leaveTable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/realtime/tickets": {
         parameters: {
             query?: never;
@@ -162,6 +255,56 @@ export interface components {
             /** Format: date-time */
             expiresAt: string;
         };
+        /** @enum {string} */
+        TableState: "WAITING" | "ACTIVE" | "BETWEEN_BOARDS" | "FINISHED" | "PAUSED";
+        /** @enum {string} */
+        TableRole: "OWNER" | "PARTICIPANT";
+        /** @enum {string} */
+        TableSeat: "N" | "E" | "S" | "W";
+        TableParticipant: {
+            /** Format: uuid */
+            id: string;
+            nickname: string;
+            role: components["schemas"]["TableRole"];
+        };
+        TableSeatAssignment: {
+            /** Format: uuid */
+            participantId: string;
+            ready: boolean;
+            /** Format: int64 */
+            controllerEpoch: number;
+        };
+        TableView: {
+            /** Format: uuid */
+            tableId: string;
+            state: components["schemas"]["TableState"];
+            locked: boolean;
+            /** Format: int64 */
+            revision: number;
+            /** Format: int64 */
+            lastSeq: number;
+            /** Format: uuid */
+            boardId?: string;
+            boardNumber: number;
+            /** Format: uuid */
+            viewerParticipantId: string;
+            viewerRole: components["schemas"]["TableRole"];
+            viewerSeat?: components["schemas"]["TableSeat"];
+            participants: components["schemas"]["TableParticipant"][];
+            seats: {
+                [key: string]: components["schemas"]["TableSeatAssignment"];
+            };
+        };
+        CreateTableResponse: {
+            inviteCode: string;
+            table: components["schemas"]["TableView"];
+        };
+        TablePreview: {
+            state: components["schemas"]["TableState"];
+            locked: boolean;
+            participantCount: number;
+            capacity: number;
+        };
     };
     responses: {
         /** @description The request was rejected */
@@ -175,7 +318,10 @@ export interface components {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        InviteCode: string;
+        TableId: string;
+    };
     requestBodies: never;
     headers: {
         /** @description Correlation identifier for the request. */
@@ -352,6 +498,126 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["ProblemResponse"];
+        };
+    };
+    createTable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Table created */
+            201: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateTableResponse"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+        };
+    };
+    previewTable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inviteCode: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Non-identifying table preview */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TablePreview"];
+                };
+            };
+            404: components["responses"]["ProblemResponse"];
+        };
+    };
+    joinTable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inviteCode: components["parameters"]["InviteCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Participant joined or existing participation resumed */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+        };
+    };
+    getTable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tableId: components["parameters"]["TableId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized table state */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+        };
+    };
+    leaveTable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tableId: components["parameters"]["TableId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Participant left the table */
+            204: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
         };
     };
     createRealtimeTicket: {

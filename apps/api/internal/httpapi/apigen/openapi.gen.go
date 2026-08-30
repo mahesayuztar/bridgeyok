@@ -30,9 +30,84 @@ func (e HealthResponseStatus) Valid() bool {
 	}
 }
 
+// Defines values for TableRole.
+const (
+	OWNER       TableRole = "OWNER"
+	PARTICIPANT TableRole = "PARTICIPANT"
+)
+
+// Valid indicates whether the value is a known member of the TableRole enum.
+func (e TableRole) Valid() bool {
+	switch e {
+	case OWNER:
+		return true
+	case PARTICIPANT:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TableSeat.
+const (
+	E TableSeat = "E"
+	N TableSeat = "N"
+	S TableSeat = "S"
+	W TableSeat = "W"
+)
+
+// Valid indicates whether the value is a known member of the TableSeat enum.
+func (e TableSeat) Valid() bool {
+	switch e {
+	case E:
+		return true
+	case N:
+		return true
+	case S:
+		return true
+	case W:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TableState.
+const (
+	ACTIVE        TableState = "ACTIVE"
+	BETWEENBOARDS TableState = "BETWEEN_BOARDS"
+	FINISHED      TableState = "FINISHED"
+	PAUSED        TableState = "PAUSED"
+	WAITING       TableState = "WAITING"
+)
+
+// Valid indicates whether the value is a known member of the TableState enum.
+func (e TableState) Valid() bool {
+	switch e {
+	case ACTIVE:
+		return true
+	case BETWEENBOARDS:
+		return true
+	case FINISHED:
+		return true
+	case PAUSED:
+		return true
+	case WAITING:
+		return true
+	default:
+		return false
+	}
+}
+
 // CreateGuestSessionRequest defines model for CreateGuestSessionRequest.
 type CreateGuestSessionRequest struct {
 	Nickname string `json:"nickname"`
+}
+
+// CreateTableResponse defines model for CreateTableResponse.
+type CreateTableResponse struct {
+	InviteCode string    `json:"inviteCode"`
+	Table      TableView `json:"table"`
 }
 
 // GuestCredentials defines model for GuestCredentials.
@@ -74,6 +149,59 @@ type RealtimeTicket struct {
 type RefreshGuestSessionRequest struct {
 	DeviceCredential string `json:"deviceCredential"`
 }
+
+// TableParticipant defines model for TableParticipant.
+type TableParticipant struct {
+	Id       openapi_types.UUID `json:"id"`
+	Nickname string             `json:"nickname"`
+	Role     TableRole          `json:"role"`
+}
+
+// TablePreview defines model for TablePreview.
+type TablePreview struct {
+	Capacity         int        `json:"capacity"`
+	Locked           bool       `json:"locked"`
+	ParticipantCount int        `json:"participantCount"`
+	State            TableState `json:"state"`
+}
+
+// TableRole defines model for TableRole.
+type TableRole string
+
+// TableSeat defines model for TableSeat.
+type TableSeat string
+
+// TableSeatAssignment defines model for TableSeatAssignment.
+type TableSeatAssignment struct {
+	ControllerEpoch int64              `json:"controllerEpoch"`
+	ParticipantId   openapi_types.UUID `json:"participantId"`
+	Ready           bool               `json:"ready"`
+}
+
+// TableState defines model for TableState.
+type TableState string
+
+// TableView defines model for TableView.
+type TableView struct {
+	BoardId             *openapi_types.UUID            `json:"boardId,omitempty"`
+	BoardNumber         int                            `json:"boardNumber"`
+	LastSeq             int64                          `json:"lastSeq"`
+	Locked              bool                           `json:"locked"`
+	Participants        []TableParticipant             `json:"participants"`
+	Revision            int64                          `json:"revision"`
+	Seats               map[string]TableSeatAssignment `json:"seats"`
+	State               TableState                     `json:"state"`
+	TableId             openapi_types.UUID             `json:"tableId"`
+	ViewerParticipantId openapi_types.UUID             `json:"viewerParticipantId"`
+	ViewerRole          TableRole                      `json:"viewerRole"`
+	ViewerSeat          *TableSeat                     `json:"viewerSeat,omitempty"`
+}
+
+// InviteCode defines model for InviteCode.
+type InviteCode = string
+
+// TableId defines model for TableId.
+type TableId = openapi_types.UUID
 
 // ProblemResponse defines model for ProblemResponse.
 type ProblemResponse = Problem
