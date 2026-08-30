@@ -1,4 +1,7 @@
-[
+{
+  "sourceUrl": "https://www.worldbridge.org/wp-content/uploads/2017/03/2017LawsofDuplicateBridge-nohighlights.pdf",
+  "law": "77",
+  "cases": [
   {"name":"1C by N non-vulnerable exactly","level":1,"strain":"C","doubling":"UNDOUBLED","declarer":"N","vulnerability":"NONE","tricks":7,"declarerScore":70,"scoreNS":70},
   {"name":"1D by E vulnerable plus one","level":1,"strain":"D","doubling":"UNDOUBLED","declarer":"E","vulnerability":"EW","tricks":8,"declarerScore":90,"scoreNS":-90},
   {"name":"1H by S non-vulnerable exactly","level":1,"strain":"H","doubling":"UNDOUBLED","declarer":"S","vulnerability":"NONE","tricks":7,"declarerScore":80,"scoreNS":80},
@@ -28,5 +31,14 @@
   {"name":"4S doubled by E vulnerable down two","level":4,"strain":"S","doubling":"DOUBLED","declarer":"E","vulnerability":"EW","tricks":8,"declarerScore":-500,"scoreNS":500},
   {"name":"4S doubled by E vulnerable down three","level":4,"strain":"S","doubling":"DOUBLED","declarer":"E","vulnerability":"EW","tricks":7,"declarerScore":-800,"scoreNS":800},
   {"name":"4S redoubled by N non-vulnerable down four","level":4,"strain":"S","doubling":"REDOUBLED","declarer":"N","vulnerability":"NONE","tricks":6,"declarerScore":-1600,"scoreNS":-1600},
-  {"name":"4S redoubled by E vulnerable down three","level":4,"strain":"S","doubling":"REDOUBLED","declarer":"E","vulnerability":"EW","tricks":7,"declarerScore":-1600,"scoreNS":1600}
-]
+  {"name":"4S redoubled by E vulnerable down three","level":4,"strain":"S","doubling":"REDOUBLED","declarer":"E","vulnerability":"EW","tricks":7,"declarerScore":-1600,"scoreNS":1600},
+  {"name":"1C doubled by N non-vulnerable exactly","level":1,"strain":"C","doubling":"DOUBLED","declarer":"N","vulnerability":"NONE","tricks":7,"declarerScore":140,"scoreNS":140},
+  {"name":"1NT doubled by N non-vulnerable exactly","level":1,"strain":"NT","doubling":"DOUBLED","declarer":"N","vulnerability":"NONE","tricks":7,"declarerScore":180,"scoreNS":180},
+  {"name":"1C redoubled by N non-vulnerable exactly","level":1,"strain":"C","doubling":"REDOUBLED","declarer":"N","vulnerability":"NONE","tricks":7,"declarerScore":230,"scoreNS":230},
+  {"name":"1NT redoubled by N non-vulnerable exactly","level":1,"strain":"NT","doubling":"REDOUBLED","declarer":"N","vulnerability":"NONE","tricks":7,"declarerScore":560,"scoreNS":560},
+  {"name":"7NT redoubled by N vulnerable exactly","level":7,"strain":"NT","doubling":"REDOUBLED","declarer":"N","vulnerability":"BOTH","tricks":13,"declarerScore":2980,"scoreNS":2980},
+  {"name":"7NT redoubled by N vulnerable down thirteen","level":7,"strain":"NT","doubling":"REDOUBLED","declarer":"N","vulnerability":"BOTH","tricks":0,"declarerScore":-7600,"scoreNS":-7600},
+  {"name":"6H doubled by N vulnerable exactly","level":6,"strain":"H","doubling":"DOUBLED","declarer":"N","vulnerability":"BOTH","tricks":12,"declarerScore":1660,"scoreNS":1660},
+  {"name":"6D redoubled by E vulnerable plus one","level":6,"strain":"D","doubling":"REDOUBLED","declarer":"E","vulnerability":"BOTH","tricks":13,"declarerScore":2230,"scoreNS":-2230}
+  ]
+}
