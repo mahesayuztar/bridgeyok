@@ -485,12 +485,18 @@ func (aggregate Aggregate) seatForParticipant(participantID string) (bridge.Seat
 func (aggregate Aggregate) clone() Aggregate {
 	clone := aggregate
 	clone.Participants = append([]Participant(nil), aggregate.Participants...)
+	for _index := range clone.Participants {
+		if clone.Participants[_index].LeftAt != nil {
+			leftAt := *clone.Participants[_index].LeftAt
+			clone.Participants[_index].LeftAt = &leftAt
+		}
+	}
 	clone.Seats = make(map[bridge.Seat]SeatAssignment, len(aggregate.Seats))
 	for seat, assignment := range aggregate.Seats {
 		clone.Seats[seat] = assignment
 	}
 	if aggregate.Game != nil {
-		game := *aggregate.Game
+		game := aggregate.Game.Clone()
 		clone.Game = &game
 	}
 	return clone

@@ -469,3 +469,8 @@ func (state State) clone() State {
 	}
 	return clone
 }
+
+// Clone returns a defensive copy safe to pass across concurrency boundaries.
+func (state State) Clone() State {
+	return state.clone()
+}
