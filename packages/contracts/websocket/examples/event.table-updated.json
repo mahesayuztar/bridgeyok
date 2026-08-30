@@ -6,6 +6,24 @@
   "revision": 1,
   "seq": 1,
   "payload": {
-    "phase": "waiting"
+    "eventType": "TABLE_LOCKED",
+    "table": {
+      "tableId": "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31",
+      "state": "WAITING",
+      "locked": true,
+      "revision": 1,
+      "lastSeq": 1,
+      "boardNumber": 0,
+      "viewerParticipantId": "c7f2974f-cd0d-4531-979c-b4bd47fd76d8",
+      "viewerRole": "OWNER",
+      "participants": [
+        {
+          "id": "c7f2974f-cd0d-4531-979c-b4bd47fd76d8",
+          "nickname": "North Player",
+          "role": "OWNER"
+        }
+      ],
+      "seats": {}
+    }
   }
 }

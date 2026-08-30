@@ -11,14 +11,7 @@
     { "$ref": "#/$defs/controlEnvelope" }
   ],
   "$defs": {
-    "version": {
-      "type": "integer",
-      "const": 1
-    },
-    "kind": {
-      "type": "string",
-      "enum": ["command", "ack", "event", "error", "snapshot", "control"]
-    },
+    "version": { "type": "integer", "const": 1 },
     "messageName": {
       "type": "string",
       "minLength": 1,
@@ -31,34 +24,271 @@
       "maxLength": 64,
       "pattern": "^[A-Za-z0-9_-]+$"
     },
-    "tableId": {
-      "type": "string",
-      "format": "uuid"
+    "tableId": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 0 },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "payload": { "type": "object" },
+    "emptyPayload": { "type": "object", "additionalProperties": false },
+    "subscriptionPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["last_seen_seq"],
+      "properties": { "last_seen_seq": { "$ref": "#/$defs/sequence" } }
     },
-    "revision": {
-      "type": "integer",
-      "minimum": 0
+    "call": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "enum": ["PASS", "DOUBLE", "REDOUBLE"] } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "level", "strain"],
+          "properties": {
+            "kind": { "const": "BID" },
+            "level": { "type": "integer", "minimum": 1, "maximum": 7 },
+            "strain": { "enum": ["C", "D", "H", "S", "NT"] }
+          }
+        }
+      ]
     },
-    "sequence": {
-      "type": "integer",
-      "minimum": 0
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suit", "rank"],
+      "properties": {
+        "suit": { "enum": ["C", "D", "H", "S"] },
+        "rank": { "enum": ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"] }
+      }
     },
-    "payload": {
-      "type": "object"
+    "ackPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "duplicate"],
+      "properties": {
+        "status": { "const": "accepted" },
+        "duplicate": { "type": "boolean" },
+        "syncMode": { "enum": ["events", "snapshot"] }
+      }
+    },
+    "projectedParticipant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "nickname", "role"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "nickname": { "type": "string" },
+        "role": { "enum": ["OWNER", "PARTICIPANT"] }
+      }
+    },
+    "seatAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["participantId", "ready", "controllerEpoch"],
+      "properties": {
+        "participantId": { "type": "string", "format": "uuid" },
+        "ready": { "type": "boolean" },
+        "controllerEpoch": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "tableProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tableId",
+        "state",
+        "locked",
+        "revision",
+        "lastSeq",
+        "boardNumber",
+        "viewerParticipantId",
+        "viewerRole",
+        "participants",
+        "seats"
+      ],
+      "properties": {
+        "tableId": { "$ref": "#/$defs/tableId" },
+        "state": { "enum": ["WAITING", "ACTIVE", "BETWEEN_BOARDS", "FINISHED"] },
+        "locked": { "type": "boolean" },
+        "revision": { "$ref": "#/$defs/revision" },
+        "lastSeq": { "$ref": "#/$defs/sequence" },
+        "boardId": { "$ref": "#/$defs/tableId" },
+        "boardNumber": { "type": "integer", "minimum": 0 },
+        "viewerParticipantId": { "type": "string", "format": "uuid" },
+        "viewerRole": { "enum": ["OWNER", "PARTICIPANT"] },
+        "viewerSeat": { "enum": ["N", "E", "S", "W"] },
+        "participants": { "type": "array", "items": { "$ref": "#/$defs/projectedParticipant" } },
+        "seats": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "N": { "$ref": "#/$defs/seatAssignment" },
+            "E": { "$ref": "#/$defs/seatAssignment" },
+            "S": { "$ref": "#/$defs/seatAssignment" },
+            "W": { "$ref": "#/$defs/seatAssignment" }
+          }
+        },
+        "game": { "type": "object" }
+      }
+    },
+    "projectedEventPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eventType", "table"],
+      "properties": {
+        "eventType": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "table": { "$ref": "#/$defs/tableProjection" }
+      }
     },
     "commandEnvelope": {
+      "oneOf": [
+        { "$ref": "#/$defs/subscriptionCommandEnvelope" },
+        { "$ref": "#/$defs/mutationCommandEnvelope" }
+      ]
+    },
+    "subscriptionCommandEnvelope": {
       "type": "object",
       "additionalProperties": false,
       "required": ["v", "kind", "name", "request_id", "table_id", "payload"],
       "properties": {
         "v": { "$ref": "#/$defs/version" },
         "kind": { "const": "command" },
-        "name": { "$ref": "#/$defs/messageName" },
+        "name": { "enum": ["table.subscribe", "table.resume"] },
+        "request_id": { "$ref": "#/$defs/requestId" },
+        "table_id": { "$ref": "#/$defs/tableId" },
+        "payload": { "$ref": "#/$defs/subscriptionPayload" }
+      }
+    },
+    "mutationCommandEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "kind", "name", "request_id", "table_id", "expected_revision", "payload"],
+      "properties": {
+        "v": { "$ref": "#/$defs/version" },
+        "kind": { "const": "command" },
+        "name": {
+          "enum": [
+            "table.take_seat",
+            "table.leave_seat",
+            "table.set_ready",
+            "table.lock",
+            "table.remove_participant",
+            "table.start_game",
+            "game.make_call",
+            "game.play_card",
+            "table.next_board",
+            "table.finish",
+            "table.leave",
+            "table.takeover"
+          ]
+        },
         "request_id": { "$ref": "#/$defs/requestId" },
         "table_id": { "$ref": "#/$defs/tableId" },
         "expected_revision": { "$ref": "#/$defs/revision" },
+        "controller_epoch": { "type": "integer", "minimum": 1 },
         "payload": { "$ref": "#/$defs/payload" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "name": { "const": "table.take_seat" } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["seat"],
+                "properties": { "seat": { "enum": ["N", "E", "S", "W"] } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "name": { "const": "table.set_ready" } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ready"],
+                "properties": { "ready": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "name": { "const": "table.lock" } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["locked"],
+                "properties": { "locked": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "name": { "const": "table.remove_participant" } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["participant_id"],
+                "properties": { "participant_id": { "type": "string", "format": "uuid" } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "name": { "const": "game.make_call" } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["call"],
+                "properties": { "call": { "$ref": "#/$defs/call" } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "name": { "const": "game.play_card" } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["card"],
+                "properties": { "card": { "$ref": "#/$defs/card" } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "enum": [
+                  "table.leave_seat",
+                  "table.start_game",
+                  "table.next_board",
+                  "table.finish",
+                  "table.leave",
+                  "table.takeover"
+                ]
+              }
+            },
+            "required": ["name"]
+          },
+          "then": { "properties": { "payload": { "$ref": "#/$defs/emptyPayload" } } }
+        }
+      ]
     },
     "ackEnvelope": {
       "type": "object",
@@ -72,7 +302,7 @@
         "table_id": { "$ref": "#/$defs/tableId" },
         "revision": { "$ref": "#/$defs/revision" },
         "seq": { "$ref": "#/$defs/sequence" },
-        "payload": { "$ref": "#/$defs/payload" }
+        "payload": { "$ref": "#/$defs/ackPayload" }
       }
     },
     "eventEnvelope": {
@@ -86,7 +316,7 @@
         "table_id": { "$ref": "#/$defs/tableId" },
         "revision": { "$ref": "#/$defs/revision" },
         "seq": { "$ref": "#/$defs/sequence" },
-        "payload": { "$ref": "#/$defs/payload" }
+        "payload": { "$ref": "#/$defs/projectedEventPayload" }
       }
     },
     "errorEnvelope": {
@@ -106,7 +336,9 @@
           "pattern": "^[A-Z][A-Z0-9_]*$"
         },
         "retryable": { "type": "boolean" },
-        "payload": { "$ref": "#/$defs/payload" }
+        "revision": { "$ref": "#/$defs/revision" },
+        "seq": { "$ref": "#/$defs/sequence" },
+        "payload": { "$ref": "#/$defs/emptyPayload" }
       }
     },
     "snapshotEnvelope": {
@@ -120,7 +352,7 @@
         "table_id": { "$ref": "#/$defs/tableId" },
         "revision": { "$ref": "#/$defs/revision" },
         "seq": { "$ref": "#/$defs/sequence" },
-        "payload": { "$ref": "#/$defs/payload" }
+        "payload": { "$ref": "#/$defs/tableProjection" }
       }
     },
     "controlEnvelope": {

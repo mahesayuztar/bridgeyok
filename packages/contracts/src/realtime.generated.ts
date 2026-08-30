@@ -7,21 +7,46 @@
 
 export type BridgeYokRealtimeEnvelope =
   CommandEnvelope | AckEnvelope | EventEnvelope | ErrorEnvelope | SnapshotEnvelope | ControlEnvelope;
+export type CommandEnvelope = SubscriptionCommandEnvelope | MutationCommandEnvelope;
 export type Version = 1;
-export type MessageName = string;
 export type RequestId = string;
 export type TableId = string;
-export type Revision = number;
 export type Sequence = number;
-
-export interface CommandEnvelope {
+export type MutationCommandEnvelope = {
   v: Version;
   kind: "command";
-  name: MessageName;
+  name:
+    | "table.take_seat"
+    | "table.leave_seat"
+    | "table.set_ready"
+    | "table.lock"
+    | "table.remove_participant"
+    | "table.start_game"
+    | "game.make_call"
+    | "game.play_card"
+    | "table.next_board"
+    | "table.finish"
+    | "table.leave"
+    | "table.takeover";
   request_id: RequestId;
   table_id: TableId;
-  expected_revision?: Revision;
+  expected_revision: Revision;
+  controller_epoch?: number;
   payload: Payload;
+};
+export type Revision = number;
+export type MessageName = string;
+
+export interface SubscriptionCommandEnvelope {
+  v: Version;
+  kind: "command";
+  name: "table.subscribe" | "table.resume";
+  request_id: RequestId;
+  table_id: TableId;
+  payload: SubscriptionPayload;
+}
+export interface SubscriptionPayload {
+  last_seen_seq: Sequence;
 }
 export interface Payload {
   [k: string]: unknown;
@@ -34,7 +59,12 @@ export interface AckEnvelope {
   table_id: TableId;
   revision: Revision;
   seq: Sequence;
-  payload: Payload;
+  payload: AckPayload;
+}
+export interface AckPayload {
+  status: "accepted";
+  duplicate: boolean;
+  syncMode?: "events" | "snapshot";
 }
 export interface EventEnvelope {
   v: Version;
@@ -43,7 +73,43 @@ export interface EventEnvelope {
   table_id: TableId;
   revision: Revision;
   seq: Sequence;
-  payload: Payload;
+  payload: ProjectedEventPayload;
+}
+export interface ProjectedEventPayload {
+  eventType: string;
+  table: TableProjection;
+}
+export interface TableProjection {
+  tableId: TableId;
+  state: "WAITING" | "ACTIVE" | "BETWEEN_BOARDS" | "FINISHED";
+  locked: boolean;
+  revision: Revision;
+  lastSeq: Sequence;
+  boardId?: TableId;
+  boardNumber: number;
+  viewerParticipantId: string;
+  viewerRole: "OWNER" | "PARTICIPANT";
+  viewerSeat?: "N" | "E" | "S" | "W";
+  participants: ProjectedParticipant[];
+  seats: {
+    N?: SeatAssignment;
+    E?: SeatAssignment;
+    S?: SeatAssignment;
+    W?: SeatAssignment;
+  };
+  game?: {
+    [k: string]: unknown;
+  };
+}
+export interface ProjectedParticipant {
+  id: string;
+  nickname: string;
+  role: "OWNER" | "PARTICIPANT";
+}
+export interface SeatAssignment {
+  participantId: string;
+  ready: boolean;
+  controllerEpoch: number;
 }
 export interface ErrorEnvelope {
   v: Version;
@@ -53,8 +119,11 @@ export interface ErrorEnvelope {
   table_id?: TableId;
   code: string;
   retryable: boolean;
-  payload: Payload;
+  revision?: Revision;
+  seq?: Sequence;
+  payload: EmptyPayload;
 }
+export interface EmptyPayload {}
 export interface SnapshotEnvelope {
   v: Version;
   kind: "snapshot";
@@ -62,7 +131,7 @@ export interface SnapshotEnvelope {
   table_id: TableId;
   revision: Revision;
   seq: Sequence;
-  payload: Payload;
+  payload: TableProjection;
 }
 export interface ControlEnvelope {
   v: Version;
