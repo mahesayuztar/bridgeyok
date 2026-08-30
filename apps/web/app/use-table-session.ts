@@ -4,6 +4,7 @@ import type { components } from "@bridgeyok/contracts/openapi";
 import type { MutationCommandEnvelope } from "@bridgeyok/contracts/realtime";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { issueFromFailure, issueFromServer, type ClientIssue } from "./client-issue";
+import { createRequestId } from "./request-id";
 import {
   createEmptyTableState,
   reduceTableState,
@@ -283,7 +284,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       v: 1,
       kind: "command",
       name: "table.resume",
-      request_id: `req_${crypto.randomUUID().replaceAll("-", "")}`,
+      request_id: createRequestId(),
       table_id: tableId,
       payload: { last_seen_seq: tableStateRef.current.lastSeenSeq }
     }));
@@ -317,7 +318,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
               v: 1,
               kind: "command",
               name: lastSeenSeq > 0 ? "table.resume" : "table.subscribe",
-              request_id: `req_${crypto.randomUUID().replaceAll("-", "")}`,
+              request_id: createRequestId(),
               table_id: tableId,
               payload: { last_seen_seq: lastSeenSeq }
             })
@@ -679,7 +680,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       });
       return;
     }
-    const requestId = `req_${crypto.randomUUID().replaceAll("-", "")}`;
+    const requestId = createRequestId();
     const controllerEpoch = table.viewerSeat === undefined ? undefined : table.seats[table.viewerSeat]?.controllerEpoch;
     const command: MutationCommandEnvelope = {
       v: 1,
