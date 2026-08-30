@@ -15,6 +15,7 @@ import (
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpserver"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/observability"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
 )
 
 func main() {
@@ -38,12 +39,18 @@ func main() {
 		logger.Error("identity initialization failed", "error", err)
 		os.Exit(1)
 	}
+	tableService, err := table.NewService(postgres, appConfig.AuthSecret, rand.Reader, time.Now)
+	if err != nil {
+		logger.Error("table initialization failed", "error", err)
+		os.Exit(1)
+	}
 
 	handler := httpapi.NewRouter(httpapi.Options{
 		Logger:         logger,
 		AllowedOrigins: appConfig.AllowedOrigins,
 		Readiness:      postgres,
 		Identity:       identityService,
+		Table:          tableService,
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

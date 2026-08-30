@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpapi/apigen"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
 )
 
 const requestIDHeader = "X-Request-ID"
@@ -28,6 +29,7 @@ type Options struct {
 	AllowedOrigins []string
 	Readiness      ReadinessChecker
 	Identity       IdentityService
+	Table          TableService
 }
 
 type IdentityService interface {
@@ -36,6 +38,14 @@ type IdentityService interface {
 	Authenticate(context.Context, string) (identity.Session, error)
 	Revoke(context.Context, string) error
 	IssueTicket(context.Context, identity.Session) (string, time.Time, error)
+}
+
+type TableService interface {
+	Create(context.Context, identity.Session) (table.CreatedTable, error)
+	Preview(context.Context, string) (table.Preview, error)
+	Join(context.Context, string, identity.Session) (table.Projection, error)
+	Get(context.Context, string, identity.Session) (table.Projection, error)
+	Leave(context.Context, string, identity.Session) error
 }
 
 type contextKey string
@@ -64,10 +74,16 @@ func NewRouter(options Options) http.Handler {
 		writeJSON(writer, http.StatusOK, apigen.HealthResponse{Status: apigen.Ready, Service: "api"})
 	})
 	identityHandler := identityHTTPHandler{service: options.Identity, logger: options.Logger}
+	tableHandler := tableHTTPHandler{service: options.Table, identity: identityHandler, logger: options.Logger}
 	router.Post("/v1/guest-sessions", identityHandler.createSession)
 	router.Post("/v1/guest-sessions/refresh", identityHandler.refreshSession)
 	router.Delete("/v1/guest-sessions/current", identityHandler.revokeSession)
 	router.Post("/v1/realtime/tickets", identityHandler.createRealtimeTicket)
+	router.Post("/v1/tables", tableHandler.createTable)
+	router.Get("/v1/tables/{inviteCode}/preview", tableHandler.previewTable)
+	router.Post("/v1/tables/{inviteCode}/join", tableHandler.joinTable)
+	router.Get("/v1/tables/{tableId}", tableHandler.getTable)
+	router.Post("/v1/tables/{tableId}/leave", tableHandler.leaveTable)
 	router.NotFound(func(writer http.ResponseWriter, request *http.Request) {
 		writeProblem(writer, request, http.StatusNotFound, "Resource not found")
 	})
