@@ -212,6 +212,60 @@ func TestDecideRejectsInvalidCommands(t *testing.T) {
 	}
 }
 
+func TestEventValidateShape(t *testing.T) {
+	t.Parallel()
+
+	call := Pass()
+	card := Card{Suit: Spades, Rank: Ace}
+	contract := Contract{Level: 1, Strain: StrainNoTrump, Doubling: Undoubled, Declarer: North}
+	trick := Trick{Leader: East, Plays: []PlayedCard{}}
+	result, err := ScoreContract(contract, VulnerabilityNone, 7)
+	if err != nil {
+		t.Fatalf("ScoreContract() error = %v", err)
+	}
+	valid := []Event{
+		{Type: EventCallMade, Seat: North, Call: &call},
+		{Type: EventAuctionPassedOut},
+		{Type: EventContractSet, Contract: &contract},
+		{Type: EventCardPlayed, Seat: East, Card: &card},
+		{Type: EventDummyRevealed},
+		{Type: EventTrickCompleted, Trick: &trick},
+		{Type: EventBoardScored, Result: &result},
+	}
+	for _, event := range valid {
+		event := event
+		t.Run(string(event.Type)+" valid", func(t *testing.T) {
+			t.Parallel()
+			if err := event.validateShape(); err != nil {
+				t.Fatalf("validateShape() error = %v", err)
+			}
+		})
+	}
+
+	tests := []struct {
+		name  string
+		event Event
+	}{
+		{name: "unknown event", event: Event{Type: "UNKNOWN"}},
+		{name: "call without seat", event: Event{Type: EventCallMade, Call: &call}},
+		{name: "passed out with seat", event: Event{Type: EventAuctionPassedOut, Seat: North}},
+		{name: "contract with call", event: Event{Type: EventContractSet, Call: &call, Contract: &contract}},
+		{name: "card with result", event: Event{Type: EventCardPlayed, Seat: East, Card: &card, Result: &result}},
+		{name: "dummy with card", event: Event{Type: EventDummyRevealed, Card: &card}},
+		{name: "trick with contract", event: Event{Type: EventTrickCompleted, Contract: &contract, Trick: &trick}},
+		{name: "score with trick", event: Event{Type: EventBoardScored, Trick: &trick, Result: &result}},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if err := test.event.validateShape(); err == nil {
+				t.Fatal("validateShape() error = nil")
+			}
+		})
+	}
+}
+
 func newTestBoard(t *testing.T, boardNumber int) State {
 	t.Helper()
 	deal, err := GenerateDeal(constantReader(0x80))

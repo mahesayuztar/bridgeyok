@@ -55,6 +55,42 @@ type Event struct {
 	Result   *Result   `json:"result,omitempty"`
 }
 
+func (event Event) validateShape() error {
+	switch event.Type {
+	case EventCallMade:
+		if !event.Seat.Valid() || event.Call == nil || event.Card != nil || event.Contract != nil || event.Trick != nil || event.Result != nil {
+			return fmt.Errorf("invalid call-made event payload")
+		}
+	case EventAuctionPassedOut:
+		if event.Seat != "" || event.Call != nil || event.Card != nil || event.Contract != nil || event.Trick != nil || event.Result != nil {
+			return fmt.Errorf("invalid passed-out event payload")
+		}
+	case EventContractSet:
+		if event.Seat != "" || event.Call != nil || event.Card != nil || event.Contract == nil || event.Trick != nil || event.Result != nil {
+			return fmt.Errorf("invalid contract-set event payload")
+		}
+	case EventCardPlayed:
+		if !event.Seat.Valid() || event.Call != nil || event.Card == nil || event.Contract != nil || event.Trick != nil || event.Result != nil {
+			return fmt.Errorf("invalid card-played event payload")
+		}
+	case EventDummyRevealed:
+		if event.Seat != "" || event.Call != nil || event.Card != nil || event.Contract != nil || event.Trick != nil || event.Result != nil {
+			return fmt.Errorf("invalid dummy-revealed event payload")
+		}
+	case EventTrickCompleted:
+		if event.Seat != "" || event.Call != nil || event.Card != nil || event.Contract != nil || event.Trick == nil || event.Result != nil {
+			return fmt.Errorf("invalid trick-completed event payload")
+		}
+	case EventBoardScored:
+		if event.Seat != "" || event.Call != nil || event.Card != nil || event.Contract != nil || event.Trick != nil || event.Result == nil {
+			return fmt.Errorf("invalid board-scored event payload")
+		}
+	default:
+		return fmt.Errorf("unknown event type %q", event.Type)
+	}
+	return nil
+}
+
 // State is the authoritative private state of one board.
 type State struct {
 	RulesetVersion  string        `json:"rulesetVersion"`
@@ -299,9 +335,12 @@ func reduceFromValid(state State, events []Event) (State, error) {
 }
 
 func (state *State) apply(event Event) error {
+	if err := event.validateShape(); err != nil {
+		return err
+	}
 	switch event.Type {
 	case EventCallMade:
-		if state.Phase != PhaseAuction || event.Call == nil || event.Card != nil || event.Contract != nil || event.Trick != nil || event.Result != nil {
+		if state.Phase != PhaseAuction {
 			return fmt.Errorf("invalid call-made event")
 		}
 		nextAuction, domainError := state.Auction.MakeCall(event.Seat, *event.Call)
@@ -312,7 +351,7 @@ func (state *State) apply(event Event) error {
 		state.Turn = nextAuction.Turn
 		return nil
 	case EventAuctionPassedOut:
-		if state.Phase != PhaseAuction || !state.Auction.PassedOut || event.Call != nil || event.Card != nil || event.Contract != nil || event.Trick != nil || event.Result != nil {
+		if state.Phase != PhaseAuction || !state.Auction.PassedOut {
 			return fmt.Errorf("invalid passed-out event")
 		}
 		result, err := PassedOutResult(state.Board.Vulnerability)
@@ -324,7 +363,7 @@ func (state *State) apply(event Event) error {
 		state.Result = &result
 		return nil
 	case EventContractSet:
-		if state.Phase != PhaseAuction || !state.Auction.Complete || state.Auction.PassedOut || event.Contract == nil || !reflect.DeepEqual(state.Auction.Contract, event.Contract) {
+		if state.Phase != PhaseAuction || !state.Auction.Complete || state.Auction.PassedOut || !reflect.DeepEqual(state.Auction.Contract, event.Contract) {
 			return fmt.Errorf("invalid contract-set event")
 		}
 		state.Phase = PhaseOpeningLead
@@ -332,7 +371,7 @@ func (state *State) apply(event Event) error {
 		state.CurrentTrick = Trick{Leader: state.Turn, Plays: []PlayedCard{}}
 		return nil
 	case EventCardPlayed:
-		if (state.Phase != PhaseOpeningLead && state.Phase != PhasePlay) || event.Card == nil || event.Seat != state.Turn || len(state.CurrentTrick.Plays) >= 4 {
+		if (state.Phase != PhaseOpeningLead && state.Phase != PhasePlay) || event.Seat != state.Turn || len(state.CurrentTrick.Plays) >= 4 {
 			return fmt.Errorf("invalid card-played event")
 		}
 		hand := state.Deal.hand(event.Seat)
@@ -356,7 +395,7 @@ func (state *State) apply(event Event) error {
 		state.Phase = PhasePlay
 		return nil
 	case EventTrickCompleted:
-		if state.Phase != PhasePlay || event.Trick == nil || len(state.CurrentTrick.Plays) != 4 || !reflect.DeepEqual(event.Trick.Plays, state.CurrentTrick.Plays) || event.Trick.Leader != state.CurrentTrick.Leader {
+		if state.Phase != PhasePlay || len(state.CurrentTrick.Plays) != 4 || !reflect.DeepEqual(event.Trick.Plays, state.CurrentTrick.Plays) || event.Trick.Leader != state.CurrentTrick.Leader {
 			return fmt.Errorf("invalid trick-completed event")
 		}
 		winner, err := trickWinner(state.CurrentTrick, state.Auction.Contract.Strain)
@@ -374,7 +413,7 @@ func (state *State) apply(event Event) error {
 		state.CurrentTrick = Trick{Leader: winner, Plays: []PlayedCard{}}
 		return nil
 	case EventBoardScored:
-		if state.Phase != PhasePlay || len(state.CompletedTricks) != 13 || event.Result == nil {
+		if state.Phase != PhasePlay || len(state.CompletedTricks) != 13 {
 			return fmt.Errorf("invalid board-scored event")
 		}
 		if err := event.Result.Validate(); err != nil {
@@ -390,9 +429,8 @@ func (state *State) apply(event Event) error {
 		state.Phase = PhaseBoardScored
 		state.Turn = ""
 		return nil
-	default:
-		return fmt.Errorf("unknown event type %q", event.Type)
 	}
+	return fmt.Errorf("unknown event type %q", event.Type)
 }
 
 func (state State) clone() State {
