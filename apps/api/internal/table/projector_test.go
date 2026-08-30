@@ -60,6 +60,24 @@ func TestProjectHidesOpponentHands(t *testing.T) {
 	}
 }
 
+func TestProjectEncodesEmptyCollectionsAsArrays(t *testing.T) {
+	t.Parallel()
+
+	projection, domainError := Project(testStartedAggregate(t), "session-owner")
+	if domainError != nil {
+		t.Fatalf("Project() error = %v", domainError)
+	}
+	encoded, err := json.Marshal(projection)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	for _, expected := range []string{`"calls":[]`, `"plays":[]`, `"completedTricks":[]`} {
+		if !strings.Contains(string(encoded), expected) {
+			t.Fatalf("projection JSON does not contain %s: %s", expected, encoded)
+		}
+	}
+}
+
 func TestProjectRevealsOnlyDummyAfterOpeningLead(t *testing.T) {
 	t.Parallel()
 

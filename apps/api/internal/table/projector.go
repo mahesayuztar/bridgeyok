@@ -115,7 +115,7 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 
 func projectAuction(auction bridge.Auction) bridge.Auction {
 	projected := auction
-	projected.Calls = append([]bridge.CallRecord(nil), auction.Calls...)
+	projected.Calls = append([]bridge.CallRecord{}, auction.Calls...)
 	if auction.Contract != nil {
 		contract := *auction.Contract
 		projected.Contract = &contract
@@ -125,7 +125,7 @@ func projectAuction(auction bridge.Auction) bridge.Auction {
 
 func projectTrick(trick bridge.Trick) bridge.Trick {
 	projected := trick
-	projected.Plays = append([]bridge.PlayedCard(nil), trick.Plays...)
+	projected.Plays = append([]bridge.PlayedCard{}, trick.Plays...)
 	return projected
 }
 
