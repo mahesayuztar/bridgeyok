@@ -266,6 +266,69 @@ func TestEventValidateShape(t *testing.T) {
 	}
 }
 
+func TestDecideRejectsIntermediateEventBoundaries(t *testing.T) {
+	t.Parallel()
+
+	openingState := contractedTestBoard(t)
+	actor := openingState.Turn
+	openingDecision, domainError := Decide(openingState, PlayCardCommand(actor, openingState.Deal.hand(actor)[0]))
+	if domainError != nil {
+		t.Fatalf("Decide(opening lead) error = %v", domainError)
+	}
+	partialOpening, err := Reduce(openingState, openingDecision.Events[:1])
+	if err != nil {
+		t.Fatalf("Reduce(partial opening) error = %v", err)
+	}
+
+	threeCards := playLegalCards(t, contractedTestBoard(t), 3)
+	actor = threeCards.Turn
+	legalCards, domainError := threeCards.LegalCards(actor)
+	if domainError != nil {
+		t.Fatalf("LegalCards(fourth card) error = %v", domainError)
+	}
+	fourthDecision, domainError := Decide(threeCards, PlayCardCommand(actor, legalCards[0]))
+	if domainError != nil {
+		t.Fatalf("Decide(fourth card) error = %v", domainError)
+	}
+	partialTrick, err := Reduce(threeCards, fourthDecision.Events[:1])
+	if err != nil {
+		t.Fatalf("Reduce(partial trick) error = %v", err)
+	}
+
+	fiftyOneCards := playLegalCards(t, contractedTestBoard(t), 51)
+	actor = fiftyOneCards.Turn
+	legalCards, domainError = fiftyOneCards.LegalCards(actor)
+	if domainError != nil {
+		t.Fatalf("LegalCards(final card) error = %v", domainError)
+	}
+	finalDecision, domainError := Decide(fiftyOneCards, PlayCardCommand(actor, legalCards[0]))
+	if domainError != nil {
+		t.Fatalf("Decide(final card) error = %v", domainError)
+	}
+	partialScore, err := Reduce(fiftyOneCards, finalDecision.Events[:2])
+	if err != nil {
+		t.Fatalf("Reduce(partial score) error = %v", err)
+	}
+
+	tests := []struct {
+		name  string
+		state State
+	}{
+		{name: "opening lead before dummy reveal", state: partialOpening},
+		{name: "fourth card before trick completion", state: partialTrick},
+		{name: "thirteenth trick before scoring", state: partialScore},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if _, domainError := Decide(test.state, Command{Name: "UNKNOWN"}); domainError == nil || domainError.Code != ErrorInvalidState {
+				t.Fatalf("Decide() error = %+v, want %s", domainError, ErrorInvalidState)
+			}
+		})
+	}
+}
+
 func newTestBoard(t *testing.T, boardNumber int) State {
 	t.Helper()
 	deal, err := GenerateDeal(constantReader(0x80))
