@@ -2,8 +2,14 @@ package bridge
 
 import (
 	"encoding/binary"
+	"os"
 	"reflect"
 	"testing"
+)
+
+const (
+	defaultRandomizedGameCount = 250
+	stressRandomizedGameCount  = 10_000
 )
 
 type deterministicSource struct {
@@ -33,7 +39,10 @@ func (source *deterministicSource) intn(upperBound int) int {
 }
 
 func TestRandomizedLegalGames(t *testing.T) {
-	const gameCount = 10_000
+	gameCount := defaultRandomizedGameCount
+	if os.Getenv("BRIDGE_ENGINE_STRESS") == "1" {
+		gameCount = stressRandomizedGameCount
+	}
 	source := &deterministicSource{state: 0x627269646765796f}
 	passedOutCount := 0
 
@@ -112,8 +121,9 @@ func TestRandomizedLegalGames(t *testing.T) {
 			assertRandomizedReplay(t, _gameIndex, initial, events, state)
 		}
 	}
-	if passedOutCount != gameCount/100 {
-		t.Fatalf("passed-out games = %d, want %d", passedOutCount, gameCount/100)
+	wantPassedOut := (gameCount + 99) / 100
+	if passedOutCount != wantPassedOut {
+		t.Fatalf("passed-out games = %d, want %d", passedOutCount, wantPassedOut)
 	}
 }
 
