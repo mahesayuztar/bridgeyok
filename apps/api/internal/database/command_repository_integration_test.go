@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/database/dbgen"
@@ -233,25 +234,78 @@ func TestCommandRepositoryRejectsInvalidSnapshot(t *testing.T) {
 	}
 }
 
+func TestCommandRepositoryPersistsAndHydratesCompletedBoard(t *testing.T) {
+	environment := newCommandTestEnvironment(t, 4)
+	aggregate := readyCommandTable(t, environment)
+	deal, err := bridge.GenerateDeal(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateDeal() error = %v", err)
+	}
+	boardID := uuid.NewString()
+	started := environment.process(t, table.CommandRequest{
+		TableID: environment.tableID, SessionID: environment.sessions[0].ID, RequestID: "valid_start_01",
+		ExpectedRevision: aggregate.Revision,
+		Command:          table.Command{Name: table.CommandStartGame, Deal: &deal, BoardID: boardID},
+	})
+	aggregate = started.Aggregate
+	if aggregate.State != table.StateActive || aggregate.Game == nil || aggregate.BoardID != boardID {
+		t.Fatalf("started aggregate = %+v", aggregate)
+	}
+	for _callIndex := 0; _callIndex < 4; _callIndex++ {
+		call := bridge.Pass()
+		result := environment.process(t, table.CommandRequest{
+			TableID: environment.tableID, SessionID: commandSessionForSeat(t, aggregate, aggregate.Game.Turn),
+			RequestID: "passed_out_" + string(rune('a'+_callIndex)), ExpectedRevision: aggregate.Revision,
+			Command: table.Command{Name: table.CommandMakeCall, Call: &call},
+		})
+		aggregate = result.Aggregate
+	}
+	if aggregate.State != table.StateBetweenBoards || aggregate.Game.Result == nil || !aggregate.Game.Result.PassedOut {
+		t.Fatalf("completed aggregate = %+v", aggregate)
+	}
+
+	var boardStatus string
+	var scoreNS *int32
+	var resultJSON []byte
+	if err := environment.postgres.Pool().QueryRow(environment.ctx,
+		"SELECT status, score_ns, result FROM bridgeyok.boards WHERE table_id = $1 AND id = $2",
+		environment.tableID, boardID,
+	).Scan(&boardStatus, &scoreNS, &resultJSON); err != nil {
+		t.Fatalf("read persisted board: %v", err)
+	}
+	if boardStatus != "PASSED_OUT" || scoreNS == nil || *scoreNS != 0 || len(resultJSON) == 0 {
+		t.Fatalf("persisted board status=%s score=%v result=%s", boardStatus, scoreNS, resultJSON)
+	}
+
+	restarted, err := Open(environment.ctx, os.Getenv("TEST_DATABASE_URL"), 2)
+	if err != nil {
+		t.Fatalf("restart Open() error = %v", err)
+	}
+	t.Cleanup(restarted.Close)
+	hydrated, err := restarted.FindTable(environment.ctx, environment.tableID)
+	if err != nil {
+		t.Fatalf("restart FindTable() error = %v", err)
+	}
+	if !reflect.DeepEqual(hydrated, aggregate) {
+		t.Fatal("completed board did not hydrate exactly")
+	}
+	events, err := restarted.ListEventsAfter(environment.ctx, environment.tableID, 0, maxRecoveryEvents)
+	if err != nil {
+		t.Fatalf("ListEventsAfter() error = %v", err)
+	}
+	if len(events) != int(aggregate.LastSeq) {
+		t.Fatalf("events = %d, last seq = %d", len(events), aggregate.LastSeq)
+	}
+	for _index, event := range events {
+		if event.Seq != int64(_index+1) {
+			t.Fatalf("event %d seq = %d", _index, event.Seq)
+		}
+	}
+}
+
 func TestCommandRepositoryRollsBackPartialPersistence(t *testing.T) {
 	environment := newCommandTestEnvironment(t, 4)
-	seats := []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West}
-	aggregate, err := environment.postgres.FindTable(environment.ctx, environment.tableID)
-	if err != nil {
-		t.Fatalf("FindTable() error = %v", err)
-	}
-	for _index, session := range environment.sessions {
-		takeSeat := environment.process(t, table.CommandRequest{
-			TableID: environment.tableID, SessionID: session.ID, RequestID: "rollback_seat_" + string(rune('a'+_index)),
-			ExpectedRevision: aggregate.Revision, Command: table.Command{Name: table.CommandTakeSeat, Seat: seats[_index]},
-		})
-		aggregate = takeSeat.Aggregate
-		ready := environment.process(t, table.CommandRequest{
-			TableID: environment.tableID, SessionID: session.ID, RequestID: "rollback_ready_" + string(rune('a'+_index)),
-			ExpectedRevision: aggregate.Revision, Command: table.Command{Name: table.CommandSetReady, Ready: true},
-		})
-		aggregate = ready.Aggregate
-	}
+	aggregate := readyCommandTable(t, environment)
 	before := aggregate
 	beforeEvents, err := environment.postgres.ListEventsAfter(environment.ctx, environment.tableID, 0, maxRecoveryEvents)
 	if err != nil {
@@ -292,6 +346,43 @@ func TestCommandRepositoryRollsBackPartialPersistence(t *testing.T) {
 	if !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("FindProcessedCommand() error = %v, want no rows", err)
 	}
+}
+
+func readyCommandTable(t *testing.T, environment commandTestEnvironment) table.Aggregate {
+	t.Helper()
+	seats := []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West}
+	aggregate, err := environment.postgres.FindTable(environment.ctx, environment.tableID)
+	if err != nil {
+		t.Fatalf("FindTable() error = %v", err)
+	}
+	for _index, session := range environment.sessions {
+		takeSeat := environment.process(t, table.CommandRequest{
+			TableID: environment.tableID, SessionID: session.ID, RequestID: "setup_seat_" + string(rune('a'+_index)),
+			ExpectedRevision: aggregate.Revision, Command: table.Command{Name: table.CommandTakeSeat, Seat: seats[_index]},
+		})
+		aggregate = takeSeat.Aggregate
+		ready := environment.process(t, table.CommandRequest{
+			TableID: environment.tableID, SessionID: session.ID, RequestID: "setup_ready_" + string(rune('a'+_index)),
+			ExpectedRevision: aggregate.Revision, Command: table.Command{Name: table.CommandSetReady, Ready: true},
+		})
+		aggregate = ready.Aggregate
+	}
+	return aggregate
+}
+
+func commandSessionForSeat(t *testing.T, aggregate table.Aggregate, seat bridge.Seat) string {
+	t.Helper()
+	assignment, exists := aggregate.Seats[seat]
+	if !exists {
+		t.Fatalf("seat %s is empty", seat)
+	}
+	for _, participant := range aggregate.Participants {
+		if participant.ID == assignment.ParticipantID {
+			return participant.SessionID
+		}
+	}
+	t.Fatalf("seat %s references missing participant", seat)
+	return ""
 }
 
 func newCommandTestEnvironment(t *testing.T, participantCount int) commandTestEnvironment {
