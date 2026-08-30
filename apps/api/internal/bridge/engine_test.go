@@ -182,6 +182,40 @@ func TestDecideIsDeterministicAndDoesNotMutateInput(t *testing.T) {
 	}
 }
 
+func TestEngineOutputsDoNotAliasInputsOrSiblings(t *testing.T) {
+	t.Parallel()
+
+	deal, err := GenerateDeal(constantReader(0x80))
+	if err != nil {
+		t.Fatalf("GenerateDeal() error = %v", err)
+	}
+	originalNorthCard := deal.North[0]
+	state, err := NewBoard(1, deal)
+	if err != nil {
+		t.Fatalf("NewBoard() error = %v", err)
+	}
+	deal.North[0] = deal.East[0]
+	if state.Deal.North[0] != originalNorthCard {
+		t.Fatal("NewBoard() retained an alias to the source deal")
+	}
+
+	state = contractedTestBoard(t)
+	decision, domainError := Decide(state, PlayCardCommand(East, state.Deal.East[0]))
+	if domainError != nil {
+		t.Fatalf("Decide(opening lead) error = %v", domainError)
+	}
+	eventCard := *decision.Events[0].Card
+	decision.NextState.CurrentTrick.Plays[0].Card = state.Deal.North[0]
+	if *decision.Events[0].Card != eventCard {
+		t.Fatal("mutating next state changed decision events")
+	}
+	nextStateCard := decision.NextState.CurrentTrick.Plays[0].Card
+	decision.Events[0].Card.Suit = "INVALID"
+	if decision.NextState.CurrentTrick.Plays[0].Card != nextStateCard {
+		t.Fatal("mutating decision events changed next state")
+	}
+}
+
 func TestDecideRejectsInvalidCommands(t *testing.T) {
 	t.Parallel()
 
