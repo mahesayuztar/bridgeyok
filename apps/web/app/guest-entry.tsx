@@ -35,11 +35,20 @@ export default function GuestEntry({ initialInviteCode = "" }: { initialInviteCo
           </Link>
         ) : null}
       </div>
-      <form onSubmit={submitIdentity}>
-        <label htmlFor="nickname">Nama di meja</label>
-        <input id="nickname" name="nickname" autoComplete="nickname" maxLength={128} required value={nickname} onChange={(event) => setNickname(event.target.value)} />
-        <button className="primary-button" type="submit" disabled={session.busy || session.initializing}>Masuk sebagai tamu</button>
-      </form>
+      {session.initializing ? (
+        <div className="identity-loading" role="status" aria-live="polite">
+          <span className="loading-spinner" aria-hidden="true" />
+          <div><strong>Memeriksa sesi tersimpan…</strong><p>Ini hanya memerlukan beberapa saat.</p></div>
+        </div>
+      ) : (
+        <form onSubmit={submitIdentity} aria-busy={session.busy}>
+          <label htmlFor="nickname">Nama di meja</label>
+          <input id="nickname" name="nickname" autoComplete="nickname" maxLength={128} required disabled={session.busy} value={nickname} onChange={(event) => setNickname(event.target.value)} />
+          <button className="primary-button loading-button" type="submit" disabled={session.busy}>
+            {session.busy ? <><span className="loading-spinner" aria-hidden="true" />Menyiapkan sesi…</> : "Masuk sebagai tamu"}
+          </button>
+        </form>
+      )}
       {session.tableState.issue === null ? null : <IssueNotice issue={session.tableState.issue} onDismiss={session.dismissIssue} />}
     </section>
   );

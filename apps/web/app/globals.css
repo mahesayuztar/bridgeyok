@@ -119,6 +119,13 @@ h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; text-
 .identity-entry h2 { margin-bottom: 1.25rem; font-size: clamp(2.3rem, 5vw, 4.8rem); line-height: 1.02; letter-spacing: -.045em; }
 .identity-entry p:not(.eyebrow) { max-width: 38rem; color: var(--muted); line-height: 1.7; }
 .identity-entry form, .lobby-option { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 1rem; }
+.identity-loading { display: flex; min-height: 12rem; align-items: center; justify-content: center; gap: .85rem; padding: 1.5rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.identity-loading strong { display: block; margin-bottom: .25rem; }
+.identity-loading p { margin: 0; color: var(--muted); font-size: .85rem; }
+.loading-button { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; }
+.loading-button:disabled { opacity: .8; }
+.loading-spinner { width: 1rem; height: 1rem; flex: 0 0 auto; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: loading-spin 700ms linear infinite; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
 .primary-button { border-color: var(--accent-strong); background: var(--accent-strong); color: var(--background); font-weight: 700; }
 .primary-button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent); }
 .secondary-button { border-color: var(--accent-strong); color: var(--accent-strong); font-weight: 700; }
@@ -357,4 +364,5 @@ button.physical-card:disabled { opacity: .82; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  .loading-spinner { border-right-color: currentColor; opacity: .55; }
 }

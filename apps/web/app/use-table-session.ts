@@ -394,6 +394,15 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
         setInitializing(false);
         return;
       }
+      if (!restoreTable) {
+        const access = readStoredValue<StoredAccess>(sessionStorage, ACCESS_KEY);
+        if (access !== null && Date.parse(access.accessExpiresAt) > Date.now() + 30_000) {
+          credentialsRef.current = { ...identity, ...access };
+        }
+        setNickname(identity.nickname);
+        setInitializing(false);
+        return;
+      }
       try {
         const access = readStoredValue<StoredAccess>(sessionStorage, ACCESS_KEY);
         if (access !== null && Date.parse(access.accessExpiresAt) > Date.now() + 30_000) {
