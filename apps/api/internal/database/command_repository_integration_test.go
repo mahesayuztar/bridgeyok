@@ -39,6 +39,59 @@ type lockedBuffer struct {
 	builder strings.Builder
 }
 
+func TestActorRegistryPersistsAndRehydratesAfterRestart(t *testing.T) {
+	environment := newCommandTestEnvironment(t, 1)
+	registry, err := table.NewActorRegistry(environment.postgres, environment.processor, table.ActorRegistryOptions{
+		QueueCapacity: 4,
+		IdleTimeout:   time.Hour,
+		Logger:        observability.NewLoggerWithWriter(slog.LevelDebug, environment.logs),
+		Now:           time.Now,
+	})
+	if err != nil {
+		t.Fatalf("NewActorRegistry() error = %v", err)
+	}
+	initial, err := registry.Snapshot(environment.ctx, environment.tableID)
+	if err != nil {
+		t.Fatalf("Snapshot() error = %v", err)
+	}
+	result, err := registry.Submit(environment.ctx, table.CommandRequest{
+		TableID: environment.tableID, SessionID: environment.sessions[0].ID, RequestID: "actor_take_seat_01",
+		ExpectedRevision: initial.Revision, Command: table.Command{Name: table.CommandTakeSeat, Seat: bridge.North},
+	})
+	if err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	if result.Outcome.Status != table.CommandStatusAccepted || result.Aggregate.Seats[bridge.North].ParticipantID == "" {
+		t.Fatalf("Submit() result = %+v, want accepted north seat", result.Outcome)
+	}
+	if err := registry.Drain(environment.ctx); err != nil {
+		t.Fatalf("Drain() error = %v", err)
+	}
+
+	restarted, err := table.NewActorRegistry(environment.postgres, environment.processor, table.ActorRegistryOptions{
+		QueueCapacity: 4,
+		IdleTimeout:   time.Hour,
+		Logger:        observability.NewLoggerWithWriter(slog.LevelDebug, environment.logs),
+		Now:           time.Now,
+	})
+	if err != nil {
+		t.Fatalf("restart NewActorRegistry() error = %v", err)
+	}
+	hydrated, err := restarted.Snapshot(environment.ctx, environment.tableID)
+	if err != nil {
+		t.Fatalf("restart Snapshot() error = %v", err)
+	}
+	if hydrated.Revision != result.Aggregate.Revision || hydrated.LastSeq != result.Aggregate.LastSeq || hydrated.Seats[bridge.North] != result.Aggregate.Seats[bridge.North] {
+		t.Fatalf("restart Snapshot() revision/seq/seat = %d/%d/%+v, want %d/%d/%+v", hydrated.Revision, hydrated.LastSeq, hydrated.Seats[bridge.North], result.Aggregate.Revision, result.Aggregate.LastSeq, result.Aggregate.Seats[bridge.North])
+	}
+	if err := restarted.Drain(environment.ctx); err != nil {
+		t.Fatalf("restart Drain() error = %v", err)
+	}
+	if !strings.Contains(environment.logs.String(), `"msg":"table_actor_hydrated"`) || !strings.Contains(environment.logs.String(), `"msg":"table_actor_stopped"`) {
+		t.Fatalf("actor logs = %q, want hydrate and stop lifecycle events", environment.logs.String())
+	}
+}
+
 func (buffer *lockedBuffer) Write(value []byte) (int, error) {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
