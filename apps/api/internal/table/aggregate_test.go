@@ -237,6 +237,119 @@ func TestDecideStartPassedOutAndFinish(t *testing.T) {
 	}
 }
 
+func TestDecideRejectsMechanicalIrregularitiesWithoutMutation(t *testing.T) {
+	t.Parallel()
+
+	auction := testStartedAggregate(t)
+	openingPass := bridge.Pass()
+	openingDouble := bridge.Double()
+	openingBid := bridge.Bid(1, bridge.StrainSpades)
+	openingCard := auction.Game.Deal.Hand(bridge.North)[0]
+	afterBid := acceptedDecision(t, auction, Command{
+		Name: CommandMakeCall, SessionID: sessionForSeat(t, auction, bridge.North), Call: &openingBid,
+	}).NextState
+	insufficientBid := bridge.Bid(1, bridge.StrainHearts)
+
+	play := testStartedAggregate(t)
+	for _, call := range []bridge.Call{
+		bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass(),
+	} {
+		play = acceptedDecision(t, play, Command{
+			Name: CommandMakeCall, SessionID: sessionForSeat(t, play, play.Game.Turn), Call: &call,
+		}).NextState
+	}
+	openingLeader := play.Game.Turn
+	wrongHandCard := play.Game.Deal.Hand(bridge.North)[0]
+	legalOpeningCards, domainError := play.Game.LegalCards(openingLeader)
+	if domainError != nil || len(legalOpeningCards) == 0 {
+		t.Fatalf("LegalCards(%s) cards = %d, error = %v", openingLeader, len(legalOpeningCards), domainError)
+	}
+	legalOpeningCard := legalOpeningCards[0]
+	afterLead := acceptedDecision(t, play, Command{
+		Name: CommandPlayCard, SessionID: sessionForSeat(t, play, openingLeader), Card: &legalOpeningCard,
+	}).NextState
+	dummy := afterLead.Game.Auction.Contract.Dummy()
+	dummyCard := afterLead.Game.Deal.Hand(dummy)[0]
+
+	revokeState, revokeCard := aggregateWithDummyRevokeAttempt(t)
+	tests := []struct {
+		name      string
+		aggregate Aggregate
+		command   Command
+		wantCode  ErrorCode
+	}{
+		{
+			name: "call out of turn", aggregate: auction,
+			command:  Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, auction, bridge.East), Call: &openingPass},
+			wantCode: ErrorCode(bridge.ErrorNotYourTurn),
+		},
+		{
+			name: "double without prior bid", aggregate: auction,
+			command:  Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, auction, bridge.North), Call: &openingDouble},
+			wantCode: ErrorCode(bridge.ErrorIllegalCall),
+		},
+		{
+			name: "insufficient bid", aggregate: afterBid,
+			command:  Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, afterBid, bridge.East), Call: &insufficientBid},
+			wantCode: ErrorCode(bridge.ErrorIllegalCall),
+		},
+		{
+			name: "play during auction", aggregate: auction,
+			command:  Command{Name: CommandPlayCard, SessionID: sessionForSeat(t, auction, bridge.North), Card: &openingCard},
+			wantCode: ErrorCode(bridge.ErrorPlayComplete),
+		},
+		{
+			name: "call with card payload", aggregate: auction,
+			command:  Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, auction, bridge.North), Call: &openingPass, Card: &openingCard},
+			wantCode: ErrorInvalidCommand,
+		},
+		{
+			name: "opening lead out of turn", aggregate: play,
+			command:  Command{Name: CommandPlayCard, SessionID: sessionForSeat(t, play, openingLeader.Next()), Card: &legalOpeningCard},
+			wantCode: ErrorCode(bridge.ErrorNotYourTurn),
+		},
+		{
+			name: "card from wrong hand", aggregate: play,
+			command:  Command{Name: CommandPlayCard, SessionID: sessionForSeat(t, play, openingLeader), Card: &wrongHandCard},
+			wantCode: ErrorCode(bridge.ErrorCardNotHeld),
+		},
+		{
+			name: "dummy acts for own hand", aggregate: afterLead,
+			command:  Command{Name: CommandPlayCard, SessionID: sessionForSeat(t, afterLead, dummy), Card: &dummyCard},
+			wantCode: ErrorCode(bridge.ErrorDeclarerControlsDummy),
+		},
+		{
+			name: "failure to follow suit", aggregate: revokeState,
+			command: Command{
+				Name:      CommandPlayCard,
+				SessionID: sessionForSeat(t, revokeState, revokeState.Game.Auction.Contract.Declarer),
+				Card:      &revokeCard,
+			},
+			wantCode: ErrorCode(bridge.ErrorMustFollowSuit),
+		},
+		{
+			name: "play with call payload", aggregate: play,
+			command:  Command{Name: CommandPlayCard, SessionID: sessionForSeat(t, play, openingLeader), Call: &openingPass, Card: &legalOpeningCard},
+			wantCode: ErrorInvalidCommand,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			before := test.aggregate.clone()
+			decision, domainError := Decide(test.aggregate, test.command)
+			assertDomainError(t, domainError, test.wantCode)
+			if !reflect.DeepEqual(decision, Decision{}) {
+				t.Fatalf("rejected command returned decision %+v", decision)
+			}
+			if !reflect.DeepEqual(test.aggregate, before) || test.aggregate.Revision != before.Revision || test.aggregate.LastSeq != before.LastSeq {
+				t.Fatal("rejected mechanical irregularity changed aggregate, revision, or sequence")
+			}
+		})
+	}
+}
+
 func TestDecideActiveTableParticipantReplacement(t *testing.T) {
 	t.Parallel()
 
@@ -428,6 +541,39 @@ func testDeal(t *testing.T) bridge.Deal {
 		t.Fatalf("bridge.GenerateDeal() error = %v", err)
 	}
 	return deal
+}
+
+func aggregateWithDummyRevokeAttempt(t *testing.T) (Aggregate, bridge.Card) {
+	t.Helper()
+	aggregate := testStartedAggregate(t)
+	for _, call := range []bridge.Call{
+		bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass(),
+	} {
+		aggregate = acceptedDecision(t, aggregate, Command{
+			Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call,
+		}).NextState
+	}
+	dummy := aggregate.Game.Auction.Contract.Dummy()
+	for _, openingCard := range aggregate.Game.Deal.Hand(aggregate.Game.Turn) {
+		hasLedSuit := false
+		var offSuitCard bridge.Card
+		for _, card := range aggregate.Game.Deal.Hand(dummy) {
+			if card.Suit == openingCard.Suit {
+				hasLedSuit = true
+			} else {
+				offSuitCard = card
+			}
+		}
+		if !hasLedSuit || !offSuitCard.Suit.Valid() {
+			continue
+		}
+		aggregate = acceptedDecision(t, aggregate, Command{
+			Name: CommandPlayCard, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Card: &openingCard,
+		}).NextState
+		return aggregate, offSuitCard
+	}
+	t.Fatal("test deal has no dummy revoke scenario")
+	return Aggregate{}, bridge.Card{}
 }
 
 func acceptedDecision(t *testing.T, aggregate Aggregate, command Command) Decision {

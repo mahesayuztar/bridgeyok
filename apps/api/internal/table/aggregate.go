@@ -336,9 +336,9 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 			return Decision{}, reject(ErrorSeatRequired, "participant is not seated")
 		}
 		var gameCommand bridge.Command
-		if command.Name == CommandMakeCall && command.Call != nil {
+		if command.Name == CommandMakeCall && command.Call != nil && command.Card == nil {
 			gameCommand = bridge.MakeCallCommand(seat, *command.Call)
-		} else if command.Name == CommandPlayCard && command.Card != nil {
+		} else if command.Name == CommandPlayCard && command.Card != nil && command.Call == nil {
 			gameCommand = bridge.PlayCardCommand(seat, *command.Card)
 		} else {
 			return Decision{}, reject(ErrorInvalidCommand, "game command payload is invalid")
