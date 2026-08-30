@@ -5,11 +5,11 @@ import type { MutationCommandEnvelope } from "@bridgeyok/contracts/realtime";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { issueFromFailure, issueFromServer, type ClientIssue } from "./client-issue";
 import { createRequestId } from "./request-id";
+import { normalizeLiveTableProjection } from "./table-projection";
 import {
   createEmptyTableState,
   reduceTableState,
   type CommandName,
-  type LiveTableProjection,
   type TableClientState
 } from "./table-state";
 
@@ -116,23 +116,6 @@ async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> 
     throw await readProblem(response);
   }
   return (await response.json()) as T;
-}
-
-function isLiveTableProjection(value: unknown): value is LiveTableProjection {
-  if (value === null || typeof value !== "object") {
-    return false;
-  }
-  const table = value as Record<string, unknown>;
-  return (
-    typeof table.tableId === "string" &&
-    ["WAITING", "ACTIVE", "BETWEEN_BOARDS", "FINISHED"].includes(String(table.state)) &&
-    typeof table.revision === "number" &&
-    typeof table.lastSeq === "number" &&
-    typeof table.viewerParticipantId === "string" &&
-    Array.isArray(table.participants) &&
-    table.seats !== null &&
-    typeof table.seats === "object"
-  );
 }
 
 function socketUrl(ticket: string) {
@@ -338,22 +321,34 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           if (envelope.table_id !== undefined && envelope.table_id !== tableId) {
             return;
           }
-          if (envelope.kind === "snapshot" && isLiveTableProjection(envelope.payload)) {
-            dispatch({ type: "snapshot", tableId, seq: Number(envelope.seq), table: envelope.payload });
+          if (envelope.kind === "snapshot") {
+            const projectedTable = normalizeLiveTableProjection(envelope.payload);
+            if (projectedTable === null || typeof envelope.seq !== "number" || !Number.isFinite(envelope.seq)) {
+              setConnectionState("degraded");
+              dispatch({ type: "issue", issue: issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "websocket" }) });
+              return;
+            }
+            dispatch({ type: "snapshot", tableId, seq: envelope.seq, table: projectedTable });
             setConnectionState("connected");
           } else if (envelope.kind === "event") {
-            const payload = envelope.payload as Record<string, unknown> | undefined;
-            if (payload !== undefined && isLiveTableProjection(payload.table)) {
-              const eventType = typeof payload.eventType === "string" ? payload.eventType : undefined;
-              dispatch({
-                type: "event",
-                tableId,
-                seq: Number(envelope.seq),
-                table: payload.table,
-                ...(eventType === undefined ? {} : { eventType })
-              });
-              setConnectionState("connected");
+            const payload = envelope.payload !== null && typeof envelope.payload === "object" && !Array.isArray(envelope.payload)
+              ? envelope.payload as Record<string, unknown>
+              : null;
+            const eventTable = normalizeLiveTableProjection(payload?.table);
+            if (payload === null || eventTable === null || typeof envelope.seq !== "number" || !Number.isFinite(envelope.seq)) {
+              setConnectionState("degraded");
+              dispatch({ type: "issue", issue: issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "websocket" }) });
+              return;
             }
+            const eventType = typeof payload.eventType === "string" ? payload.eventType : undefined;
+            dispatch({
+              type: "event",
+              tableId,
+              seq: envelope.seq,
+              table: eventTable,
+              ...(eventType === undefined ? {} : { eventType })
+            });
+            setConnectionState("connected");
           } else if (envelope.kind === "error") {
             const code = typeof envelope.code === "string" ? envelope.code : undefined;
             const issue = issueFromServer({
@@ -444,8 +439,8 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
         }
         const storedTable = restoreTable ? readStoredValue<StoredTable>(local, TABLE_KEY) : null;
         if (storedTable !== null && active) {
-          const table = await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(storedTable.tableId)}`);
-          if (isLiveTableProjection(table)) {
+          const table = normalizeLiveTableProjection(await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(storedTable.tableId)}`));
+          if (table !== null) {
             setInviteCode(storedTable.inviteCode ?? null);
             dispatch({ type: "enter", table });
             beginConnection(table.tableId);
@@ -535,15 +530,16 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     setBusy(true);
     try {
       const created = await authenticatedRequest<CreateTableResponse>("/v1/tables", { method: "POST" });
-      if (!isLiveTableProjection(created.table)) {
-        throw new ApiError(issueFromServer({ source: "rest" }));
+      const table = normalizeLiveTableProjection(created.table);
+      if (table === null) {
+        throw new ApiError(issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "rest" }), "INVALID_TABLE_PROJECTION");
       }
       clearTable();
-      writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: created.table.tableId, inviteCode: created.inviteCode });
+      writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: table.tableId, inviteCode: created.inviteCode });
       setInviteCode(created.inviteCode);
-      dispatch({ type: "enter", table: created.table });
-      beginConnection(created.table.tableId);
-      return created.table.tableId;
+      dispatch({ type: "enter", table });
+      beginConnection(table.tableId);
+      return table.tableId;
     } catch (error) {
       dispatch({ type: "issue", issue: issueForError(error) });
       return null;
@@ -571,9 +567,9 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       }
       setBusy(true);
       try {
-        const table = await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(normalizedInviteCode)}/join`, { method: "POST" });
-        if (!isLiveTableProjection(table)) {
-          throw new ApiError(issueFromServer({ source: "rest" }));
+        const table = normalizeLiveTableProjection(await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(normalizedInviteCode)}/join`, { method: "POST" }));
+        if (table === null) {
+          throw new ApiError(issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "rest" }), "INVALID_TABLE_PROJECTION");
         }
         clearTable();
         writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: table.tableId, inviteCode: normalizedInviteCode });
@@ -597,9 +593,9 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     }
     setBusy(true);
     try {
-      const table = await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(tableId)}`);
-      if (!isLiveTableProjection(table)) {
-        throw new ApiError(issueFromServer({ source: "rest" }));
+      const table = normalizeLiveTableProjection(await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(tableId)}`));
+      if (table === null) {
+        throw new ApiError(issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "rest" }), "INVALID_TABLE_PROJECTION");
       }
       clearTable();
       writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId });

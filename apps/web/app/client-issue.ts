@@ -47,6 +47,8 @@ export function issueFromServer({ code, status, retryable = false, source }: Iss
     case "SERVER_BUSY":
     case "INTERNAL_ERROR":
       return { kind: "server", title: "Layanan meja sedang bermasalah", detail: "Aksi belum dapat dipastikan berhasil. Selaraskan meja sebelum mencoba lagi.", retryable: true, action: "retry", source };
+    case "INVALID_TABLE_PROJECTION":
+      return { kind: "server", title: "Data meja belum lengkap", detail: "Tampilan lama tetap dipertahankan. Ambil ulang keadaan meja yang valid.", retryable: true, action: source === "websocket" ? "resync" : "retry", source };
   }
   if (status === 401 || status === 403) {
     return { kind: "session", title: "Sesi tamu tidak dapat digunakan", detail: "Masuk kembali untuk melanjutkan dengan sesi baru.", retryable: false, action: "signInAgain", source };

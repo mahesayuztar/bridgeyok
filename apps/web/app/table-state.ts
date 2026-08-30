@@ -30,7 +30,7 @@ export type Contract = {
 };
 
 export type Trick = {
-  leader: Seat;
+  leader?: Seat;
   plays: Array<{ seat: Seat; card: Card }>;
   winner?: Seat;
 };
@@ -262,12 +262,13 @@ export function visualPositionForSeat(orientation: TableOrientation, seat: Seat)
   return (entry?.[0] as VisualPosition | undefined) ?? "bottom";
 }
 
-export function auctionRows(dealer: Seat, calls: CallRecord[]): AuctionRow[] {
+export function auctionRows(dealer: Seat, calls: CallRecord[] | null | undefined): AuctionRow[] {
   const columns: Seat[] = ["W", "N", "E", "S"];
   const dealerIndex = columns.indexOf(dealer);
-  const rowCount = Math.max(1, Math.ceil((dealerIndex + calls.length) / columns.length));
+  const safeCalls = calls ?? [];
+  const rowCount = Math.max(1, Math.ceil((dealerIndex + safeCalls.length) / columns.length));
   const rows = Array.from({ length: rowCount }, () => ({} as AuctionRow));
-  calls.forEach((record, _index) => {
+  safeCalls.forEach((record, _index) => {
     const slot = dealerIndex + _index;
     rows[Math.floor(slot / columns.length)]![columns[slot % columns.length]!] = record;
   });

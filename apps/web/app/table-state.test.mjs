@@ -141,6 +141,7 @@ test("auction rows preserve W N E S columns and dealer offset", () => {
     { E: { seat: "E", call: { kind: "BID", level: 1, strain: "H" } }, S: { seat: "S", call: { kind: "PASS" } } },
     { W: { seat: "W", call: { kind: "BID", level: 1, strain: "S" } } }
   ]);
+  assert.deepEqual(auctionRows("N", null), [{}]);
 });
 
 test("board result label describes exact, overtrick, and undertrick", () => {

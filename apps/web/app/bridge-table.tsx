@@ -302,7 +302,10 @@ export default function BridgeTable({ expectedTableId }: { expectedTableId: stri
     return (
       <main className="table-client waiting-client">
         <header className="table-status-bar"><Link className="table-wordmark" href="/lobby" aria-label="Kembali ke lobby">BridgeYok</Link><span>Meja tunggu</span><div className="connection-status" data-state={session.connectionState}><span className="status-mark" />{CONNECTION_LABELS[session.connectionState]}</div></header>
-        {session.tableState.issue === null ? null : <IssueNotice compact issue={session.tableState.issue} onDismiss={session.dismissIssue} onAction={(action) => action === "retry" ? session.reconnect() : undefined} />}
+        {session.tableState.issue === null ? null : <IssueNotice compact issue={session.tableState.issue} onDismiss={session.dismissIssue} onAction={(action) => {
+          if (action === "retry") session.reconnect();
+          else if (action === "resync") session.resync();
+        }} />}
         <WaitingRoom table={table} orientation={orientation} session={session} commandDisabled={commandDisabled} shareUrl={shareUrl} copied={copied} onCopy={() => void copyInvite()} />
         {table.viewerRole === "PARTICIPANT" ? <button className="leave-table-button" type="button" disabled={session.busy} onClick={() => void returnToLobby()}>Tinggalkan meja</button> : null}
       </main>
