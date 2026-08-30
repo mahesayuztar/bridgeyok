@@ -3,3 +3,123 @@
 //   sqlc v1.31.1
 
 package dbgen
+
+import (
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type BridgeyokAbuseReport struct {
+	ID                pgtype.UUID        `json:"id"`
+	ReporterSessionID pgtype.UUID        `json:"reporter_session_id"`
+	TableID           pgtype.UUID        `json:"table_id"`
+	Category          string             `json:"category"`
+	Context           string             `json:"context"`
+	Status            string             `json:"status"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
+type BridgeyokAuditLog struct {
+	ID             int64              `json:"id"`
+	ActorSessionID pgtype.UUID        `json:"actor_session_id"`
+	Action         string             `json:"action"`
+	TargetType     string             `json:"target_type"`
+	TargetID       pgtype.UUID        `json:"target_id"`
+	Metadata       []byte             `json:"metadata"`
+	OccurredAt     pgtype.Timestamptz `json:"occurred_at"`
+}
+
+type BridgeyokBoard struct {
+	ID             pgtype.UUID        `json:"id"`
+	TableID        pgtype.UUID        `json:"table_id"`
+	BoardNumber    int32              `json:"board_number"`
+	Dealer         string             `json:"dealer"`
+	Vulnerability  string             `json:"vulnerability"`
+	RulesetVersion string             `json:"ruleset_version"`
+	Status         string             `json:"status"`
+	ScoreNs        *int32             `json:"score_ns"`
+	Result         []byte             `json:"result"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+}
+
+type BridgeyokGameEvent struct {
+	TableID    pgtype.UUID        `json:"table_id"`
+	Seq        int64              `json:"seq"`
+	Revision   int64              `json:"revision"`
+	EventType  string             `json:"event_type"`
+	Payload    []byte             `json:"payload"`
+	OccurredAt pgtype.Timestamptz `json:"occurred_at"`
+}
+
+type BridgeyokGameSnapshot struct {
+	TableID       pgtype.UUID        `json:"table_id"`
+	BoardID       pgtype.UUID        `json:"board_id"`
+	SchemaVersion int32              `json:"schema_version"`
+	Revision      int64              `json:"revision"`
+	LastSeq       int64              `json:"last_seq"`
+	PrivateState  []byte             `json:"private_state"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BridgeyokGuestSession struct {
+	ID             pgtype.UUID        `json:"id"`
+	CredentialHash []byte             `json:"credential_hash"`
+	Nickname       string             `json:"nickname"`
+	Status         string             `json:"status"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt     pgtype.Timestamptz `json:"last_seen_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+}
+
+type BridgeyokProcessedCommand struct {
+	TableID     pgtype.UUID        `json:"table_id"`
+	SessionID   pgtype.UUID        `json:"session_id"`
+	RequestID   string             `json:"request_id"`
+	CommandName string             `json:"command_name"`
+	Outcome     []byte             `json:"outcome"`
+	Revision    int64              `json:"revision"`
+	LastSeq     int64              `json:"last_seq"`
+	ProcessedAt pgtype.Timestamptz `json:"processed_at"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+}
+
+type BridgeyokRealtimeTicket struct {
+	TicketHash []byte             `json:"ticket_hash"`
+	SessionID  pgtype.UUID        `json:"session_id"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+	UsedAt     pgtype.Timestamptz `json:"used_at"`
+}
+
+type BridgeyokTable struct {
+	ID             pgtype.UUID        `json:"id"`
+	OwnerSessionID pgtype.UUID        `json:"owner_session_id"`
+	InviteCodeHash []byte             `json:"invite_code_hash"`
+	State          string             `json:"state"`
+	Locked         bool               `json:"locked"`
+	Revision       int64              `json:"revision"`
+	NextSeq        int64              `json:"next_seq"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	MeaningfulAt   pgtype.Timestamptz `json:"meaningful_at"`
+	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
+}
+
+type BridgeyokTableParticipant struct {
+	ID        pgtype.UUID        `json:"id"`
+	TableID   pgtype.UUID        `json:"table_id"`
+	SessionID pgtype.UUID        `json:"session_id"`
+	Role      string             `json:"role"`
+	JoinedAt  pgtype.Timestamptz `json:"joined_at"`
+	LeftAt    pgtype.Timestamptz `json:"left_at"`
+}
+
+type BridgeyokTableSeat struct {
+	TableID         pgtype.UUID        `json:"table_id"`
+	Seat            string             `json:"seat"`
+	ParticipantID   pgtype.UUID        `json:"participant_id"`
+	Ready           bool               `json:"ready"`
+	ControllerEpoch int64              `json:"controller_epoch"`
+	RecoveryHash    []byte             `json:"recovery_hash"`
+	OfflineSince    pgtype.Timestamptz `json:"offline_since"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
