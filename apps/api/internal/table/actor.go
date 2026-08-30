@@ -56,6 +56,7 @@ type ActorRegistry struct {
 type actorRequest struct {
 	ctx      context.Context
 	command  *CommandRequest
+	refresh  bool
 	response chan actorResponse
 }
 
@@ -137,6 +138,25 @@ func (registry *ActorRegistry) Snapshot(ctx context.Context, tableID string) (Ag
 			return Aggregate{}, err
 		}
 		aggregate, err := actor.snapshot(ctx)
+		if !errors.Is(err, ErrActorStopped) {
+			return aggregate, err
+		}
+		registry.retire(actor)
+	}
+	return Aggregate{}, ErrActorStopped
+}
+
+// Refresh reloads durable table state through the table's serialized actor queue.
+func (registry *ActorRegistry) Refresh(ctx context.Context, tableID string) (Aggregate, error) {
+	if _, err := uuid.Parse(tableID); err != nil {
+		return Aggregate{}, fmt.Errorf("table id is invalid")
+	}
+	for _attempt := 0; _attempt < 2; _attempt++ {
+		actor, err := registry.actor(tableID)
+		if err != nil {
+			return Aggregate{}, err
+		}
+		aggregate, err := actor.refresh(ctx)
 		if !errors.Is(err, ErrActorStopped) {
 			return aggregate, err
 		}
@@ -248,6 +268,19 @@ func (actor *tableActor) snapshot(ctx context.Context) (Aggregate, error) {
 	}
 }
 
+func (actor *tableActor) refresh(ctx context.Context) (Aggregate, error) {
+	response := make(chan actorResponse, 1)
+	if err := actor.enqueue(ctx, actorRequest{ctx: ctx, refresh: true, response: response}); err != nil {
+		return Aggregate{}, err
+	}
+	select {
+	case result := <-response:
+		return result.aggregate, result.err
+	case <-ctx.Done():
+		return Aggregate{}, ctx.Err()
+	}
+}
+
 func (actor *tableActor) enqueue(ctx context.Context, request actorRequest) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -328,7 +361,7 @@ func (actor *tableActor) run() {
 }
 
 func (actor *tableActor) handle(request actorRequest, aggregate **Aggregate) {
-	if *aggregate == nil {
+	if *aggregate == nil || request.refresh {
 		startedAt := actor.now().UTC()
 		hydrated, err := actor.hydrator.FindTable(request.ctx, actor.tableID)
 		if err == nil && hydrated.ID != actor.tableID {

@@ -203,6 +203,18 @@ func (service *Service) ConsumeTicket(ctx context.Context, ticket string) (Sessi
 	return session, nil
 }
 
+// ValidateSession resolves the current active state of a connected guest.
+func (service *Service) ValidateSession(ctx context.Context, sessionID string) (Session, error) {
+	if !validUUID(sessionID) {
+		return Session{}, ErrInvalidCredential
+	}
+	session, err := service.repository.FindActiveSession(ctx, sessionID, service.now().UTC())
+	if err != nil {
+		return Session{}, fmt.Errorf("validate guest session: %w", err)
+	}
+	return session, nil
+}
+
 func (service *Service) credentials(session Session, deviceCredential string, now time.Time) (CredentialSet, error) {
 	expiresAt := now.Add(accessLifetime)
 	payload := base64.RawURLEncoding.EncodeToString([]byte(session.ID + "|" + expiresAt.Format(time.RFC3339)))

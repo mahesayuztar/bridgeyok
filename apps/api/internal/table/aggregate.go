@@ -43,6 +43,7 @@ const (
 	CommandPlayCard          CommandName = "PLAY_CARD"
 	CommandRequestNextBoard  CommandName = "REQUEST_NEXT_BOARD"
 	CommandFinishTable       CommandName = "FINISH_TABLE"
+	CommandTakeoverControl   CommandName = "TAKEOVER_CONTROL"
 )
 
 // ErrorCode is a stable table rejection reason.
@@ -63,6 +64,7 @@ const (
 	ErrorNotReady           ErrorCode = "TABLE_NOT_READY"
 	ErrorParticipantMissing ErrorCode = "PARTICIPANT_MISSING"
 	ErrorInvalidCommand     ErrorCode = "INVALID_COMMAND"
+	ErrorStaleController    ErrorCode = "STALE_CONTROLLER"
 )
 
 // DomainError describes a rejected table command.
@@ -113,18 +115,19 @@ type Aggregate struct {
 
 // Command contains one authenticated table mutation.
 type Command struct {
-	Name          CommandName
-	SessionID     string
-	Participant   *Participant
-	OccurredAt    time.Time
-	Seat          bridge.Seat
-	Ready         bool
-	Locked        bool
-	ParticipantID string
-	Call          *bridge.Call
-	Card          *bridge.Card
-	Deal          *bridge.Deal
-	BoardID       string
+	Name            CommandName
+	SessionID       string
+	Participant     *Participant
+	OccurredAt      time.Time
+	Seat            bridge.Seat
+	Ready           bool
+	Locked          bool
+	ParticipantID   string
+	Call            *bridge.Call
+	Card            *bridge.Card
+	Deal            *bridge.Deal
+	BoardID         string
+	ControllerEpoch int64
 }
 
 // Event is a durable aggregate fact with a privacy-safe typed payload.
@@ -169,6 +172,12 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 	participant, exists := aggregate.activeParticipant(command.SessionID)
 	if !exists {
 		return Decision{}, reject(ErrorNotParticipant, "session is not an active participant")
+	}
+	if command.ControllerEpoch > 0 {
+		seat, seated := aggregate.seatForParticipant(participant.ID)
+		if !seated || aggregate.Seats[seat].ControllerEpoch != command.ControllerEpoch {
+			return Decision{}, reject(ErrorStaleController, "seat controller has been replaced")
+		}
 	}
 
 	next := aggregate.clone()
@@ -348,6 +357,21 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		}
 		next.State = StateFinished
 		events = []Event{{Type: "TABLE_FINISHED", Payload: map[string]any{}}}
+	case CommandTakeoverControl:
+		if next.State == StateFinished {
+			return Decision{}, reject(ErrorInvalidState, "finished table controller cannot be replaced")
+		}
+		if command.ControllerEpoch < 1 {
+			return Decision{}, reject(ErrorInvalidCommand, "controller epoch is required")
+		}
+		seat, seated := next.seatForParticipant(participant.ID)
+		if !seated {
+			return Decision{}, reject(ErrorSeatRequired, "participant is not seated")
+		}
+		assignment := next.Seats[seat]
+		assignment.ControllerEpoch++
+		next.Seats[seat] = assignment
+		events = []Event{{Type: "CONTROLLER_REPLACED", Payload: map[string]any{"participantId": participant.ID, "controllerEpoch": assignment.ControllerEpoch}}}
 	default:
 		return Decision{}, reject(ErrorInvalidCommand, "unknown table command")
 	}

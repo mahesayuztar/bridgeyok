@@ -263,6 +263,37 @@ func TestActorRegistryRetriesFailedHydrate(t *testing.T) {
 	})
 }
 
+func TestActorRegistryRefreshReplacesCachedState(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		aggregate := actorAggregate(t)
+		hydrator := &actorHydrator{aggregate: aggregate}
+		handler := &actorCommandHandler{aggregate: aggregate}
+		registry := actorRegistryForTest(t, hydrator, handler, 2, time.Hour, nil)
+
+		if _, err := registry.Snapshot(t.Context(), actorTableID); err != nil {
+			t.Fatalf("Snapshot() error = %v", err)
+		}
+		hydrator.mutex.Lock()
+		hydrator.aggregate.Revision = 4
+		hydrator.aggregate.LastSeq = 6
+		hydrator.mutex.Unlock()
+		refreshed, err := registry.Refresh(t.Context(), actorTableID)
+		if err != nil {
+			t.Fatalf("Refresh() error = %v", err)
+		}
+		cached, err := registry.Snapshot(t.Context(), actorTableID)
+		if err != nil {
+			t.Fatalf("Snapshot() after refresh error = %v", err)
+		}
+		if refreshed.Revision != 4 || cached.Revision != 4 || cached.LastSeq != 6 || hydrator.callCount() != 2 {
+			t.Fatalf("refreshed = %+v, cached = %+v, hydration calls = %d", refreshed, cached, hydrator.callCount())
+		}
+		if err := registry.Drain(t.Context()); err != nil {
+			t.Fatalf("Drain() error = %v", err)
+		}
+	})
+}
+
 func TestActorRegistryEvictsIdleActorAndRehydrates(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		aggregate := actorAggregate(t)

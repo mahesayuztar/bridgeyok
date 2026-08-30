@@ -125,6 +125,31 @@ func TestServiceTicketIsSingleUse(t *testing.T) {
 	}
 }
 
+func TestServiceValidateSessionReadsCurrentDurableState(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 8, 30, 4, 0, 0, 0, time.UTC)
+	repository := &memoryRepository{}
+	service, err := NewService(repository, []byte(strings.Repeat("p", 32)), bytes.NewReader(deterministicBytes(256)), func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	credentials, err := service.CreateSession(context.Background(), "North Player")
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	if _, err := service.ValidateSession(context.Background(), credentials.Session.ID); err != nil {
+		t.Fatalf("ValidateSession() error = %v", err)
+	}
+	repository.session.Status = "REVOKED"
+	if _, err := service.ValidateSession(context.Background(), credentials.Session.ID); err == nil {
+		t.Fatal("ValidateSession() accepted revoked durable session")
+	}
+	if _, err := service.ValidateSession(context.Background(), "invalid"); !errors.Is(err, ErrInvalidCredential) {
+		t.Fatalf("invalid ValidateSession() error = %v", err)
+	}
+}
+
 func TestNormalizeNickname(t *testing.T) {
 	t.Parallel()
 

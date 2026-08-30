@@ -184,6 +184,21 @@ func TestDecideWaitingSeatAndFinishCommands(t *testing.T) {
 	}
 }
 
+func TestDecideControllerTakeoverFencesPreviousController(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testAggregate(t)
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandTakeSeat, SessionID: "session-owner", Seat: bridge.North}).NextState
+	takeover := acceptedDecision(t, aggregate, Command{Name: CommandTakeoverControl, SessionID: "session-owner", ControllerEpoch: 1})
+	assignment := takeover.NextState.Seats[bridge.North]
+	if assignment.ControllerEpoch != 2 || takeover.Events[0].Type != "CONTROLLER_REPLACED" {
+		t.Fatalf("takeover = %+v", takeover)
+	}
+	_, domainError := Decide(takeover.NextState, Command{Name: CommandSetReady, SessionID: "session-owner", ControllerEpoch: 1, Ready: true})
+	assertDomainError(t, domainError, ErrorStaleController)
+	acceptedDecision(t, takeover.NextState, Command{Name: CommandSetReady, SessionID: "session-owner", ControllerEpoch: 2, Ready: true})
+}
+
 func TestDecideStartPassedOutAndFinish(t *testing.T) {
 	t.Parallel()
 
