@@ -1,5 +1,6 @@
 import type { components } from "@bridgeyok/contracts/openapi";
 import Link from "next/link";
+import BridgeTable from "./bridge-table";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8080";
 
@@ -42,8 +43,10 @@ async function getApiAvailability(): Promise<ApiAvailability> {
   }
 }
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ invite?: string | string[] }> }) {
   const availability = await getApiAvailability();
+  const inviteParameter = (await searchParams).invite;
+  const initialInviteCode = typeof inviteParameter === "string" ? inviteParameter : "";
 
   return (
     <div className="site-shell">
@@ -51,20 +54,20 @@ export default async function HomePage() {
         <Link className="wordmark" href="/" aria-label="BridgeYok, halaman utama">
           BridgeYok
         </Link>
-        <span className="phase-label">Foundation / 01</span>
+        <span className="phase-label">Realtime table / 03</span>
       </header>
 
       <main>
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-copy">
-            <p className="eyebrow">Bridge online untuk meja sendiri</p>
-            <h1 id="hero-title">Main bareng. Tetap dekat, walau beda tempat.</h1>
+            <p className="eyebrow">Duplicate bridge untuk meja sendiri</p>
+            <h1 id="hero-title">Empat kursi. Satu meja. Main dari mana saja.</h1>
             <p className="hero-summary">
-              BridgeYok sedang dibangun sebagai ruang bermain yang ringan, jelas, dan tahan saat koneksi tidak sempurna.
-              Selalu gratis, tanpa pembayaran.
+              Buat meja, undang tiga teman, lalu mainkan lelang dan kartu bersama secara langsung. BridgeYok tetap ringan
+              dan menjaga permainan saat koneksi tidak sempurna.
             </p>
-            <a className="text-link" href="#status">
-              Lihat kesiapan fondasi <span aria-hidden="true">↓</span>
+            <a className="text-link" href="#play">
+              Mulai bermain <span aria-hidden="true">↓</span>
             </a>
           </div>
           <p className="hero-note">
@@ -78,8 +81,8 @@ export default async function HomePage() {
 
         <section className="foundation" id="status" aria-labelledby="status-title">
           <div>
-            <p className="eyebrow">Status Phase 1</p>
-            <h2 id="status-title">Jalur dasar sudah tersambung.</h2>
+            <p className="eyebrow">Status layanan</p>
+            <h2 id="status-title">Meja realtime siap dimainkan.</h2>
           </div>
           <div className="runtime-status" data-state={availability.state} role="status" aria-live="polite">
             <span className="status-mark" aria-hidden="true" />
@@ -89,6 +92,10 @@ export default async function HomePage() {
             </div>
           </div>
         </section>
+
+        <div id="play">
+          <BridgeTable initialInviteCode={initialInviteCode} />
+        </div>
       </main>
 
       <footer className="site-footer">
