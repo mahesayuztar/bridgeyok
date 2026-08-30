@@ -16,13 +16,12 @@ func TestProductionPackageHasNoExternalOrImpureImports(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadDir() error = %v", err)
 	}
-	forbidden := []string{
-		"crypto/rand",
-		"database/",
-		"math/rand",
-		"net",
-		"time",
-		"github.com/",
+	allowed := map[string]struct{}{
+		"encoding/binary": {},
+		"fmt":             {},
+		"io":              {},
+		"reflect":         {},
+		"sort":            {},
 	}
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
@@ -37,10 +36,8 @@ func TestProductionPackageHasNoExternalOrImpureImports(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unquote(%s) error = %v", importSpec.Path.Value, err)
 			}
-			for _, prefix := range forbidden {
-				if path == prefix || strings.HasPrefix(path, prefix) {
-					t.Errorf("%s imports forbidden dependency %s", entry.Name(), path)
-				}
+			if _, ok := allowed[path]; !ok {
+				t.Errorf("%s imports dependency outside the pure-engine allowlist: %s", entry.Name(), path)
 			}
 		}
 	}

@@ -7,6 +7,8 @@ import (
 	"sort"
 )
 
+const maxRandomIndexAttempts = 128
+
 // Hand is the remaining collection of cards held by one seat.
 type Hand []Card
 
@@ -55,7 +57,7 @@ func readRandomIndex(randomSource io.Reader, upperBound uint64) (int, error) {
 
 	threshold := -upperBound % upperBound
 	var buffer [8]byte
-	for {
+	for _attempt := 0; _attempt < maxRandomIndexAttempts; _attempt++ {
 		if _, err := io.ReadFull(randomSource, buffer[:]); err != nil {
 			return 0, fmt.Errorf("read random bytes: %w", err)
 		}
@@ -64,6 +66,7 @@ func readRandomIndex(randomSource io.Reader, upperBound uint64) (int, error) {
 			return int(value % upperBound), nil
 		}
 	}
+	return 0, fmt.Errorf("random source exceeded %d rejected samples", maxRandomIndexAttempts)
 }
 
 // Hand returns a defensive copy of the hand for a seat.
