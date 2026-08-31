@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { auctionRows, boardResultLabel, createEmptyTableState, playableHand, reduceTableState, tableOrientation, visualPositionForSeat } from "./table-state.ts";
+import { auctionRows, boardResultLabel, createEmptyTableState, playableHand, projectedTableState, reduceTableState, tableOrientation, visualPositionForSeat } from "./table-state.ts";
 
 function tableProjection(tableId, lastSeq = 0) {
   return {
@@ -19,7 +19,7 @@ function tableProjection(tableId, lastSeq = 0) {
 
 test("table reducer clears private state and ignores stale rooms", () => {
   const first = reduceTableState(createEmptyTableState(), { type: "enter", table: tableProjection("table-a", 2) });
-  const withPending = reduceTableState(first, { type: "pending", requestId: "request-1", commandName: "table.lock" });
+  const withPending = reduceTableState(first, { type: "pending", requestId: "request-1", commandName: "table.lock", payload: {} });
   const staleRoom = reduceTableState(withPending, {
     type: "event",
     tableId: "table-b",
@@ -47,12 +47,52 @@ test("table reducer clears private state and ignores stale rooms", () => {
 
 test("table reducer converges to projected event sequence", () => {
   const initial = reduceTableState(createEmptyTableState(), { type: "enter", table: tableProjection("table-a", 1) });
-  const pending = reduceTableState(initial, { type: "pending", requestId: "request-1", commandName: "table.lock" });
+  const pending = reduceTableState(initial, { type: "pending", requestId: "request-1", commandName: "table.lock", payload: {} });
   const projected = tableProjection("table-a", 4);
   const next = reduceTableState(pending, { type: "event", tableId: "table-a", seq: 2, table: projected });
   assert.equal(next.table, projected);
   assert.equal(next.lastSeenSeq, 4);
-  assert.deepEqual(next.pending, {});
+  assert.equal(next.pending["request-1"].name, "table.lock");
+});
+
+test("table reducer projects a call until ack and authoritative event converge", () => {
+  const table = {
+    ...tableProjection("table-a", 4),
+    state: "ACTIVE",
+    viewerSeat: "N",
+    game: {
+      rulesetVersion: "v1",
+      board: { number: 1, dealer: "N", vulnerability: "NONE" },
+      phase: "AUCTION",
+      auction: { dealer: "N", turn: "N", calls: [], complete: false, passedOut: false },
+      legalCalls: [{ kind: "PASS" }],
+      turn: "N",
+      dummyRevealed: false,
+      currentTrick: { plays: [] },
+      completedTricks: [],
+      tricksNS: 0,
+      tricksEW: 0,
+      ownHand: [],
+    },
+  };
+  const entered = reduceTableState(createEmptyTableState(), { type: "enter", table });
+  const pending = reduceTableState(entered, { type: "pending", requestId: "call", commandName: "game.make_call", payload: { call: { kind: "PASS" } } });
+  assert.deepEqual(projectedTableState(pending).game.auction.calls, [{ seat: "N", call: { kind: "PASS" } }]);
+  const accepted = reduceTableState(pending, { type: "ack", requestId: "call", revision: 5, seq: 5 });
+  assert.equal(accepted.pending.call.status, "accepted");
+  const authoritative = {
+    ...table,
+    revision: 5,
+    lastSeq: 5,
+    game: {
+      ...table.game,
+      turn: "E",
+      auction: { ...table.game.auction, turn: "E", calls: [{ seat: "N", call: { kind: "PASS" } }] },
+    },
+  };
+  const settled = reduceTableState(accepted, { type: "event", tableId: "table-a", seq: 5, table: authoritative });
+  assert.deepEqual(settled.pending, {});
+  assert.equal(projectedTableState(settled).game.auction.calls.length, 1);
 });
 
 test("table reducer tracks presence and removes departed participants", () => {
@@ -131,7 +171,7 @@ test("controller recovery waits for fresh projection and replacement event", () 
     seats: { S: { participantId: "viewer", ready: true, controllerEpoch: 1 } }
   };
   const entered = reduceTableState(createEmptyTableState(), { type: "enter", table: projected });
-  const pending = reduceTableState(entered, { type: "pending", requestId: "stale-command", commandName: "game.make_call" });
+  const pending = reduceTableState(entered, { type: "pending", requestId: "stale-command", commandName: "game.make_call", payload: {} });
   const issue = { kind: "conflict", title: "Kendali stale", detail: "Selaraskan.", retryable: true, action: "resync", source: "websocket" };
   const syncing = reduceTableState(pending, { type: "conflict", issue });
   assert.equal(syncing.controllerState, "resyncing");
@@ -149,7 +189,7 @@ test("controller recovery waits for fresh projection and replacement event", () 
   const repeatedSnapshot = reduceTableState(fresh, { type: "snapshot", tableId: "table-a", seq: 5, table: freshProjection });
   assert.equal(repeatedSnapshot.controllerState, "readyToTakeover");
 
-  const takeover = reduceTableState(fresh, { type: "pending", requestId: "takeover", commandName: "table.takeover" });
+  const takeover = reduceTableState(fresh, { type: "pending", requestId: "takeover", commandName: "table.takeover", payload: {} });
   assert.equal(takeover.controllerState, "takeoverPending");
   const replaced = reduceTableState(takeover, {
     type: "event",

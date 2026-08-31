@@ -1,4 +1,33 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
+
+function delayAuthoritativeGameplay(route: WebSocketRoute) {
+  const server = route.connectToServer();
+  server.onMessage((message) => {
+    let kind: unknown;
+    try {
+      kind = JSON.parse(String(message)).kind;
+    } catch {
+      route.send(message);
+      return;
+    }
+    if (kind === "ack" || kind === "event") {
+      setTimeout(() => void route.send(message), 500);
+    } else {
+      route.send(message);
+    }
+  });
+}
+
+function mutationFrameCount(frames: string[]) {
+  return frames.filter((encoded) => {
+    try {
+      const envelope = JSON.parse(encoded) as Record<string, unknown>;
+      return envelope.kind === "command" && envelope.name !== "table.subscribe" && envelope.name !== "table.resume";
+    } catch {
+      return false;
+    }
+  }).length;
+}
 
 async function enterAsGuest(page: Page, nickname: string) {
   await page.goto("/");
@@ -43,6 +72,7 @@ async function makeBid(page: Page, level: number, strain: string) {
   const button = page.locator(".bid-strains button").filter({ hasText: strain });
   await expect(button).toBeEnabled();
   await button.click();
+  await expect(page.locator(".auction-table tbody")).toContainText(`${level}${strain}`, { timeout: 250 });
 }
 
 async function playNextCard(pages: Page[]) {
@@ -60,7 +90,7 @@ async function playNextCard(pages: Page[]) {
         exact: true,
       });
       await card.dispatchEvent("click");
-      await expect(cardButton).toHaveCount(0);
+      await expect(cardButton).toHaveCount(0, { timeout: 250 });
       return;
     }
   }
@@ -96,14 +126,19 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     const context = await browser.newContext();
     const page = await context.newPage();
     const frames: string[] = [];
+    const sentFrames: string[] = [];
+    await page.routeWebSocket(/\/v1\/ws/, delayAuthoritativeGameplay);
     page.on("websocket", (socket) => {
       if (!socket.url().startsWith("ws://localhost:8180")) return;
       socket.on("framereceived", (event) =>
         frames.push(String(event.payload)),
       );
+      socket.on("framesent", (event) =>
+        sentFrames.push(String(event.payload)),
+      );
     });
     await enterAsGuest(page, nickname);
-    return { context, page, frames };
+    return { context, page, frames, sentFrames };
   }));
   const north = players[0]!;
   const east = players[1]!;
@@ -131,6 +166,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await takeSeat(west.page, "Wira", "W");
 
   const replacementTab = await north.context.newPage();
+  await replacementTab.routeWebSocket(/\/v1\/ws/, delayAuthoritativeGameplay);
   replacementTab.on("websocket", (socket) => {
     if (!socket.url().startsWith("ws://localhost:8180")) return;
     socket.on("framereceived", (event) =>
@@ -157,6 +193,11 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   for (const page of activePages) {
     await expect(page.locator(".own-hand .physical-card")).toHaveCount(13);
   }
+
+  const invalidFrameCount = mutationFrameCount(east.sentFrames);
+  await east.page.getByRole("button", { name: /^Pass/ }).dispatchEvent("click");
+  await east.page.waitForTimeout(250);
+  expect(mutationFrameCount(east.sentFrames)).toBe(invalidFrameCount);
 
   await makeBid(replacementTab, 1, "♣");
   await makeCall(east.page, /^Pass/);
