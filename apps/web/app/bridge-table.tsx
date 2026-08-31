@@ -163,6 +163,8 @@ export default function BridgeTable({
             onAction={(action) => {
               if (action === "retry") session.reconnect();
               else if (action === "resync") session.resync();
+              else if (action === "takeover")
+                session.sendCommand("table.takeover");
             }}
           />
         )}
