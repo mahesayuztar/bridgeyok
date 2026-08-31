@@ -432,6 +432,7 @@ components:
         - id
         - nickname
         - role
+        - isBot
       properties:
         id:
           type: string
@@ -442,6 +443,8 @@ components:
           maxLength: 64
         role:
           $ref: "#/components/schemas/TableRole"
+        isBot:
+          type: boolean
     TableSeatAssignment:
       type: object
       additionalProperties: false
@@ -459,6 +462,8 @@ components:
           type: integer
           format: int64
           minimum: 1
+        isBot:
+          type: boolean
     TableView:
       type: object
       additionalProperties: false

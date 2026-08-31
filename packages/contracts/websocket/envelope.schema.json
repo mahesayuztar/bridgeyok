@@ -77,11 +77,12 @@
     "projectedParticipant": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "nickname", "role"],
+      "required": ["id", "nickname", "role", "isBot"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "nickname": { "type": "string" },
-        "role": { "enum": ["OWNER", "PARTICIPANT"] }
+        "role": { "enum": ["OWNER", "PARTICIPANT"] },
+        "isBot": { "type": "boolean" }
       }
     },
     "presenceParticipant": {
@@ -116,7 +117,8 @@
       "properties": {
         "participantId": { "type": "string", "format": "uuid" },
         "ready": { "type": "boolean" },
-        "controllerEpoch": { "type": "integer", "minimum": 1 }
+        "controllerEpoch": { "type": "integer", "minimum": 1 },
+        "isBot": { "type": "boolean" }
       }
     },
     "actionRequest": {
@@ -216,6 +218,9 @@
             "table.set_ready",
             "table.lock",
             "table.remove_participant",
+            "table.add_bot",
+            "table.remove_bot",
+            "table.replace_with_bot",
             "table.start_game",
             "game.make_call",
             "game.play_card",
@@ -277,6 +282,32 @@
         },
         {
           "if": { "properties": { "name": { "const": "table.remove_participant" } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["participant_id"],
+                "properties": { "participant_id": { "type": "string", "format": "uuid" } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "name": { "enum": ["table.add_bot", "table.remove_bot"] } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["seat"],
+                "properties": { "seat": { "enum": ["N", "E", "S", "W"] } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "name": { "const": "table.replace_with_bot" } }, "required": ["name"] },
           "then": {
             "properties": {
               "payload": {

@@ -193,7 +193,7 @@ func tableView(projection table.Projection) (apigen.TableView, error) {
 			return apigen.TableView{}, parseErr
 		}
 		view.Participants = append(view.Participants, apigen.TableParticipant{
-			Id: participantID, Nickname: participant.Nickname, Role: apigen.TableRole(participant.Role),
+			Id: participantID, Nickname: participant.Nickname, Role: apigen.TableRole(participant.Role), IsBot: participant.IsBot,
 		})
 	}
 	for seat, assignment := range projection.Seats {
@@ -201,9 +201,14 @@ func tableView(projection table.Projection) (apigen.TableView, error) {
 		if parseErr != nil {
 			return apigen.TableView{}, parseErr
 		}
-		view.Seats[string(seat)] = apigen.TableSeatAssignment{
+		projectedAssignment := apigen.TableSeatAssignment{
 			ParticipantId: participantID, Ready: assignment.Ready, ControllerEpoch: assignment.ControllerEpoch,
 		}
+		if assignment.IsBot {
+			isBot := true
+			projectedAssignment.IsBot = &isBot
+		}
+		view.Seats[string(seat)] = projectedAssignment
 	}
 	return view, nil
 }

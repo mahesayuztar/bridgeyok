@@ -12,6 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/observability"
 )
 
@@ -49,6 +50,44 @@ type actorCommandHandler struct {
 	active        int
 	maximumActive int
 	err           error
+}
+
+type botActorCommandHandler struct {
+	aggregate Aggregate
+}
+
+func (handler *botActorCommandHandler) Process(_ context.Context, request CommandRequest) (CommandResult, error) {
+	command := request.Command
+	command.SessionID = request.SessionID
+	decision, domainError := Decide(handler.aggregate, command)
+	if domainError != nil {
+		return CommandResult{
+			Aggregate: handler.aggregate.clone(),
+			Outcome: CommandOutcome{
+				RequestID: request.RequestID, CommandName: command.Name, Status: CommandStatusRejected,
+				ErrorCode: domainError.Code, Revision: handler.aggregate.Revision, LastSeq: handler.aggregate.LastSeq,
+			},
+		}, nil
+	}
+	next := decision.NextState
+	next.Revision = handler.aggregate.Revision + 1
+	next.LastSeq = handler.aggregate.LastSeq + int64(len(decision.Events))
+	events := make([]PersistedEvent, 0, len(decision.Events))
+	for _index, event := range decision.Events {
+		events = append(events, PersistedEvent{
+			TableID: next.ID, Seq: handler.aggregate.LastSeq + int64(_index) + 1,
+			Revision: next.Revision, Type: event.Type, Payload: event.Payload,
+		})
+	}
+	handler.aggregate = next.clone()
+	return CommandResult{
+		Aggregate: next,
+		Outcome: CommandOutcome{
+			RequestID: request.RequestID, CommandName: command.Name, Status: CommandStatusAccepted,
+			Revision: next.Revision, FirstSeq: events[0].Seq, LastSeq: next.LastSeq,
+		},
+		Events: events,
+	}, nil
 }
 
 func (handler *actorCommandHandler) Process(_ context.Context, request CommandRequest) (CommandResult, error) {
@@ -194,6 +233,49 @@ func TestActorRegistryKeepsCommittedStateWhenHandlerReturnsPublishError(t *testi
 		}
 		if drainErr := registry.Drain(t.Context()); drainErr != nil {
 			t.Fatalf("Drain() error = %v", drainErr)
+		}
+	})
+}
+
+func TestActorRegistryRunsBotActionAfterCommittedCommand(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		aggregate := actorAggregate(t)
+		for _index := 0; _index < 2; _index++ {
+			participant := Participant{
+				ID: "participant-" + string(rune('a'+_index)), SessionID: "session-" + string(rune('a'+_index)),
+				Nickname: "Guest " + string(rune('A'+_index)), Role: RoleParticipant, JoinedAt: testJoinedAt,
+			}
+			aggregate = acceptedDecision(t, aggregate, Command{Name: CommandJoinTable, Participant: &participant}).NextState
+		}
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandAddBot, SessionID: actorSessionID, Seat: bridge.North, BotID: "bot-north"}).NextState
+		for _index, participant := range aggregate.Participants {
+			seat := []bridge.Seat{bridge.East, bridge.South, bridge.West}[_index]
+			aggregate = acceptedDecision(t, aggregate, Command{Name: CommandTakeSeat, SessionID: participant.SessionID, Seat: seat}).NextState
+			aggregate = acceptedDecision(t, aggregate, Command{Name: CommandSetReady, SessionID: participant.SessionID, Ready: true}).NextState
+		}
+		handler := &botActorCommandHandler{aggregate: aggregate}
+		registry := actorRegistryForTest(t, &actorHydrator{aggregate: aggregate}, handler, 4, time.Hour, nil)
+		deal := testDeal(t)
+
+		result, err := registry.Submit(t.Context(), CommandRequest{
+			TableID: actorTableID, SessionID: actorSessionID, RequestID: "start_with_bot", ExpectedRevision: 0,
+			Command: Command{Name: CommandStartGame, Deal: &deal, BoardID: "board-one"},
+		})
+		if err != nil {
+			t.Fatalf("Submit() error = %v", err)
+		}
+		if len(result.AutomatedResults) != 1 || result.AutomatedResults[0].Outcome.CommandName != CommandMakeCall {
+			t.Fatalf("automated results = %+v", result.AutomatedResults)
+		}
+		current, err := registry.Snapshot(t.Context(), actorTableID)
+		if err != nil {
+			t.Fatalf("Snapshot() error = %v", err)
+		}
+		if current.Revision != 2 || len(current.Game.Auction.Calls) != 1 || current.Game.Auction.Calls[0].Call != bridge.Pass() {
+			t.Fatalf("current bot state = %+v", current)
+		}
+		if err := registry.Drain(t.Context()); err != nil {
+			t.Fatalf("Drain() error = %v", err)
 		}
 	})
 }

@@ -108,6 +108,11 @@ func (broker *broker) publishResult(ctx context.Context, result table.CommandRes
 			}
 		}
 	}
+	for _, automatedResult := range result.AutomatedResults {
+		if err := broker.publishResult(ctx, automatedResult); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

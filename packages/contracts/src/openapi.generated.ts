@@ -266,6 +266,7 @@ export interface components {
             id: string;
             nickname: string;
             role: components["schemas"]["TableRole"];
+            isBot: boolean;
         };
         TableSeatAssignment: {
             /** Format: uuid */
@@ -273,6 +274,7 @@ export interface components {
             ready: boolean;
             /** Format: int64 */
             controllerEpoch: number;
+            isBot?: boolean;
         };
         TableView: {
             /** Format: uuid */

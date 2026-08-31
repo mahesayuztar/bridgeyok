@@ -17,6 +17,8 @@ var (
 	ErrActorRegistryDraining = errors.New("table actor registry is draining")
 )
 
+const maxConsecutiveBotActions = 64
+
 // AggregateHydrator loads the durable private state owned by a table actor.
 type AggregateHydrator interface {
 	FindTable(context.Context, string) (Aggregate, error)
@@ -361,6 +363,7 @@ func (actor *tableActor) run() {
 }
 
 func (actor *tableActor) handle(request actorRequest, aggregate **Aggregate) {
+	hydratedState := false
 	if *aggregate == nil || request.refresh {
 		startedAt := actor.now().UTC()
 		hydrated, err := actor.hydrator.FindTable(request.ctx, actor.tableID)
@@ -382,6 +385,7 @@ func (actor *tableActor) handle(request actorRequest, aggregate **Aggregate) {
 		}
 		cached := hydrated.clone()
 		*aggregate = &cached
+		hydratedState = true
 		actor.logger.InfoContext(request.ctx, "table_actor_hydrated",
 			"table_id", actor.tableID,
 			"revision", hydrated.Revision,
@@ -391,6 +395,9 @@ func (actor *tableActor) handle(request actorRequest, aggregate **Aggregate) {
 	}
 
 	if request.command == nil {
+		if hydratedState {
+			actor.driveBots(request.ctx, aggregate)
+		}
 		request.response <- actorResponse{aggregate: (*aggregate).clone()}
 		return
 	}
@@ -399,5 +406,39 @@ func (actor *tableActor) handle(request actorRequest, aggregate **Aggregate) {
 		cached := result.Aggregate.clone()
 		*aggregate = &cached
 	}
+	if err == nil && !result.Duplicate && result.Outcome.Status == CommandStatusAccepted {
+		result.AutomatedResults = actor.driveBots(request.ctx, aggregate)
+	}
 	request.response <- actorResponse{commandResult: result, err: err}
+}
+
+func (actor *tableActor) driveBots(ctx context.Context, aggregate **Aggregate) []CommandResult {
+	results := make([]CommandResult, 0)
+	for _actionIndex := 0; _actionIndex < maxConsecutiveBotActions; _actionIndex++ {
+		command, ready := nextBotCommand(**aggregate)
+		if !ready {
+			return results
+		}
+		request := CommandRequest{
+			TableID:          actor.tableID,
+			SessionID:        (*aggregate).OwnerSessionID,
+			RequestID:        fmt.Sprintf("bot_action_%d", (*aggregate).Revision+1),
+			ExpectedRevision: (*aggregate).Revision,
+			Command:          command,
+		}
+		result, err := actor.handler.Process(ctx, request)
+		if err != nil {
+			actor.logger.ErrorContext(ctx, "table_bot_action_failed", "table_id", actor.tableID, "command_name", command.Name, "result_code", "PROCESS_ERROR")
+			return results
+		}
+		if result.Outcome.Status != CommandStatusAccepted || result.Aggregate.ID != actor.tableID {
+			actor.logger.ErrorContext(ctx, "table_bot_action_rejected", "table_id", actor.tableID, "command_name", command.Name, "result_code", result.Outcome.ErrorCode)
+			return results
+		}
+		cached := result.Aggregate.clone()
+		*aggregate = &cached
+		results = append(results, result)
+	}
+	actor.logger.ErrorContext(ctx, "table_bot_action_limit_reached", "table_id", actor.tableID, "result_code", "ACTION_LIMIT")
+	return results
 }

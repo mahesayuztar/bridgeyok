@@ -153,6 +153,7 @@ type RefreshGuestSessionRequest struct {
 // TableParticipant defines model for TableParticipant.
 type TableParticipant struct {
 	Id       openapi_types.UUID `json:"id"`
+	IsBot    bool               `json:"isBot"`
 	Nickname string             `json:"nickname"`
 	Role     TableRole          `json:"role"`
 }
@@ -174,6 +175,7 @@ type TableSeat string
 // TableSeatAssignment defines model for TableSeatAssignment.
 type TableSeatAssignment struct {
 	ControllerEpoch int64              `json:"controllerEpoch"`
+	IsBot           *bool              `json:"isBot,omitempty"`
 	ParticipantId   openapi_types.UUID `json:"participantId"`
 	Ready           bool               `json:"ready"`
 }

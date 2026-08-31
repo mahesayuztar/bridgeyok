@@ -40,4 +40,26 @@ test("WebSocket contract rejects unsafe envelopes", () => {
   }
 });
 
+test("WebSocket contract accepts owner bot mutations", () => {
+  const commands = [
+    { name: "table.add_bot", payload: { seat: "N" } },
+    { name: "table.remove_bot", payload: { seat: "E" } },
+    { name: "table.replace_with_bot", payload: { participant_id: realtimeParticipantId } }
+  ];
+
+  for (const [_commandIndex, command] of commands.entries()) {
+    const envelope = {
+      v: 1,
+      kind: "command",
+      name: command.name,
+      request_id: `bot_command_${_commandIndex}`,
+      table_id: "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31",
+      expected_revision: _commandIndex,
+      controller_epoch: 1,
+      payload: command.payload
+    };
+    assert.equal(validateEnvelope(envelope), true, ajv.errorsText(validateEnvelope.errors));
+  }
+});
+
 const realtimeParticipantId = "99ef3682-3ba8-42db-9c33-17238bfb2207";

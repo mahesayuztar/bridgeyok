@@ -22,6 +22,9 @@ func TestDecodeClientEnvelope(t *testing.T) {
 		{name: "heartbeat", message: `{"v":1,"kind":"control","name":"client.heartbeat","payload":{}}`},
 		{name: "subscribe", message: commandMessage("table.subscribe", `{"last_seen_seq":0}`, "")},
 		{name: "ready mutation", message: commandMessage("table.set_ready", `{"ready":true}`, `,"expected_revision":2,"controller_epoch":1`)},
+		{name: "add bot", message: commandMessage("table.add_bot", `{"seat":"W"}`, `,"expected_revision":2,"controller_epoch":1`)},
+		{name: "remove bot", message: commandMessage("table.remove_bot", `{"seat":"W"}`, `,"expected_revision":2,"controller_epoch":1`)},
+		{name: "replace with bot", message: commandMessage("table.replace_with_bot", `{"participant_id":"99ef3682-3ba8-42db-9c33-17238bfb2207"}`, `,"expected_revision":2,"controller_epoch":1`)},
 		{name: "pass call", message: commandMessage("game.make_call", `{"call":{"kind":"PASS"}}`, `,"expected_revision":2,"controller_epoch":1`)},
 		{name: "claim", message: commandMessage("game.request_claim", `{"tricks":7}`, `,"expected_revision":2,"controller_epoch":1`)},
 		{name: "accept claim", message: commandMessage("game.respond_claim", `{"accepted":true}`, `,"expected_revision":2,"controller_epoch":1`)},
@@ -34,6 +37,7 @@ func TestDecodeClientEnvelope(t *testing.T) {
 		{name: "extra payload field", message: commandMessage("table.take_seat", `{"seat":"N","hidden":true}`, `,"expected_revision":0`), wantErr: true},
 		{name: "claim outside range", message: commandMessage("game.request_claim", `{"tricks":14}`, `,"expected_revision":0`), wantErr: true},
 		{name: "response missing decision", message: commandMessage("game.respond_undo", `{}`, `,"expected_revision":0`), wantErr: true},
+		{name: "bot seat invalid", message: commandMessage("table.add_bot", `{"seat":"X"}`, `,"expected_revision":0`), wantErr: true},
 		{name: "trailing value", message: `{"v":1,"kind":"control","name":"client.heartbeat","payload":{}} {}`, wantErr: true},
 	}
 
@@ -43,6 +47,40 @@ func TestDecodeClientEnvelope(t *testing.T) {
 			_, err := decodeClientEnvelope([]byte(test.message))
 			if (err != nil) != test.wantErr {
 				t.Fatalf("decodeClientEnvelope() error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestTableCommandMapsBotMutations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		messageName       string
+		payload           string
+		wantName          table.CommandName
+		wantSeat          string
+		wantParticipantID string
+		wantBotID         bool
+	}{
+		{name: "add", messageName: "table.add_bot", payload: `{"seat":"N"}`, wantName: table.CommandAddBot, wantSeat: "N", wantBotID: true},
+		{name: "remove", messageName: "table.remove_bot", payload: `{"seat":"E"}`, wantName: table.CommandRemoveBot, wantSeat: "E"},
+		{name: "replace", messageName: "table.replace_with_bot", payload: `{"participant_id":"99ef3682-3ba8-42db-9c33-17238bfb2207"}`, wantName: table.CommandReplaceWithBot, wantParticipantID: "99ef3682-3ba8-42db-9c33-17238bfb2207", wantBotID: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			envelope, err := decodeClientEnvelope([]byte(commandMessage(test.messageName, test.payload, `,"expected_revision":3,"controller_epoch":2`)))
+			if err != nil {
+				t.Fatalf("decodeClientEnvelope() error = %v", err)
+			}
+			command, err := tableCommand(envelope, bytes.NewReader(make([]byte, 128)), time.Now())
+			if err != nil {
+				t.Fatalf("tableCommand() error = %v", err)
+			}
+			if command.Name != test.wantName || string(command.Seat) != test.wantSeat || command.ParticipantID != test.wantParticipantID || (command.BotID != "") != test.wantBotID {
+				t.Fatalf("tableCommand() = %+v", command)
 			}
 		})
 	}

@@ -28,6 +28,9 @@ const (
 	nameSetReady          = "table.set_ready"
 	nameLockTable         = "table.lock"
 	nameRemoveParticipant = "table.remove_participant"
+	nameAddBot            = "table.add_bot"
+	nameRemoveBot         = "table.remove_bot"
+	nameReplaceWithBot    = "table.replace_with_bot"
 	nameStartGame         = "table.start_game"
 	nameMakeCall          = "game.make_call"
 	namePlayCard          = "game.play_card"
@@ -213,6 +216,23 @@ func validateMutationPayload(envelope ClientEnvelope) error {
 		if _, err := uuid.Parse(payload.ParticipantID); err != nil {
 			return fmt.Errorf("participant id is invalid")
 		}
+	case nameAddBot, nameRemoveBot:
+		var payload struct {
+			Seat bridge.Seat `json:"seat"`
+		}
+		if err := decodeStrict(envelope.Payload, &payload); err != nil || !payload.Seat.Valid() {
+			return fmt.Errorf("bot seat payload is invalid")
+		}
+	case nameReplaceWithBot:
+		var payload struct {
+			ParticipantID string `json:"participant_id"`
+		}
+		if err := decodeStrict(envelope.Payload, &payload); err != nil {
+			return fmt.Errorf("replace with bot payload is invalid")
+		}
+		if _, err := uuid.Parse(payload.ParticipantID); err != nil {
+			return fmt.Errorf("participant id is invalid")
+		}
 	case nameMakeCall:
 		var payload struct {
 			Call bridge.Call `json:"call"`
@@ -291,6 +311,37 @@ func tableCommand(envelope ClientEnvelope, random io.Reader, now time.Time) (tab
 			return table.Command{}, fmt.Errorf("decode remove participant command: %w", err)
 		}
 		command.Name, command.ParticipantID = table.CommandRemoveParticipant, payload.ParticipantID
+	case nameAddBot, nameReplaceWithBot:
+		botID, err := uuid.NewRandomFromReader(random)
+		if err != nil {
+			return table.Command{}, fmt.Errorf("generate bot id: %w", err)
+		}
+		command.BotID = botID.String()
+		if envelope.Name == nameAddBot {
+			var payload struct {
+				Seat bridge.Seat `json:"seat"`
+			}
+			if err := decodeStrict(envelope.Payload, &payload); err != nil {
+				return table.Command{}, fmt.Errorf("decode add bot command: %w", err)
+			}
+			command.Name, command.Seat = table.CommandAddBot, payload.Seat
+		} else {
+			var payload struct {
+				ParticipantID string `json:"participant_id"`
+			}
+			if err := decodeStrict(envelope.Payload, &payload); err != nil {
+				return table.Command{}, fmt.Errorf("decode replace with bot command: %w", err)
+			}
+			command.Name, command.ParticipantID = table.CommandReplaceWithBot, payload.ParticipantID
+		}
+	case nameRemoveBot:
+		var payload struct {
+			Seat bridge.Seat `json:"seat"`
+		}
+		if err := decodeStrict(envelope.Payload, &payload); err != nil {
+			return table.Command{}, fmt.Errorf("decode remove bot command: %w", err)
+		}
+		command.Name, command.Seat = table.CommandRemoveBot, payload.Seat
 	case nameStartGame, nameNextBoard:
 		deal, err := bridge.GenerateDeal(random)
 		if err != nil {

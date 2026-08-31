@@ -18,7 +18,8 @@
       {
         "id": "c7f2974f-cd0d-4531-979c-b4bd47fd76d8",
         "nickname": "North Player",
-        "role": "OWNER"
+        "role": "OWNER",
+        "isBot": false
       }
     ],
     "seats": {},

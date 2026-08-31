@@ -21,6 +21,9 @@ export type MutationCommandEnvelope = {
     | "table.set_ready"
     | "table.lock"
     | "table.remove_participant"
+    | "table.add_bot"
+    | "table.remove_bot"
+    | "table.replace_with_bot"
     | "table.start_game"
     | "game.make_call"
     | "game.play_card"
@@ -119,11 +122,13 @@ export interface ProjectedParticipant {
   id: string;
   nickname: string;
   role: "OWNER" | "PARTICIPANT";
+  isBot: boolean;
 }
 export interface SeatAssignment {
   participantId: string;
   ready: boolean;
   controllerEpoch: number;
+  isBot?: boolean;
 }
 export interface ActionRequest {
   kind: "CLAIM" | "UNDO";

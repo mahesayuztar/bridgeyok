@@ -51,10 +51,11 @@ type PersistedEvent struct {
 
 // CommandResult is returned only after its transaction has committed.
 type CommandResult struct {
-	Outcome   CommandOutcome
-	Aggregate Aggregate
-	Events    []PersistedEvent
-	Duplicate bool
+	Outcome          CommandOutcome
+	Aggregate        Aggregate
+	Events           []PersistedEvent
+	Duplicate        bool
+	AutomatedResults []CommandResult
 }
 
 // CommittedBatch contains only durable event facts safe for a downstream publisher.
