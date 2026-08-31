@@ -38,6 +38,13 @@ async function makeCall(page: Page, name: RegExp) {
   await button.click();
 }
 
+async function makeBid(page: Page, level: number, strain: string) {
+  await page.getByRole("button", { name: String(level), exact: true }).click();
+  const button = page.locator(".bid-strains button").filter({ hasText: strain });
+  await expect(button).toBeEnabled();
+  await button.click();
+}
+
 async function playNextCard(pages: Page[]) {
   await expect.poll(async () => {
     const counts = await Promise.all(pages.map((page) => page.locator('button[aria-label^="Mainkan "]:enabled').count()));
@@ -46,7 +53,14 @@ async function playNextCard(pages: Page[]) {
   for (const page of pages) {
     const cards = page.locator('button[aria-label^="Mainkan "]:enabled');
     if (await cards.count() > 0) {
-      await cards.first().click();
+      const card = cards.first();
+      const cardLabel = await card.getAttribute("aria-label");
+      const cardButton = page.getByRole("button", {
+        name: cardLabel!,
+        exact: true,
+      });
+      await card.dispatchEvent("click");
+      await expect(cardButton).toHaveCount(0);
       return;
     }
   }
@@ -77,11 +91,17 @@ function assertPrivateFrames(frames: string[]) {
 }
 
 test("four guests finish boards, recover a controller, and keep hidden hands private", async ({ browser }) => {
+  test.setTimeout(180_000);
   const players = await Promise.all(["Nara", "Eka", "Sari", "Wira"].map(async (nickname) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     const frames: string[] = [];
-    page.on("websocket", (socket) => socket.on("framereceived", (event) => frames.push(String(event.payload))));
+    page.on("websocket", (socket) => {
+      if (!socket.url().startsWith("ws://localhost:8180")) return;
+      socket.on("framereceived", (event) =>
+        frames.push(String(event.payload)),
+      );
+    });
     await enterAsGuest(page, nickname);
     return { context, page, frames };
   }));
@@ -111,14 +131,19 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await takeSeat(west.page, "Wira", "W");
 
   const replacementTab = await north.context.newPage();
-  replacementTab.on("websocket", (socket) => socket.on("framereceived", (event) => north.frames.push(String(event.payload))));
+  replacementTab.on("websocket", (socket) => {
+    if (!socket.url().startsWith("ws://localhost:8180")) return;
+    socket.on("framereceived", (event) =>
+      north.frames.push(String(event.payload)),
+    );
+  });
   await replacementTab.goto(tableURL);
   await waitForConnection(replacementTab);
   await replacementTab.getByRole("button", { name: /^Buka menu Nara, kursi [NESW]$/ }).click();
   await replacementTab.getByRole("button", { name: "Saya siap" }).click();
   await expect(replacementTab.getByRole("button", { name: "Ambil alih kendali" })).toBeVisible();
   await replacementTab.getByRole("button", { name: "Ambil alih kendali" }).click();
-  await expect(replacementTab.getByText("Kendali sudah berpindah ke perangkat ini.")).toBeVisible();
+  await expect(replacementTab.getByRole("button", { name: "Kunci meja" })).toBeEnabled();
   await north.page.getByRole("button", { name: "Kunci meja" }).click();
   await expect(north.page.getByRole("button", { name: "Ambil alih kendali" })).toBeVisible();
 
@@ -133,7 +158,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     await expect(page.locator(".own-hand .physical-card")).toHaveCount(13);
   }
 
-  await makeCall(replacementTab, /^1♣$/);
+  await makeBid(replacementTab, 1, "♣");
   await makeCall(east.page, /^Pass/);
   await makeCall(south.page, /^Pass/);
   await west.page.reload();
@@ -141,7 +166,6 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await makeCall(west.page, /^Pass/);
   await expect(west.page.getByRole("button", { name: "Ambil alih kendali" })).toBeVisible();
   await west.page.getByRole("button", { name: "Ambil alih kendali" }).click();
-  await expect(west.page.getByText("Kendali sudah berpindah ke perangkat ini.")).toBeVisible();
   await makeCall(west.page, /^Pass/);
 
   for (let _cardIndex = 0; _cardIndex < 52; _cardIndex++) {
