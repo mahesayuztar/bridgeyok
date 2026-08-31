@@ -1,6 +1,6 @@
 # BridgeYok Web Roadmap
 
-> Status: **IN PROGRESS — GUX UX-01–UX-03 PASS; UX-04–UX-14 belum dimulai**
+> Status: **IN PROGRESS — GUX UX-01–UX-03 dan UX-06–UX-09 PASS; UX-04–UX-05 dan UX-10–UX-14 belum dimulai**
 > Last updated: 1 September 2026
 > Scope: guest entry, lobby navigation, actionable errors, controller takeover, table UX/layout, dan objective GUX frontend-first yang regression-sensitive.
 > Implementation must not begin until the visual-reference and projection audits in Work 0 are complete.
@@ -600,7 +600,7 @@ Visual novelty bukan tujuan.
 
 ## 19. Objective GUX — Gameplay UX Reliability & Interaction Refactor
 
-**Status:** IN PROGRESS — UX-01–UX-03 PASS; UX-04–UX-14 NOT STARTED
+**Status:** IN PROGRESS — UX-01–UX-03 and UX-06–UX-09 PASS; UX-04–UX-05 and UX-10–UX-14 NOT STARTED
 
 **Priority:** UX correctness dan gameplay feel kira-kira 10× lebih penting daripada decorative polish.
 
@@ -698,6 +698,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ### UX-06 — Card scale and board geometry
 
+**Status:** PASS — shared scale tokens, explicit player/play zones, three dummy orientations, and cross-viewport collision checks completed 1 September 2026.
+
 - **Problem:** own/dummy/trick sizing comes from unrelated context selectors and offsets; dummy/trick/hand collisions remain likely across orientations and narrow widths.
 - **Scope:** coherent card proportion/typography tokens and explicit board zones for players, own hand, oriented dummy suit groups, current trick slots, and navbar. Preserve descending rank and suit grouping.
 - **Non-goals:** no decorative redesign, no unrelated magic-number patches, no change to bridge orientation rules.
@@ -711,6 +713,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 - **Completion gate:** UX-06 PASS requires all target viewport collision assertions and approved screenshots.
 
 ### UX-07 — Contract and game information
+
+**Status:** PASS — contract, declaring seat, and participant identity now share one formatter across active status and result surfaces.
 
 - **Problem:** active navbar suppresses declarer ownership by formatting contract without declarer identity.
 - **Scope:** concise contract + declaring seat + participant name where space permits, using shared formatter/view data.
@@ -726,6 +730,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ### UX-08 — Navbar actions
 
+**Status:** PASS — Claim and Undo now expose capability state in the navbar with a keyboard-operable trick selector and contextual consensus response.
+
 - **Problem:** claim/undo occupy floating board space and availability is tied to a separate consensus panel.
 - **Scope:** compact icon + short-label Undo and Claim in table status/navbar; disabled unavailable state; claim trick-count popover/sheet only when needed; pending consensus response remains contextual.
 - **Non-goals:** no permanent floating action panel, no excessive helper copy, and no capability invented beyond projection.
@@ -739,6 +745,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 - **Completion gate:** UX-08 PASS requires all consensus interactions through navbar/contextual overlay without board collision.
 
 ### UX-09 — Concise gameplay copy
+
+**Status:** PASS — active portal, bidding, consensus, table menu, hand, bot, invite, and waiting-transition copy completed accessibility review.
 
 - **Problem:** active-game portal/menu/hints/consensus/waiting transitions contain prose that slows scanning and consumes limited geometry.
 - **Scope:** audit player portal, table menu, bidding, claim/undo, bots, invite, hints, and waiting/active transition; retain safety-critical destructive meaning while replacing obvious instruction with icon/short action/tooltip.
@@ -824,12 +832,12 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ## 20. GATE UX-G1 — Gameplay UX Refactor Complete
 
-Status saat ini: **BLOCKED — UX-01–UX-03 PASS; UX-04–UX-14 masih NOT STARTED**.
+Status saat ini: **BLOCKED — UX-01–UX-03 and UX-06–UX-09 PASS; UX-04–UX-05 and UX-10–UX-14 masih NOT STARTED**.
 
 ```text
 [x] UX-01 PASS  [x] UX-02 PASS  [x] UX-03 PASS  [ ] UX-04 PASS
-[ ] UX-05 PASS  [ ] UX-06 PASS  [ ] UX-07 PASS  [ ] UX-08 PASS
-[ ] UX-09 PASS  [ ] UX-10 PASS  [ ] UX-11 PASS  [ ] UX-12 PASS
+[ ] UX-05 PASS  [x] UX-06 PASS  [x] UX-07 PASS  [x] UX-08 PASS
+[x] UX-09 PASS  [ ] UX-10 PASS  [ ] UX-11 PASS  [ ] UX-12 PASS
 [ ] UX-13 PASS  [ ] UX-14 PASS
 ```
 
@@ -927,8 +935,8 @@ UX-02 reconciliation traces: commits 6e9eaae, c2bde4d; unit ACK/event ordering, 
 UX-03 no-invalid-frame proof: commits 6e9eaae, c2bde4d; capability matrix 6/6; forced disabled Pass dispatch produced zero mutation frames in four-browser Playwright
 UX-04 motion/skip recordings: ______________
 UX-05 desktop/mobile drag: _________________
-UX-06 viewport screenshots/geometry: _______
-UX-07–13 component/browser evidence: _______
+UX-06 viewport screenshots/geometry: commits 9275dce, 262b3be; Playwright 1920×1080, 1024×768, 768×1024, 390×844, 320×700; aspect ratio, clipping, board-zone containment, dummy/trick and own-hand/table non-overlap PASS
+UX-07–13 component/browser evidence: UX-07–09 commits 9275dce, 262b3be; formatter suits/NT/X/XX/missing identity/long name PASS; navbar disabled/available Claim and Undo, keyboard selector/focus return, contract persistence, concise accessible action labels PASS
 UX-14 matrix report: _______________________
 UX-G1 review/date: _________________________
 ENG-01 privacy review: _____________________
@@ -945,4 +953,4 @@ Known risks discovered in the current repository:
 5. ENG-02 terminology is unresolved: a single table has no inherent IMP comparison. Raw duplicate score cannot be labeled IMP without a reference result or accepted pair/session model.
 6. ADR-008 and current aggregate explicitly disable consensus whenever a bot is present. ENG-03 is a deliberate future product/architecture supersession and remains gated.
 7. Four-browser Playwright baseline is now committed and passing; the local `.playwright` configuration remains unrelated user work and is intentionally excluded from UX commits.
-8. CSS has many orientation-specific offsets but no shared board-zone contract; motion built before UX-06 would couple animation to fragile magic numbers.
+8. UX-06 replaced the unbounded orientation offsets with shared card scales and explicit player/play zones; motion may now consume those stable anchors.
