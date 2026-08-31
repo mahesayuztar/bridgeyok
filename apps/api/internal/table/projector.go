@@ -39,6 +39,7 @@ type ProjectedParticipant struct {
 	ID       string `json:"id"`
 	Nickname string `json:"nickname"`
 	Role     Role   `json:"role"`
+	IsBot    bool   `json:"isBot"`
 }
 
 // ProjectedGame contains public board state plus viewer-authorized cards.
@@ -81,7 +82,7 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 	}
 	for _, participant := range aggregate.Participants {
 		if participant.LeftAt == nil {
-			projection.Participants = append(projection.Participants, ProjectedParticipant{ID: participant.ID, Nickname: participant.Nickname, Role: participant.Role})
+			projection.Participants = append(projection.Participants, ProjectedParticipant{ID: participant.ID, Nickname: participant.Nickname, Role: participant.Role, IsBot: false})
 		}
 	}
 	for seat, assignment := range aggregate.Seats {
@@ -90,7 +91,13 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 			projection.ViewerSeat = seat
 		}
 	}
-	if aggregate.UndoableAction != nil && (aggregate.State == StateActive || aggregate.State == StateBetweenBoards) && projection.ViewerSeat == aggregate.UndoableAction.ActorSeat && aggregate.ActionRequest == nil {
+	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+		assignment, occupied := aggregate.Seats[seat]
+		if occupied && assignment.IsBot {
+			projection.Participants = append(projection.Participants, ProjectedParticipant{ID: assignment.ParticipantID, Nickname: "Bot", Role: RoleParticipant, IsBot: true})
+		}
+	}
+	if aggregate.UndoableAction != nil && (aggregate.State == StateActive || aggregate.State == StateBetweenBoards) && projection.ViewerSeat == aggregate.UndoableAction.ActorSeat && aggregate.ActionRequest == nil && !aggregate.hasBot() {
 		projection.CanRequestUndo = true
 	}
 	if aggregate.ActionRequest != nil {

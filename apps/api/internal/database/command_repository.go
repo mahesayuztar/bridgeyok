@@ -216,6 +216,9 @@ func syncRelationalAggregate(ctx context.Context, queries *dbgen.Queries, aggreg
 		return fmt.Errorf("clear table seats: %w", err)
 	}
 	for seat, assignment := range aggregate.Seats {
+		if assignment.IsBot {
+			continue
+		}
 		if err := queries.InsertTableSeatForSync(ctx, dbgen.InsertTableSeatForSyncParams{
 			TableID: aggregate.ID, Seat: string(seat), ParticipantID: assignment.ParticipantID,
 			Ready: assignment.Ready, ControllerEpoch: assignment.ControllerEpoch,

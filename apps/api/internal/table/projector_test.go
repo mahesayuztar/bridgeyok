@@ -3,6 +3,7 @@ package table
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -32,6 +33,29 @@ func TestProjectWaitingTable(t *testing.T) {
 		if strings.Contains(string(encoded), participant.SessionID) {
 			t.Fatalf("projection contains private session id %q", participant.SessionID)
 		}
+	}
+}
+
+func TestProjectIncludesBotWithoutCreatingGuestIdentity(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testAggregate(t)
+	aggregate = acceptedDecision(t, aggregate, Command{
+		Name: CommandAddBot, SessionID: aggregate.OwnerSessionID, Seat: bridge.West, BotID: "bot-west",
+	}).NextState
+	projection, domainError := Project(aggregate, aggregate.OwnerSessionID)
+	if domainError != nil {
+		t.Fatalf("Project() error = %v", domainError)
+	}
+	assignment := projection.Seats[bridge.West]
+	if !assignment.IsBot || assignment.ParticipantID != "bot-west" {
+		t.Fatalf("projected bot seat = %+v", assignment)
+	}
+	botIndex := slices.IndexFunc(projection.Participants, func(participant ProjectedParticipant) bool {
+		return participant.ID == "bot-west"
+	})
+	if botIndex < 0 || !projection.Participants[botIndex].IsBot || projection.Participants[botIndex].Nickname != "Bot" {
+		t.Fatalf("projected bot participant = %+v", projection.Participants)
 	}
 }
 

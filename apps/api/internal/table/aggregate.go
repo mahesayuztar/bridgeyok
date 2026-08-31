@@ -38,6 +38,9 @@ const (
 	CommandSetReady          CommandName = "SET_READY"
 	CommandLockTable         CommandName = "LOCK_TABLE"
 	CommandRemoveParticipant CommandName = "REMOVE_PARTICIPANT"
+	CommandAddBot            CommandName = "ADD_BOT"
+	CommandRemoveBot         CommandName = "REMOVE_BOT"
+	CommandReplaceWithBot    CommandName = "REPLACE_WITH_BOT"
 	CommandExpireParticipant CommandName = "EXPIRE_PARTICIPANT"
 	CommandStartGame         CommandName = "START_GAME"
 	CommandMakeCall          CommandName = "MAKE_CALL"
@@ -68,6 +71,7 @@ const (
 	ErrorSeatRequired       ErrorCode = "SEAT_REQUIRED"
 	ErrorNotReady           ErrorCode = "TABLE_NOT_READY"
 	ErrorParticipantMissing ErrorCode = "PARTICIPANT_MISSING"
+	ErrorBotRequired        ErrorCode = "BOT_REQUIRED"
 	ErrorInvalidCommand     ErrorCode = "INVALID_COMMAND"
 	ErrorStaleController    ErrorCode = "STALE_CONTROLLER"
 	ErrorActionPending      ErrorCode = "ACTION_PENDING"
@@ -125,6 +129,7 @@ type SeatAssignment struct {
 	ParticipantID   string `json:"participantId"`
 	Ready           bool   `json:"ready"`
 	ControllerEpoch int64  `json:"controllerEpoch"`
+	IsBot           bool   `json:"isBot,omitempty"`
 }
 
 // Aggregate is the authoritative private state of one table.
@@ -155,6 +160,8 @@ type Command struct {
 	Ready                    bool
 	Locked                   bool
 	ParticipantID            string
+	BotID                    string
+	BotSeat                  bridge.Seat
 	Call                     *bridge.Call
 	Card                     *bridge.Card
 	ClaimTricks              int
@@ -296,6 +303,63 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		}
 		next.Locked = command.Locked
 		events = []Event{{Type: "TABLE_LOCKED", Payload: map[string]any{"locked": command.Locked}}}
+	case CommandAddBot:
+		if participant.Role != RoleOwner {
+			return Decision{}, reject(ErrorOwnerRequired, "only the owner can add a bot")
+		}
+		if next.State != StateWaiting && next.State != StateActive && next.State != StateBetweenBoards {
+			return Decision{}, reject(ErrorInvalidState, "bots require an open table")
+		}
+		if !command.Seat.Valid() || command.BotID == "" {
+			return Decision{}, reject(ErrorInvalidCommand, "bot seat and id are required")
+		}
+		if next.activeOccupantCount() >= 4 {
+			return Decision{}, reject(ErrorTableFull, "table already has four occupants")
+		}
+		if _, occupied := next.Seats[command.Seat]; occupied {
+			return Decision{}, reject(ErrorSeatTaken, "seat is already occupied")
+		}
+		next.Seats[command.Seat] = SeatAssignment{ParticipantID: command.BotID, Ready: true, ControllerEpoch: 1, IsBot: true}
+		events = []Event{{Type: "BOT_ADDED", Payload: map[string]any{"botId": command.BotID, "seat": command.Seat}}}
+	case CommandRemoveBot:
+		if participant.Role != RoleOwner {
+			return Decision{}, reject(ErrorOwnerRequired, "only the owner can remove a bot")
+		}
+		if next.State == StateFinished {
+			return Decision{}, reject(ErrorInvalidState, "finished table bots cannot be removed")
+		}
+		assignment, occupied := next.Seats[command.Seat]
+		if !command.Seat.Valid() || !occupied || !assignment.IsBot {
+			return Decision{}, reject(ErrorBotRequired, "seat is not occupied by a bot")
+		}
+		delete(next.Seats, command.Seat)
+		next.ActionRequest = nil
+		events = []Event{{Type: "BOT_REMOVED", Payload: map[string]any{"botId": assignment.ParticipantID, "seat": command.Seat}}}
+	case CommandReplaceWithBot:
+		if participant.Role != RoleOwner {
+			return Decision{}, reject(ErrorOwnerRequired, "only the owner can replace a participant with a bot")
+		}
+		if next.State == StateFinished {
+			return Decision{}, reject(ErrorInvalidState, "finished table participants cannot be replaced")
+		}
+		targetIndex := slices.IndexFunc(next.Participants, func(candidate Participant) bool {
+			return candidate.ID == command.ParticipantID && candidate.LeftAt == nil
+		})
+		if targetIndex < 0 {
+			return Decision{}, reject(ErrorParticipantMissing, "participant cannot be replaced")
+		}
+		if next.Participants[targetIndex].Role == RoleOwner {
+			return Decision{}, reject(ErrorOwnerCannotLeave, "owner cannot be replaced by a bot")
+		}
+		seat, seated := next.seatForParticipant(command.ParticipantID)
+		if !seated || command.BotID == "" || command.OccurredAt.IsZero() {
+			return Decision{}, reject(ErrorInvalidCommand, "seated participant, bot id, and replacement time are required")
+		}
+		leftAt := command.OccurredAt.UTC()
+		next.Participants[targetIndex].LeftAt = &leftAt
+		next.Seats[seat] = SeatAssignment{ParticipantID: command.BotID, Ready: true, ControllerEpoch: 1, IsBot: true}
+		next.ActionRequest = nil
+		events = []Event{{Type: "PARTICIPANT_REPLACED_BY_BOT", Payload: map[string]any{"participantId": command.ParticipantID, "botId": command.BotID, "seat": seat}}}
 	case CommandRemoveParticipant, CommandExpireParticipant:
 		if participant.Role != RoleOwner {
 			return Decision{}, reject(ErrorOwnerRequired, "only the owner can remove a participant")
@@ -371,6 +435,13 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 			return Decision{}, reject(ErrorActionPending, "claim or undo response is pending")
 		}
 		seat, seated := next.seatForParticipant(participant.ID)
+		if command.BotSeat != "" {
+			assignment, botSeated := next.Seats[command.BotSeat]
+			if !command.BotSeat.Valid() || !botSeated || !assignment.IsBot {
+				return Decision{}, reject(ErrorBotRequired, "bot actor is not seated")
+			}
+			seat, seated = command.BotSeat, true
+		}
 		if !seated {
 			return Decision{}, reject(ErrorSeatRequired, "participant is not seated")
 		}
@@ -398,6 +469,9 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 	case CommandRequestClaim:
 		if next.State != StateActive || next.Game == nil {
 			return Decision{}, reject(ErrorInvalidState, "claim requires an active board")
+		}
+		if next.hasBot() {
+			return Decision{}, reject(ErrorInvalidState, "claim is unavailable while a bot is seated")
 		}
 		if next.ActionRequest != nil {
 			return Decision{}, reject(ErrorActionPending, "another claim or undo request is pending")
@@ -441,6 +515,9 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 	case CommandRequestUndo:
 		if (next.State != StateActive && next.State != StateBetweenBoards) || next.Game == nil {
 			return Decision{}, reject(ErrorInvalidState, "undo requires a current board")
+		}
+		if next.hasBot() {
+			return Decision{}, reject(ErrorInvalidState, "undo is unavailable while a bot is seated")
 		}
 		if next.ActionRequest != nil {
 			return Decision{}, reject(ErrorActionPending, "another claim or undo request is pending")
@@ -545,8 +622,8 @@ func decideJoin(aggregate Aggregate, command Command) (Decision, *DomainError) {
 	if _, exists := aggregate.activeParticipant(participant.SessionID); exists {
 		return Decision{}, reject(ErrorAlreadyParticipant, "session already joined the table")
 	}
-	if aggregate.activeParticipantCount() >= 4 {
-		return Decision{}, reject(ErrorTableFull, "table already has four participants")
+	if aggregate.activeOccupantCount() >= 4 {
+		return Decision{}, reject(ErrorTableFull, "table already has four occupants")
 	}
 
 	next := aggregate.clone()
@@ -598,21 +675,30 @@ func (aggregate Aggregate) Validate() error {
 	if ownerCount != 1 {
 		return fmt.Errorf("table must have exactly one active owner")
 	}
-	if len(activeParticipantIDs) > 4 {
-		return fmt.Errorf("table cannot have more than four active participants")
-	}
 	seatedParticipants := make(map[string]struct{}, len(aggregate.Seats))
+	botCount := 0
 	for seat, assignment := range aggregate.Seats {
-		if !seat.Valid() || assignment.ControllerEpoch < 1 {
+		if !seat.Valid() || assignment.ParticipantID == "" || assignment.ControllerEpoch < 1 {
 			return fmt.Errorf("invalid seat assignment")
 		}
-		if _, exists := activeParticipantIDs[assignment.ParticipantID]; !exists {
+		if assignment.IsBot {
+			botCount++
+			if !assignment.Ready {
+				return fmt.Errorf("bot seat must be ready")
+			}
+			if _, exists := participantIDs[assignment.ParticipantID]; exists {
+				return fmt.Errorf("bot id conflicts with participant")
+			}
+		} else if _, exists := activeParticipantIDs[assignment.ParticipantID]; !exists {
 			return fmt.Errorf("seat references inactive participant")
 		}
 		if _, exists := seatedParticipants[assignment.ParticipantID]; exists {
 			return fmt.Errorf("participant occupies multiple seats")
 		}
 		seatedParticipants[assignment.ParticipantID] = struct{}{}
+	}
+	if len(activeParticipantIDs)+botCount > 4 {
+		return fmt.Errorf("table cannot have more than four active occupants")
 	}
 	if aggregate.State == StateActive || aggregate.State == StateBetweenBoards {
 		if aggregate.Game == nil || aggregate.BoardID == "" || aggregate.BoardNumber < 1 {
@@ -689,6 +775,25 @@ func (aggregate Aggregate) activeParticipantCount() int {
 		}
 	}
 	return count
+}
+
+func (aggregate Aggregate) activeOccupantCount() int {
+	count := aggregate.activeParticipantCount()
+	for _, assignment := range aggregate.Seats {
+		if assignment.IsBot {
+			count++
+		}
+	}
+	return count
+}
+
+func (aggregate Aggregate) hasBot() bool {
+	for _, assignment := range aggregate.Seats {
+		if assignment.IsBot {
+			return true
+		}
+	}
+	return false
 }
 
 func (aggregate Aggregate) seatForParticipant(participantID string) (bridge.Seat, bool) {

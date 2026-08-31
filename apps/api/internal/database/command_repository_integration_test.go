@@ -92,6 +92,40 @@ func TestActorRegistryPersistsAndRehydratesAfterRestart(t *testing.T) {
 	}
 }
 
+func TestCommandRepositoryPersistsBotInPrivateSnapshot(t *testing.T) {
+	environment := newCommandTestEnvironment(t, 1)
+	botID := uuid.NewString()
+	result := environment.process(t, table.CommandRequest{
+		TableID: environment.tableID, SessionID: environment.sessions[0].ID, RequestID: "add_bot_snapshot_01",
+		ExpectedRevision: 0, Command: table.Command{Name: table.CommandAddBot, Seat: bridge.West, BotID: botID},
+	})
+	if result.Outcome.Status != table.CommandStatusAccepted || !result.Aggregate.Seats[bridge.West].IsBot {
+		t.Fatalf("add bot result = %+v", result)
+	}
+	var relationalSeatCount int
+	if err := environment.postgres.Pool().QueryRow(environment.ctx,
+		"SELECT count(*) FROM bridgeyok.table_seats WHERE table_id = $1", environment.tableID,
+	).Scan(&relationalSeatCount); err != nil {
+		t.Fatalf("count relational seats: %v", err)
+	}
+	if relationalSeatCount != 0 {
+		t.Fatalf("relational bot seat count = %d, want 0", relationalSeatCount)
+	}
+
+	restarted, err := Open(environment.ctx, os.Getenv("TEST_DATABASE_URL"), 2)
+	if err != nil {
+		t.Fatalf("restart Open() error = %v", err)
+	}
+	t.Cleanup(restarted.Close)
+	hydrated, err := restarted.FindTable(environment.ctx, environment.tableID)
+	if err != nil {
+		t.Fatalf("restart FindTable() error = %v", err)
+	}
+	if assignment := hydrated.Seats[bridge.West]; !assignment.IsBot || assignment.ParticipantID != botID || !assignment.Ready {
+		t.Fatalf("hydrated bot assignment = %+v", assignment)
+	}
+}
+
 func (buffer *lockedBuffer) Write(value []byte) (int, error) {
 	buffer.mutex.Lock()
 	defer buffer.mutex.Unlock()
