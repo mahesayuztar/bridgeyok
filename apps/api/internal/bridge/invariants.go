@@ -29,18 +29,18 @@ func (state State) ValidateInvariants() error {
 
 	switch state.Phase {
 	case PhaseAuction:
-		if state.Auction.Complete || state.Turn != state.Auction.Turn || state.DummyRevealed || state.CurrentTrick.Leader != "" || len(state.CurrentTrick.Plays) != 0 || len(state.CompletedTricks) != 0 || state.Result != nil {
+		if state.Auction.Complete || state.Turn != state.Auction.Turn || state.DummyRevealed || state.CurrentTrick.Leader != "" || len(state.CurrentTrick.Plays) != 0 || len(state.CompletedTricks) != 0 || state.Result != nil || state.Claimed {
 			return fmt.Errorf("auction phase contains play or terminal state")
 		}
 		if err := state.Deal.Validate(); err != nil {
 			return fmt.Errorf("auction deal: %w", err)
 		}
 	case PhaseOpeningLead:
-		if !state.hasActiveContract() || state.DummyRevealed || len(state.CurrentTrick.Plays) > 1 || len(state.CompletedTricks) != 0 || state.Result != nil {
+		if !state.hasActiveContract() || state.DummyRevealed || len(state.CurrentTrick.Plays) > 1 || len(state.CompletedTricks) != 0 || state.Result != nil || state.Claimed {
 			return fmt.Errorf("opening-lead phase is inconsistent")
 		}
 	case PhasePlay:
-		if !state.hasActiveContract() || !state.DummyRevealed || state.Result != nil || len(state.CompletedTricks) > 13 {
+		if !state.hasActiveContract() || !state.DummyRevealed || state.Result != nil || state.Claimed || len(state.CompletedTricks) > 13 {
 			return fmt.Errorf("play phase is inconsistent")
 		}
 	case PhaseBoardScored:
@@ -54,11 +54,15 @@ func (state State) ValidateInvariants() error {
 			return fmt.Errorf("result vulnerability does not match board")
 		}
 		if state.Auction.PassedOut {
-			if !state.Result.PassedOut || len(state.CompletedTricks) != 0 || state.DummyRevealed {
+			if !state.Result.PassedOut || len(state.CompletedTricks) != 0 || state.DummyRevealed || state.Claimed {
 				return fmt.Errorf("passed-out board contains play state")
 			}
 			if err := state.Deal.Validate(); err != nil {
 				return fmt.Errorf("passed-out deal: %w", err)
+			}
+		} else if state.Claimed {
+			if !state.DummyRevealed || len(state.CurrentTrick.Plays) != 0 || len(state.CompletedTricks) >= 13 || state.Result.TricksNS+state.Result.TricksEW != 13 || state.Result.TricksNS < state.TricksNS || state.Result.TricksEW < state.TricksEW || !reflect.DeepEqual(state.Result.Contract, state.Auction.Contract) {
+				return fmt.Errorf("claimed result does not match board state")
 			}
 		} else if !state.DummyRevealed || len(state.CompletedTricks) != 13 || state.Result.TricksNS != state.TricksNS || state.Result.TricksEW != state.TricksEW || !reflect.DeepEqual(state.Result.Contract, state.Auction.Contract) {
 			return fmt.Errorf("played result does not match board state")

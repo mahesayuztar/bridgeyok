@@ -163,6 +163,64 @@ func TestDecideCompletesBoard(t *testing.T) {
 	}
 }
 
+func TestDecideClaimAtTrickBoundary(t *testing.T) {
+	t.Parallel()
+
+	state := playLegalCards(t, contractedTestBoard(t), 4)
+	if len(state.CompletedTricks) != 1 || len(state.CurrentTrick.Plays) != 0 {
+		t.Fatalf("claim boundary state = %+v", state)
+	}
+	claimTricks := 8
+	decision, domainError := Decide(state, ClaimCommand(North, claimTricks))
+	if domainError != nil {
+		t.Fatalf("Decide(claim) error = %v", domainError)
+	}
+	if len(decision.Events) != 1 || decision.Events[0].Type != EventBoardClaimed {
+		t.Fatalf("claim events = %+v", decision.Events)
+	}
+	if decision.NextState.Phase != PhaseBoardScored || !decision.NextState.Claimed || decision.NextState.Result == nil {
+		t.Fatalf("claimed state = %+v", decision.NextState)
+	}
+	wantNS := state.TricksNS + claimTricks
+	if decision.NextState.Result.TricksNS != wantNS || decision.NextState.Result.TricksEW != 13-wantNS {
+		t.Fatalf("claim result = %+v, want NS=%d EW=%d", decision.NextState.Result, wantNS, 13-wantNS)
+	}
+	replayed, err := Reduce(state, decision.Events)
+	if err != nil {
+		t.Fatalf("Reduce(claim) error = %v", err)
+	}
+	if !reflect.DeepEqual(replayed, decision.NextState) {
+		t.Fatal("replayed claim differs from decided state")
+	}
+}
+
+func TestDecideRejectsInvalidClaims(t *testing.T) {
+	t.Parallel()
+
+	boundary := playLegalCards(t, contractedTestBoard(t), 4)
+	partialTrick := playLegalCards(t, contractedTestBoard(t), 1)
+	tests := []struct {
+		name    string
+		state   State
+		command Command
+		code    ErrorCode
+	}{
+		{name: "during auction", state: newTestBoard(t, 1), command: ClaimCommand(North, 1), code: ErrorInvalidState},
+		{name: "during partial trick", state: partialTrick, command: ClaimCommand(North, 1), code: ErrorInvalidState},
+		{name: "dummy requester", state: boundary, command: ClaimCommand(South, 1), code: ErrorInvalidCommand},
+		{name: "negative tricks", state: boundary, command: ClaimCommand(North, -1), code: ErrorInvalidCommand},
+		{name: "too many tricks", state: boundary, command: ClaimCommand(North, 13), code: ErrorInvalidCommand},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if _, domainError := Decide(test.state, test.command); domainError == nil || domainError.Code != test.code {
+				t.Fatalf("Decide() error = %+v, want %s", domainError, test.code)
+			}
+		})
+	}
+}
+
 func TestDecideIsDeterministicAndDoesNotMutateInput(t *testing.T) {
 	t.Parallel()
 
@@ -228,7 +286,7 @@ func TestDecideRejectsInvalidCommands(t *testing.T) {
 		command Command
 		code    ErrorCode
 	}{
-		{name: "unknown command", state: auctionState, command: Command{ActorSeat: North, Name: "CLAIM"}, code: ErrorInvalidCommand},
+		{name: "unknown command", state: auctionState, command: Command{ActorSeat: North, Name: "UNKNOWN"}, code: ErrorInvalidCommand},
 		{name: "call missing payload", state: auctionState, command: Command{ActorSeat: North, Name: CommandMakeCall}, code: ErrorInvalidCommand},
 		{name: "play during auction", state: auctionState, command: PlayCardCommand(North, auctionState.Deal.North[0]), code: ErrorPlayComplete},
 		{name: "call after auction", state: playState, command: MakeCallCommand(North, Pass()), code: ErrorAuctionComplete},
@@ -265,6 +323,7 @@ func TestEventValidateShape(t *testing.T) {
 		{Type: EventDummyRevealed},
 		{Type: EventTrickCompleted, Trick: &trick},
 		{Type: EventBoardScored, Result: &result},
+		{Type: EventBoardClaimed, Seat: North, Result: &result},
 	}
 	for _, event := range valid {
 		event := event
@@ -288,6 +347,7 @@ func TestEventValidateShape(t *testing.T) {
 		{name: "dummy with card", event: Event{Type: EventDummyRevealed, Card: &card}},
 		{name: "trick with contract", event: Event{Type: EventTrickCompleted, Contract: &contract, Trick: &trick}},
 		{name: "score with trick", event: Event{Type: EventBoardScored, Trick: &trick, Result: &result}},
+		{name: "claim without seat", event: Event{Type: EventBoardClaimed, Result: &result}},
 	}
 	for _, test := range tests {
 		test := test

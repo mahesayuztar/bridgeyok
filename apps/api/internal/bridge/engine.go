@@ -21,14 +21,16 @@ type CommandName string
 const (
 	CommandMakeCall CommandName = "MAKE_CALL"
 	CommandPlayCard CommandName = "PLAY_CARD"
+	CommandClaim    CommandName = "CLAIM"
 )
 
 // Command is one typed game mutation request.
 type Command struct {
-	ActorSeat Seat        `json:"actorSeat"`
-	Name      CommandName `json:"name"`
-	Call      *Call       `json:"call,omitempty"`
-	Card      *Card       `json:"card,omitempty"`
+	ActorSeat   Seat        `json:"actorSeat"`
+	Name        CommandName `json:"name"`
+	Call        *Call       `json:"call,omitempty"`
+	Card        *Card       `json:"card,omitempty"`
+	ClaimTricks *int        `json:"claimTricks,omitempty"`
 }
 
 // EventType identifies one deterministic state transition.
@@ -42,6 +44,7 @@ const (
 	EventDummyRevealed    EventType = "DUMMY_REVEALED"
 	EventTrickCompleted   EventType = "TRICK_COMPLETED"
 	EventBoardScored      EventType = "BOARD_SCORED"
+	EventBoardClaimed     EventType = "BOARD_CLAIMED"
 )
 
 // Event is a complete replayable domain fact.
@@ -85,6 +88,10 @@ func (event Event) validateShape() error {
 		if event.Seat != "" || event.Call != nil || event.Card != nil || event.Contract != nil || event.Trick != nil || event.Result == nil {
 			return fmt.Errorf("invalid board-scored event payload")
 		}
+	case EventBoardClaimed:
+		if !event.Seat.Valid() || event.Call != nil || event.Card != nil || event.Contract != nil || event.Trick != nil || event.Result == nil {
+			return fmt.Errorf("invalid board-claimed event payload")
+		}
 	default:
 		return fmt.Errorf("unknown event type %q", event.Type)
 	}
@@ -105,6 +112,7 @@ type State struct {
 	TricksNS        int           `json:"tricksNS"`
 	TricksEW        int           `json:"tricksEW"`
 	Result          *Result       `json:"result,omitempty"`
+	Claimed         bool          `json:"claimed"`
 }
 
 // Decision contains the next immutable state and facts needed to replay it.
@@ -123,6 +131,12 @@ func MakeCallCommand(actor Seat, call Call) Command {
 func PlayCardCommand(actor Seat, card Card) Command {
 	cardCopy := card
 	return Command{ActorSeat: actor, Name: CommandPlayCard, Card: &cardCopy}
+}
+
+// ClaimCommand creates a claim for the actor's partnership over the remaining tricks.
+func ClaimCommand(actor Seat, tricks int) Command {
+	claimTricks := tricks
+	return Command{ActorSeat: actor, Name: CommandClaim, ClaimTricks: &claimTricks}
 }
 
 // NewBoard creates a board at the beginning of its auction.
@@ -169,6 +183,8 @@ func Decide(state State, command Command) (Decision, *DomainError) {
 		events, domainError = decideCall(state, command)
 	case CommandPlayCard:
 		events, domainError = decidePlay(state, command)
+	case CommandClaim:
+		events, domainError = decideClaim(state, command)
 	default:
 		domainError = reject(ErrorInvalidCommand, "unknown command")
 	}
@@ -181,6 +197,41 @@ func Decide(state State, command Command) (Decision, *DomainError) {
 		return Decision{}, reject(ErrorInvalidState, err.Error())
 	}
 	return Decision{NextState: nextState, Events: events}, nil
+}
+
+func decideClaim(state State, command Command) ([]Event, *DomainError) {
+	if state.Phase != PhasePlay || len(state.CurrentTrick.Plays) != 0 {
+		return nil, reject(ErrorInvalidState, "claims require a completed trick boundary")
+	}
+	if command.ClaimTricks == nil || command.Call != nil || command.Card != nil || !command.ActorSeat.Valid() {
+		return nil, reject(ErrorInvalidCommand, "claim requires a seat and trick count")
+	}
+	if state.Auction.Contract == nil || command.ActorSeat == state.Auction.Contract.Dummy() {
+		return nil, reject(ErrorInvalidCommand, "dummy cannot make a claim")
+	}
+	remainingTricks := 13 - len(state.CompletedTricks)
+	if *command.ClaimTricks < 0 || *command.ClaimTricks > remainingTricks {
+		return nil, reject(ErrorInvalidCommand, "claim trick count is outside the remaining tricks")
+	}
+
+	tricksNS := state.TricksNS
+	tricksEW := state.TricksEW
+	if command.ActorSeat.Partnership() == NorthSouth {
+		tricksNS += *command.ClaimTricks
+		tricksEW = 13 - tricksNS
+	} else {
+		tricksEW += *command.ClaimTricks
+		tricksNS = 13 - tricksEW
+	}
+	tricksDeclarer := tricksNS
+	if state.Auction.Contract.Declarer.Partnership() == EastWest {
+		tricksDeclarer = tricksEW
+	}
+	result, err := ScoreContract(*state.Auction.Contract, state.Board.Vulnerability, tricksDeclarer)
+	if err != nil {
+		return nil, reject(ErrorInvalidState, err.Error())
+	}
+	return []Event{{Type: EventBoardClaimed, Seat: command.ActorSeat, Result: &result}}, nil
 }
 
 func (state State) validateCommandBoundary() error {
@@ -201,7 +252,7 @@ func decideCall(state State, command Command) ([]Event, *DomainError) {
 	if state.Phase != PhaseAuction {
 		return nil, reject(ErrorAuctionComplete, "board is no longer in auction")
 	}
-	if command.Call == nil || command.Card != nil {
+	if command.Call == nil || command.Card != nil || command.ClaimTricks != nil {
 		return nil, reject(ErrorInvalidCommand, "make call requires only a call payload")
 	}
 
@@ -224,7 +275,7 @@ func decidePlay(state State, command Command) ([]Event, *DomainError) {
 	if state.Phase != PhaseOpeningLead && state.Phase != PhasePlay {
 		return nil, reject(ErrorPlayComplete, "board is not accepting card play")
 	}
-	if command.Card == nil || command.Call != nil {
+	if command.Card == nil || command.Call != nil || command.ClaimTricks != nil {
 		return nil, reject(ErrorInvalidCommand, "play card requires only a card payload")
 	}
 	if err := command.Card.Validate(); err != nil {
@@ -443,6 +494,24 @@ func (state *State) apply(event Event) error {
 		contract := *event.Result.Contract
 		result.Contract = &contract
 		state.Result = &result
+		state.Phase = PhaseBoardScored
+		state.Turn = ""
+		return nil
+	case EventBoardClaimed:
+		if state.Phase != PhasePlay || len(state.CurrentTrick.Plays) != 0 || state.Auction.Contract == nil || event.Seat == state.Auction.Contract.Dummy() {
+			return fmt.Errorf("invalid board-claimed event")
+		}
+		if err := event.Result.Validate(); err != nil {
+			return err
+		}
+		if event.Result.TricksNS+event.Result.TricksEW != 13 || event.Result.TricksNS < state.TricksNS || event.Result.TricksEW < state.TricksEW || event.Result.Vulnerability != state.Board.Vulnerability || !reflect.DeepEqual(event.Result.Contract, state.Auction.Contract) {
+			return fmt.Errorf("claim result does not match completed play")
+		}
+		result := *event.Result
+		contract := *event.Result.Contract
+		result.Contract = &contract
+		state.Result = &result
+		state.Claimed = true
 		state.Phase = PhaseBoardScored
 		state.Turn = ""
 		return nil
