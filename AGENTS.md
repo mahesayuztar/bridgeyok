@@ -258,6 +258,24 @@ or keep simple markup directly within `HeroSection`.
 
 ---
 
+# Gameplay Client Reliability
+
+For bridge gameplay, correctness and interaction feedback take priority over decorative redesign.
+
+* Follow established bridge-table conventions and approved references before inventing a new interaction.
+* Keep reusable bridge domains and stateful interaction boundaries out of a monolithic gameplay component, but do not extract meaningless wrapper components.
+* Own-hand, dummy-hand, and played/trick cards must use one canonical card rendering primitive with context-specific variants and shared scale tokens.
+* The Go engine and server projection remain authoritative. Legal local actions may be projected optimistically, then confirmed, rebased, or rolled back using request identity, revision/sequence, and snapshot recovery.
+* Keep authoritative projection, optimistic operations, and animation/presentation state separate. Animation timing must never determine game legality or delay realtime reconciliation.
+* Click, tap, and drag/drop must converge on one gameplay action path and one legality/capability source.
+* Disable actions already known to be illegal or unavailable. Do not use rule-invalidity toasts as the normal interaction model; preserve feedback for unexpected infrastructure, authentication, revision, or projection failures.
+* Treat card movement, trick pacing, and spatial continuity as gameplay correctness. Dummy, trick slots, players, and own hand must occupy predictable non-overlapping zones across desktop and mobile.
+* Use available table navbar/status space for persistent game actions before adding floating action panels. Keep active-game copy concise while preserving destructive-action clarity and accessible names.
+* Verify gameplay behavior, geometry, and real pointer interaction across desktop, tablet, common mobile, and approximately 320–400 px widths. Compilation alone is not completion.
+* Do not bypass or duplicate the pure bridge engine boundary in React presentation code.
+
+---
+
 # Design System
 
 ## Global CSS Is the Source of Truth
