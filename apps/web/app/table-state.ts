@@ -1,5 +1,12 @@
 import type { MutationCommandEnvelope, TableProjection } from "@bridgeyok/contracts/realtime";
 import type { ClientIssue } from "./client-issue";
+import {
+  acknowledgePendingCommand,
+  createPendingTableCommand,
+  projectOptimisticTable,
+  reconcilePendingCommands,
+  type PendingTableCommand,
+} from "./optimistic-gameplay.ts";
 
 export type Seat = "N" | "E" | "S" | "W";
 export type Suit = "C" | "D" | "H" | "S";
@@ -98,7 +105,7 @@ export type TableClientState = {
   activeTableId: string | null;
   table: LiveTableProjection | null;
   lastSeenSeq: number;
-  pending: Record<string, CommandName>;
+  pending: Record<string, PendingTableCommand>;
   presence: Record<string, ParticipantPresence>;
   issue: ClientIssue | null;
   notice: string | null;
@@ -111,7 +118,8 @@ export type TableAction =
   | { type: "event"; tableId: string; seq: number; table: LiveTableProjection; eventType?: string }
   | { type: "presenceSnapshot"; tableId: string; participants: ParticipantPresence[] }
   | { type: "presenceChanged"; tableId: string; participant: ParticipantPresence }
-  | { type: "pending"; requestId: string; commandName: CommandName }
+  | { type: "pending"; requestId: string; commandName: CommandName; payload: Record<string, unknown> }
+  | { type: "ack"; requestId: string; revision: number; seq: number }
   | { type: "settled"; requestId: string; issue?: ClientIssue }
   | { type: "conflict"; issue: ClientIssue }
   | { type: "connectionLost"; issue: ClientIssue }
@@ -178,7 +186,7 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         ...state,
         table: action.table,
         lastSeenSeq: Math.max(action.seq, action.table.lastSeq),
-        pending: {},
+        pending: reconcilePendingCommands(state.pending, action.table),
         presence: retainActivePresence(state.presence, action.table),
         issue: controllerReplaced ? null : state.issue,
         notice: becameOwner
@@ -211,16 +219,36 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
       }
       return { ...state, presence: { ...state.presence, [action.participant.participantId]: action.participant } };
     case "pending":
+      if (state.table === null) return state;
       return {
         ...state,
-        pending: { ...state.pending, [action.requestId]: action.commandName },
+        pending: {
+          ...state.pending,
+          [action.requestId]: createPendingTableCommand(
+            state.table,
+            action.requestId,
+            action.commandName,
+            action.payload,
+          ),
+        },
         issue: null,
         notice: null,
         controllerState: action.commandName === "table.takeover" ? "takeoverPending" : state.controllerState
       };
+    case "ack":
+      return {
+        ...state,
+        pending: acknowledgePendingCommand(
+          state.pending,
+          action.requestId,
+          action.revision,
+          action.seq,
+          state.table?.revision,
+        ),
+      };
     case "settled": {
       const pending = { ...state.pending };
-      const commandName = pending[action.requestId];
+      const commandName = pending[action.requestId]?.name;
       delete pending[action.requestId];
       return {
         ...state,
@@ -245,6 +273,10 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
     case "clear":
       return createEmptyTableState();
   }
+}
+
+export function projectedTableState(state: TableClientState) {
+  return projectOptimisticTable(state.table, state.pending);
 }
 
 function retainActivePresence(presence: Record<string, ParticipantPresence>, table: LiveTableProjection) {

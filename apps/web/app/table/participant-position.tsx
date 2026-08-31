@@ -24,7 +24,7 @@ export function ParticipantPosition({
   presence,
   seat,
   position,
-  disabled,
+  canSendCommand,
   turn,
   onCommand,
   onRemove,
@@ -34,7 +34,7 @@ export function ParticipantPosition({
   presence: Record<string, ParticipantPresence>;
   seat: Seat;
   position: VisualPosition;
-  disabled: boolean;
+  canSendCommand: TableSession["canSendCommand"];
   turn: boolean;
   onCommand: TableSession["sendCommand"];
   onRemove?: (participantId: string) => void;
@@ -153,7 +153,7 @@ export function ParticipantPosition({
                 {assignment !== undefined || !canTakeSeat ? null : (
                   <button
                     type="button"
-                    disabled={disabled}
+                    disabled={!canSendCommand("table.take_seat", { seat })}
                     onClick={() => {
                       setPortalOpen(false);
                       onCommand("table.take_seat", { seat });
@@ -165,7 +165,7 @@ export function ParticipantPosition({
                 {!canAddBot ? null : (
                   <button
                     type="button"
-                    disabled={disabled}
+                    disabled={!canSendCommand("table.add_bot", { seat })}
                     onClick={() => {
                       setPortalOpen(false);
                       onCommand("table.add_bot", { seat });
@@ -177,7 +177,7 @@ export function ParticipantPosition({
                 {!canManageOwnSeat ? null : (
                   <button
                     type="button"
-                    disabled={disabled}
+                    disabled={!canSendCommand("table.set_ready", { ready: !assignment.ready })}
                     onClick={() => {
                       setPortalOpen(false);
                       onCommand("table.set_ready", {
@@ -191,7 +191,7 @@ export function ParticipantPosition({
                 {!canManageOwnSeat ? null : (
                   <button
                     type="button"
-                    disabled={disabled}
+                    disabled={!canSendCommand("table.leave_seat")}
                     onClick={() => {
                       setPortalOpen(false);
                       onCommand("table.leave_seat");
@@ -203,7 +203,7 @@ export function ParticipantPosition({
                 {!canRemove ? null : (
                   <button
                     type="button"
-                    disabled={disabled}
+                    disabled={!canSendCommand("table.remove_participant", { participant_id: assignment.participantId })}
                     onClick={() => {
                       setPortalOpen(false);
                       onRemove(assignment.participantId);
@@ -215,7 +215,7 @@ export function ParticipantPosition({
                 {!canReplaceWithBot ? null : (
                   <button
                     type="button"
-                    disabled={disabled}
+                    disabled={!canSendCommand("table.replace_with_bot", { participant_id: assignment.participantId })}
                     onClick={() => {
                       setPortalOpen(false);
                       onCommand("table.replace_with_bot", {
@@ -229,7 +229,7 @@ export function ParticipantPosition({
                 {!canRemoveBot ? null : (
                   <button
                     type="button"
-                    disabled={disabled}
+                    disabled={!canSendCommand("table.remove_bot", { seat })}
                     onClick={() => {
                       setPortalOpen(false);
                       onCommand("table.remove_bot", { seat });
@@ -241,7 +241,6 @@ export function ParticipantPosition({
                 {!isViewer || onLeaveTable === undefined ? null : (
                   <button
                     type="button"
-                    disabled={disabled}
                     onClick={() => {
                       setPortalOpen(false);
                       onLeaveTable();

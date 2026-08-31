@@ -15,7 +15,7 @@ export function WaitingRoom({
   orientation,
   presence,
   inviteCode,
-  commandDisabled,
+  canSendCommand,
   shareUrl,
   copied,
   onCopy,
@@ -26,7 +26,7 @@ export function WaitingRoom({
   orientation: TableOrientation;
   presence: Record<string, ParticipantPresence>;
   inviteCode: string | null;
-  commandDisabled: boolean;
+  canSendCommand: TableSession["canSendCommand"];
   shareUrl: string;
   copied: boolean;
   onCopy: () => void;
@@ -64,7 +64,7 @@ export function WaitingRoom({
               presence={presence}
               seat={seat}
               position={position}
-              disabled={commandDisabled}
+              canSendCommand={canSendCommand}
               turn={false}
               onCommand={onCommand}
               {...(isOwner
@@ -97,7 +97,7 @@ export function WaitingRoom({
           <>
             <button
               type="button"
-              disabled={commandDisabled}
+              disabled={!canSendCommand("table.lock", { locked: !table.locked })}
               onClick={() =>
                 onCommand("table.lock", { locked: !table.locked })
               }
@@ -107,14 +107,14 @@ export function WaitingRoom({
             <button
               className="start-board-button"
               type="button"
-              disabled={commandDisabled || !allReady}
+              disabled={!allReady || !canSendCommand("table.start_game")}
               onClick={() => onCommand("table.start_game")}
             >
               Mulai board
             </button>
             <button
               type="button"
-              disabled={commandDisabled}
+              disabled={!canSendCommand("table.finish")}
               onClick={() => onCommand("table.finish")}
             >
               Akhiri meja

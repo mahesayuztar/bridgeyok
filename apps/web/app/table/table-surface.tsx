@@ -13,14 +13,14 @@ export function TableSurface({
   table,
   orientation,
   presence,
-  commandDisabled,
+  canSendCommand,
   onCommand,
   children,
 }: {
   table: LiveTableProjection;
   orientation: TableOrientation;
   presence: Record<string, ParticipantPresence>;
-  commandDisabled: boolean;
+  canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
   children: ReactNode;
 }) {
@@ -35,7 +35,7 @@ export function TableSurface({
             presence={presence}
             seat={seat}
             position={position}
-            disabled={commandDisabled}
+            canSendCommand={canSendCommand}
             turn={table.game?.turn === seat}
             onCommand={onCommand}
             {...(isOwner

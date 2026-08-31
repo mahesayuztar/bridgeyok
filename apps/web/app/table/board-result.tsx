@@ -4,11 +4,11 @@ import { contractLabel } from "./gameplay-presentation";
 
 export function BoardResult({
   table,
-  commandDisabled,
+  canSendCommand,
   onCommand,
 }: {
   table: LiveTableProjection;
-  commandDisabled: boolean;
+  canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
 }) {
   const result = table.game?.result;
@@ -49,14 +49,14 @@ export function BoardResult({
           <button
             className="primary-button"
             type="button"
-            disabled={commandDisabled}
+            disabled={!canSendCommand("table.next_board")}
             onClick={() => onCommand("table.next_board")}
           >
             Board berikutnya
           </button>
           <button
             type="button"
-            disabled={commandDisabled}
+            disabled={!canSendCommand("table.finish")}
             onClick={() => onCommand("table.finish")}
           >
             Akhiri meja

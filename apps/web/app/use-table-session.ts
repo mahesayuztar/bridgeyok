@@ -2,14 +2,17 @@
 
 import type { components } from "@bridgeyok/contracts/openapi";
 import type { MutationCommandEnvelope } from "@bridgeyok/contracts/realtime";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { issueFromFailure, issueFromServer, type ClientIssue } from "./client-issue";
+import { canSendTableCommand } from "./gameplay-capabilities";
 import { createRequestId } from "./request-id";
 import { normalizeLiveTableProjection, normalizeParticipantPresence, normalizePresenceSnapshot } from "./table-projection";
 import {
   createEmptyTableState,
+  projectedTableState,
   reduceTableState,
   type CommandName,
+  type LiveTableProjection,
   type TableClientState
 } from "./table-state";
 
@@ -136,6 +139,7 @@ export type TableSession = {
   connectionState: ConnectionState;
   inviteCode: string | null;
   tableState: TableClientState;
+  projectedTable: LiveTableProjection | null;
   createIdentity: (nickname: string) => Promise<boolean>;
   logout: () => Promise<void>;
   createTable: () => Promise<string | null>;
@@ -146,11 +150,13 @@ export type TableSession = {
   resync: () => void;
   dismissIssue: () => void;
   dismissNotice: () => void;
+  canSendCommand: (name: CommandName, payload?: Record<string, unknown>) => boolean;
   sendCommand: (name: CommandName, payload?: Record<string, unknown>) => void;
 };
 
 export function useTableSession({ restoreTable = true }: { restoreTable?: boolean } = {}): TableSession {
   const [tableState, dispatch] = useReducer(reduceTableState, undefined, createEmptyTableState);
+  const projectedTable = useMemo(() => projectedTableState(tableState), [tableState]);
   const [initializing, setInitializing] = useState(restoreTable);
   const [busy, setBusy] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
@@ -349,6 +355,20 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
               ...(eventType === undefined ? {} : { eventType })
             });
             setConnectionState("connected");
+          } else if (
+            envelope.kind === "ack" &&
+            typeof envelope.request_id === "string" &&
+            typeof envelope.revision === "number" &&
+            Number.isFinite(envelope.revision) &&
+            typeof envelope.seq === "number" &&
+            Number.isFinite(envelope.seq)
+          ) {
+            dispatch({
+              type: "ack",
+              requestId: envelope.request_id,
+              revision: envelope.revision,
+              seq: envelope.seq,
+            });
           } else if (envelope.kind === "error") {
             const code = typeof envelope.code === "string" ? envelope.code : undefined;
             const issue = issueFromServer({
@@ -673,6 +693,15 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     dispatch({ type: "dismissNotice" });
   }, []);
 
+  const canSendCommand = useCallback((name: CommandName, payload: Record<string, unknown> = {}) => {
+    return canSendTableCommand({
+      table: projectedTable,
+      connected: connectionState === "connected",
+      controllerState: tableState.controllerState,
+      hasPendingCommand: Object.keys(tableState.pending).length > 0,
+    }, name, payload);
+  }, [connectionState, projectedTable, tableState.controllerState, tableState.pending]);
+
   const sendCommand = useCallback((name: CommandName, payload: Record<string, unknown> = {}) => {
     const socket = socketRef.current;
     const table = tableStateRef.current.table;
@@ -695,6 +724,9 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       });
       return;
     }
+    if (!canSendCommand(name, payload)) {
+      return;
+    }
     const requestId = createRequestId();
     const controllerEpoch = table.viewerSeat === undefined ? undefined : table.seats[table.viewerSeat]?.controllerEpoch;
     const command: MutationCommandEnvelope = {
@@ -707,13 +739,13 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       payload,
       ...(controllerEpoch === undefined ? {} : { controller_epoch: controllerEpoch })
     };
-    dispatch({ type: "pending", requestId, commandName: name });
+    dispatch({ type: "pending", requestId, commandName: name, payload });
     try {
       socket.send(JSON.stringify(command));
     } catch (error) {
       dispatch({ type: "settled", requestId, issue: issueFromFailure(error, "websocket") });
     }
-  }, []);
+  }, [canSendCommand]);
 
   return {
     initializing,
@@ -722,6 +754,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     connectionState,
     inviteCode,
     tableState,
+    projectedTable,
     createIdentity,
     logout,
     createTable,
@@ -732,6 +765,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     resync,
     dismissIssue,
     dismissNotice,
+    canSendCommand,
     sendCommand
   };
 }

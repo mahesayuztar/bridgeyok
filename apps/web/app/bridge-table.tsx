@@ -32,18 +32,11 @@ export default function BridgeTable({
 }) {
   const router = useRouter();
   const session = useTableSession();
-  const { openTable, sendCommand } = session;
+  const { canSendCommand, openTable, sendCommand } = session;
   const attemptedTableIdRef = useRef<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const table = session.tableState.table;
+  const table = session.projectedTable;
   const game = table?.game;
-  const hasPendingCommand = Object.keys(session.tableState.pending).length > 0;
-  const commandDisabled =
-    session.connectionState !== "connected" ||
-    hasPendingCommand ||
-    session.tableState.controllerState !== "current";
-  const gameplayDisabled =
-    commandDisabled || table?.actionRequest !== undefined;
   const orientation = useMemo(
     () => tableOrientation(table?.viewerSeat),
     [table?.viewerSeat],
@@ -80,8 +73,7 @@ export default function BridgeTable({
         event.target instanceof HTMLSelectElement ||
         event.target instanceof HTMLTextAreaElement ||
         game?.phase !== "AUCTION" ||
-        !viewerTurn ||
-        gameplayDisabled
+        !viewerTurn
       )
         return;
       const shortcutCalls: Record<string, Call> = {
@@ -94,7 +86,7 @@ export default function BridgeTable({
         call !== undefined &&
         game.legalCalls?.some(
           (legalCall) => callKey(legalCall) === callKey(call),
-        )
+        ) && canSendCommand("game.make_call", { call })
       ) {
         event.preventDefault();
         sendCommand("game.make_call", { call });
@@ -102,7 +94,7 @@ export default function BridgeTable({
     }
     window.addEventListener("keydown", handleAuctionKeyboard);
     return () => window.removeEventListener("keydown", handleAuctionKeyboard);
-  }, [game, gameplayDisabled, sendCommand, viewerTurn]);
+  }, [canSendCommand, game, sendCommand, viewerTurn]);
 
   const shareUrl = useMemo(() => {
     if (session.inviteCode === null || typeof window === "undefined") return "";
@@ -173,7 +165,7 @@ export default function BridgeTable({
           orientation={orientation}
           presence={session.tableState.presence}
           inviteCode={session.inviteCode}
-          commandDisabled={commandDisabled}
+          canSendCommand={session.canSendCommand}
           shareUrl={shareUrl}
           copied={copied}
           onCopy={() => void copyInvite()}
@@ -239,12 +231,12 @@ export default function BridgeTable({
         table={table}
         orientation={orientation}
         presence={session.tableState.presence}
-        commandDisabled={commandDisabled}
+        canSendCommand={session.canSendCommand}
         onCommand={session.sendCommand}
       >
         <ConsensusControls
           table={table}
-          disabled={commandDisabled}
+          canSendCommand={session.canSendCommand}
           onCommand={session.sendCommand}
         />
         {game?.phase === "AUCTION" ? (
@@ -252,7 +244,8 @@ export default function BridgeTable({
             <AuctionTable game={game} />
             <BiddingBox
               legalCalls={game.legalCalls ?? []}
-              disabled={gameplayDisabled || !viewerTurn}
+              disabled={!viewerTurn}
+              canCall={(call) => session.canSendCommand("game.make_call", { call })}
               onCall={(call) => session.sendCommand("game.make_call", { call })}
             />
           </div>
@@ -269,9 +262,12 @@ export default function BridgeTable({
                 variant="dummy"
                 cards={game.dummyHand}
                 playableCards={
-                  legalPlay?.source === "dummy" ? legalPlay.hand : []
+                  legalPlay?.source === "dummy"
+                    ? legalPlay.hand.filter((card) =>
+                        canSendCommand("game.play_card", { card }),
+                      )
+                    : []
                 }
-                disabled={gameplayDisabled}
                 onPlay={(card) =>
                   session.sendCommand("game.play_card", { card })
                 }
@@ -297,7 +293,7 @@ export default function BridgeTable({
         ) : (
           <BoardResult
             table={table}
-            commandDisabled={gameplayDisabled}
+            canSendCommand={session.canSendCommand}
             onCommand={session.sendCommand}
           />
         )}
@@ -308,8 +304,14 @@ export default function BridgeTable({
           className="own-hand"
           title={``}
           cards={game.ownHand}
-          playableCards={legalPlay?.source === "own" ? legalPlay.hand : []}
-          disabled={gameplayDisabled || viewerIsDummy}
+          playableCards={
+            legalPlay?.source === "own"
+              ? legalPlay.hand.filter((card) =>
+                  canSendCommand("game.play_card", { card }),
+                )
+              : []
+          }
+          disabled={viewerIsDummy}
           {...(game.phase === "OPENING_LEAD" || game.phase === "PLAY"
             ? {
                 onPlay: (card: Card) =>

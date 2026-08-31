@@ -3,11 +3,11 @@ import type { TableSession } from "../use-table-session";
 
 export function ConsensusControls({
   table,
-  disabled,
+  canSendCommand,
   onCommand,
 }: {
   table: LiveTableProjection;
-  disabled: boolean;
+  canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
 }) {
   const game = table.game;
@@ -44,14 +44,14 @@ export function ConsensusControls({
             <button
               className="primary-button"
               type="button"
-              disabled={disabled}
+              disabled={!canSendCommand(responseCommand, { accepted: true })}
               onClick={() => onCommand(responseCommand, { accepted: true })}
             >
               Terima
             </button>
             <button
               type="button"
-              disabled={disabled}
+              disabled={!canSendCommand(responseCommand, { accepted: false })}
               onClick={() => onCommand(responseCommand, { accepted: false })}
             >
               Tolak
@@ -72,7 +72,7 @@ export function ConsensusControls({
               <button
                 type="button"
                 key={_trickCount}
-                disabled={disabled}
+                disabled={!canSendCommand("game.request_claim", { tricks: _trickCount })}
                 onClick={() =>
                   onCommand("game.request_claim", { tricks: _trickCount })
                 }
@@ -86,7 +86,7 @@ export function ConsensusControls({
       {table.canRequestUndo ? (
         <button
           type="button"
-          disabled={disabled}
+          disabled={!canSendCommand("game.request_undo")}
           onClick={() => onCommand("game.request_undo")}
         >
           Undo aksi terakhir

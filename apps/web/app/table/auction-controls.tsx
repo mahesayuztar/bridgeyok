@@ -76,10 +76,12 @@ export function AuctionTable({
 export function BiddingBox({
   legalCalls,
   disabled,
+  canCall,
   onCall,
 }: {
   legalCalls: Call[];
   disabled: boolean;
+  canCall: (call: Call) => boolean;
   onCall: (call: Call) => void;
 }) {
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
@@ -94,7 +96,7 @@ export function BiddingBox({
           <button
             type="button"
             key={label}
-            disabled={disabled || !legalKeys.has(callKey(call))}
+            disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}
             onClick={() => {
               setSelectedLevel(null);
               onCall(call);
@@ -111,7 +113,7 @@ export function BiddingBox({
             type="button"
             key={level}
             aria-pressed={selectedLevel === level}
-            disabled={disabled || !legalLevels.has(level)}
+            disabled={disabled || !legalLevels.has(level) || !legalCalls.some((call) => call.kind === "BID" && call.level === level && canCall(call))}
             onClick={() => setSelectedLevel(level)}
           >
             {level}
@@ -132,7 +134,7 @@ export function BiddingBox({
                 className={strain === "H" || strain === "D" ? "red-call" : ""}
                 type="button"
                 key={strain}
-                disabled={disabled || !legalKeys.has(callKey(call))}
+                disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}
                 onClick={() => {
                   setSelectedLevel(null);
                   onCall(call);
