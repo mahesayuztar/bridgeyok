@@ -1191,7 +1191,7 @@ Work:
 
 **Status implementasi 30 Agustus 2026:** Work 1–5 selesai. Guest/table lifecycle, durable command transaction, process-local table actor, transport WebSocket v1, dan web lobby/table sudah tersedia. Web mencakup guest session restore, create/join via invite, seat/ready/owner controls, auction keyboard/mobile controls, follow-suit card input, declarer dummy control, current trick, result, next board/finish, explicit connected/degraded/offline state, resumable sequence, dan pembersihan private/pending state ketika koneksi atau meja berubah. Reducer unit test, lint, typecheck, dan production build web lulus; scripted WS contract, recipient privacy, package race, serta PostgreSQL command/resume integration test dari Work 4 tetap lulus. Phase 3 tetap terbuka; Work 6 berikutnya mengeraskan room/table transition dan menutup four-browser persisted/reconnect/privacy gate sebelum observability minimum.
 
-### Objective GUX — Gameplay UX Reliability & Interaction Refactor — PLANNED / NOT STARTED
+### Objective GUX — Gameplay UX Reliability & Interaction Refactor — IN PROGRESS / UX-01 PASS
 
 **Objective:** membuat aksi bridge terasa langsung, predictable, spatially continuous, dan usable di desktop/mobile tanpa decorative redesign atau perubahan prematur pada pure engine. UX correctness dan gameplay feel mempunyai prioritas kira-kira 10× decorative quality.
 
@@ -1218,7 +1218,7 @@ Required order adalah audit baseline → behavior-preserving UX-01 extraction �
 
 #### GATE UX-G1 — Gameplay UX Refactor Complete
 
-- [ ] UX-01 PASS
+- [x] UX-01 PASS
 - [ ] UX-02 PASS
 - [ ] UX-03 PASS
 - [ ] UX-04 PASS
@@ -1411,7 +1411,7 @@ Semua decision berikut berlaku sebagai baseline implementasi. Phase 0 tidak memi
 | OD-17 | Owner dapat mengelola bot kursi sederhana. | Bot bukan guest identity; add/remove/replace bersifat durabel, bot memilih legal call/card pertama melalui actor, dan claim/undo dinonaktifkan saat bot duduk. Lihat ADR-008. |
 | OD-18 | Gameplay UX reliability memakai server-authoritative optimistic client, logical/presentation separation, one canonical card primitive, one play-command path, dan UX-G1 engine gate. | Local legal call/play terlihat segera lalu reconcile/rollback dengan revision/request identity; known-illegal action dicegah; motion terurut dapat di-skip hanya lewat board; ENG-01/02/03 blocked sampai UX-01–14 PASS. Lihat ADR-009 dan `apps/web/PLAN.md`. |
 
-Status OD-01 sampai OD-12: **CLOSED — accepted 29 Agustus 2026**. OD-13 sampai OD-16 mencatat refactor scope 30 Agustus 2026. OD-17 diterima 31 Agustus 2026 sebagai perubahan produk eksplisit dan menjadi baseline Phase 3–5. OD-18 diterima 1 September 2026 sebagai architecture/sequence baseline Objective GUX; implementation tetap NOT STARTED.
+Status OD-01 sampai OD-12: **CLOSED — accepted 29 Agustus 2026**. OD-13 sampai OD-16 mencatat refactor scope 30 Agustus 2026. OD-17 diterima 31 Agustus 2026 sebagai perubahan produk eksplisit dan menjadi baseline Phase 3–5. OD-18 diterima 1 September 2026 sebagai architecture/sequence baseline Objective GUX; implementation sedang berjalan dengan UX-01 PASS dan UX-02–UX-14 belum dimulai.
 
 ---
 

@@ -600,7 +600,7 @@ Visual novelty bukan tujuan.
 
 ## 19. Objective GUX — Gameplay UX Reliability & Interaction Refactor
 
-**Status:** PLANNED / NOT STARTED
+**Status:** IN PROGRESS — UX-01 PASS; UX-02–UX-14 NOT STARTED
 
 **Priority:** UX correctness dan gameplay feel kira-kira 10× lebih penting daripada decorative polish.
 
@@ -621,6 +621,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 - Unit test berbasis `node:test` mencakup projection normalization, reducer, request ID, issue mapping, orientation/auction/legal cards. Playwright/config dan satu four-context desktop flow ada sebagai worktree yang belum selesai; belum ada mobile/touch, screenshot matrix, delayed ACK/rejection, optimistic reconnect, atau animation-order coverage.
 
 ### UX-01 — Frontend component architecture
+
+**Status:** PASS — behavior-preserving extraction and regression gate completed 1 September 2026.
 
 - **Problem:** gameplay domains dan interaction boundaries menumpuk di `bridge-table.tsx`, sehingga card layout, portal, game action, dan phase rendering sulit diuji atau diubah tanpa regresi.
 - **Scope:** behavior-preserving extraction untuk canonical `PlayingCard`; `BridgeHand`/`OwnHand`; `DummyHand`, `DummySuit`, dan layout orientation; `CurrentTrick`/played card/result indicator; auction/bidding; participant identity/position/bot marker/portal; shared dialog primitive bila benar-benar reused; status/navbar/actions; contract/invite; sound, drag, optimistic reconciliation, dan presentation queue boundaries. Audit nama final terhadap code sebelum membuat file.
@@ -818,10 +820,10 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ## 20. GATE UX-G1 — Gameplay UX Refactor Complete
 
-Status awal: **BLOCKED — seluruh UX objective masih NOT STARTED**.
+Status saat ini: **BLOCKED — UX-01 PASS; UX-02–UX-14 masih NOT STARTED**.
 
 ```text
-[ ] UX-01 PASS  [ ] UX-02 PASS  [ ] UX-03 PASS  [ ] UX-04 PASS
+[x] UX-01 PASS  [ ] UX-02 PASS  [ ] UX-03 PASS  [ ] UX-04 PASS
 [ ] UX-05 PASS  [ ] UX-06 PASS  [ ] UX-07 PASS  [ ] UX-08 PASS
 [ ] UX-09 PASS  [ ] UX-10 PASS  [ ] UX-11 PASS  [ ] UX-12 PASS
 [ ] UX-13 PASS  [ ] UX-14 PASS
@@ -916,7 +918,7 @@ Gate hanya PASS bila seluruh fourteen objectives memiliki acceptance, browser/mo
 Record implementation evidence here; all entries begin empty:
 
 ```text
-UX-01 extraction/tests: ____________________
+UX-01 extraction/tests: commits 56ef42b, a9cc5ea, 636255b, f8501ba, 5cf8ab1; unit 19/19, typecheck, lint, production build, four-browser Playwright 1/1
 UX-02 reconciliation traces: ______________
 UX-03 no-invalid-frame proof: ______________
 UX-04 motion/skip recordings: ______________
@@ -938,5 +940,5 @@ Known risks discovered in the current repository:
 4. `CompletedTricks` is already projected to all participants. ENG-01's intended “Dummy all / others last allowed” policy conflicts with that payload and needs a security/product decision before UI.
 5. ENG-02 terminology is unresolved: a single table has no inherent IMP comparison. Raw duplicate score cannot be labeled IMP without a reference result or accepted pair/session model.
 6. ADR-008 and current aggregate explicitly disable consensus whenever a bot is present. ENG-03 is a deliberate future product/architecture supersession and remains gated.
-7. Playwright/config/e2e files are currently uncommitted alongside unrelated backend/frontend changes. Baseline ownership must be resolved before implementation commits so tests are not accidentally overwritten.
+7. Four-browser Playwright baseline is now committed and passing; the local `.playwright` configuration remains unrelated user work and is intentionally excluded from UX commits.
 8. CSS has many orientation-specific offsets but no shared board-zone contract; motion built before UX-06 would couple animation to fragile magic numbers.
