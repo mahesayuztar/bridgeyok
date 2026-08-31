@@ -228,6 +228,31 @@ function CurrentTrick({ game, orientation }: { game: NonNullable<LiveTableProjec
   );
 }
 
+function ConsensusControls({ table, disabled, onCommand }: { table: LiveTableProjection; disabled: boolean; onCommand: TableSession["sendCommand"] }) {
+  const game = table.game;
+  const request = table.actionRequest;
+  const dummy = game?.auction.contract === undefined ? undefined : oppositeSeat(game.auction.contract.declarer);
+  const canClaim = request === undefined && game?.phase === "PLAY" && game.currentTrick.plays.length === 0 && table.viewerSeat !== undefined && table.viewerSeat !== dummy;
+  const remainingTricks = game === undefined ? 0 : 13 - game.completedTricks.length;
+  if (request !== undefined) {
+    const responseCommand = request.kind === "CLAIM" ? "game.respond_claim" : "game.respond_undo";
+    return (
+      <section className="consensus-controls" aria-live="polite">
+        <strong>{request.kind === "CLAIM" ? `${request.requesterSeat} mengajukan ${request.claimTricks} trick` : `${request.requesterSeat} meminta undo`}</strong>
+        <span>{request.approvedBy.length} persetujuan diterima</span>
+        {!request.canRespond ? <span>Menunggu pemain lain.</span> : <div><button className="primary-button" type="button" disabled={disabled} onClick={() => onCommand(responseCommand, { accepted: true })}>Terima</button><button type="button" disabled={disabled} onClick={() => onCommand(responseCommand, { accepted: false })}>Tolak</button></div>}
+      </section>
+    );
+  }
+  if (!canClaim && !table.canRequestUndo) return null;
+  return (
+    <div className="consensus-controls consensus-actions">
+      {canClaim ? <details><summary>Claim</summary><div>{Array.from({ length: remainingTricks + 1 }, (_, tricks) => <button type="button" key={tricks} disabled={disabled} onClick={() => onCommand("game.request_claim", { tricks })}>{tricks}</button>)}</div></details> : null}
+      {table.canRequestUndo ? <button type="button" disabled={disabled} onClick={() => onCommand("game.request_undo")}>Undo aksi terakhir</button> : null}
+    </div>
+  );
+}
+
 function TableSurface({ table, orientation, session, commandDisabled, children }: { table: LiveTableProjection; orientation: TableOrientation; session: TableSession; commandDisabled: boolean; children: ReactNode }) {
   const isOwner = table.viewerRole === "OWNER";
   return (
@@ -387,9 +412,10 @@ export default function BridgeTable({ expectedTableId }: { expectedTableId: stri
       </div>
 
       <TableSurface table={table} orientation={orientation} session={session} commandDisabled={commandDisabled}>
+        <ConsensusControls table={table} disabled={commandDisabled} onCommand={session.sendCommand} />
         {game?.phase === "AUCTION" ? <div className="auction-workspace"><AuctionTable game={game} /><BiddingBox legalCalls={game.legalCalls ?? []} disabled={gameplayDisabled || !viewerTurn} onCall={(call) => session.sendCommand("game.make_call", { call })} /></div> : null}
         {game !== undefined && (game.phase === "OPENING_LEAD" || game.phase === "PLAY") ? <>{game.dummyHand === undefined || dummyPosition === undefined ? null : <BridgeHand className={`dummy-hand dummy-${dummyPosition}`} title={`Dummy · ${dummySeat}`} variant="dummy" cards={game.dummyHand} playableCards={legalPlay?.source === "dummy" ? legalPlay.hand : []} disabled={gameplayDisabled} onPlay={(card) => session.sendCommand("game.play_card", { card })} />}<CurrentTrick game={game} orientation={orientation} /></> : null}
-        {game?.result === undefined && table.state !== "FINISHED" ? null : table.state === "FINISHED" ? <section className="board-result finished-result"><p>Meja selesai</p><h2>Terima kasih sudah bermain.</h2><button className="primary-button" type="button" disabled={session.busy} onClick={() => void returnToLobby()}>Kembali ke lobby</button></section> : <BoardResult table={table} session={session} commandDisabled={commandDisabled} />}
+        {game?.result === undefined && table.state !== "FINISHED" ? null : table.state === "FINISHED" ? <section className="board-result finished-result"><p>Meja selesai</p><h2>Terima kasih sudah bermain.</h2><button className="primary-button" type="button" disabled={session.busy} onClick={() => void returnToLobby()}>Kembali ke lobby</button></section> : <BoardResult table={table} session={session} commandDisabled={gameplayDisabled} />}
       </TableSurface>
 
       {game === undefined ? null : <BridgeHand className="own-hand" title={`Kartu ${table.viewerSeat ?? ""}`} cards={game.ownHand} playableCards={legalPlay?.source === "own" ? legalPlay.hand : []} disabled={gameplayDisabled} {...(game.phase === "OPENING_LEAD" || game.phase === "PLAY" ? { onPlay: (card: Card) => session.sendCommand("game.play_card", { card }) } : {})} />}
