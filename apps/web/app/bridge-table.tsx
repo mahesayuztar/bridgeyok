@@ -13,7 +13,6 @@ import {
 } from "./table-state";
 import { AuctionTable, BiddingBox } from "./table/auction-controls";
 import { BoardResult } from "./table/board-result";
-import { ConsensusControls } from "./table/consensus-controls";
 import { CurrentTrick } from "./table/current-trick";
 import { callKey } from "./table/gameplay-presentation";
 import { BridgeHand } from "./table/playing-card";
@@ -194,6 +193,8 @@ export default function BridgeTable({
         inviteCode={session.inviteCode}
         copied={copied}
         onCopy={() => void copyInvite()}
+        canSendCommand={session.canSendCommand}
+        onCommand={session.sendCommand}
       />
 
       <div className="table-feedback" aria-live="polite">
@@ -234,11 +235,6 @@ export default function BridgeTable({
         canSendCommand={session.canSendCommand}
         onCommand={session.sendCommand}
       >
-        <ConsensusControls
-          table={table}
-          canSendCommand={session.canSendCommand}
-          onCommand={session.sendCommand}
-        />
         {game?.phase === "AUCTION" ? (
           <div className="auction-workspace">
             <AuctionTable game={game} />
@@ -258,7 +254,7 @@ export default function BridgeTable({
             viewerIsDummy ? null : (
               <BridgeHand
                 className={`dummy-hand dummy-${dummyPosition}`}
-                title={``}
+                title="Kartu dummy"
                 variant="dummy"
                 cards={game.dummyHand}
                 playableCards={
@@ -302,7 +298,7 @@ export default function BridgeTable({
       {game === undefined ? null : (
         <BridgeHand
           className="own-hand"
-          title={``}
+          title="Kartu Anda"
           cards={game.ownHand}
           playableCards={
             legalPlay?.source === "own"

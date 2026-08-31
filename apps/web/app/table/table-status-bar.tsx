@@ -1,7 +1,11 @@
 import Link from "next/link";
 import type { LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
-import { contractLabel } from "./gameplay-presentation";
+import { ConsensusControls } from "./consensus-controls";
+import {
+  contractSummaryLabel,
+  participantNameForSeat,
+} from "./gameplay-presentation";
 
 const vulnerabilityLabels = {
   NONE: "Tidak ada",
@@ -47,14 +51,23 @@ export function ActiveTableStatusBar({
   inviteCode,
   copied,
   onCopy,
+  canSendCommand,
+  onCommand,
 }: {
   table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
   inviteCode: string | null;
   copied: boolean;
   onCopy: () => void;
+  canSendCommand: TableSession["canSendCommand"];
+  onCommand: TableSession["sendCommand"];
 }) {
   const game = table.game;
+  const contract = game?.auction.contract;
+  const declarerName =
+    contract === undefined
+      ? undefined
+      : participantNameForSeat(table, contract.declarer);
   return (
     <header className="table-status-bar">
       <Link
@@ -83,10 +96,8 @@ export function ActiveTableStatusBar({
         </div>
         <div>
           <dt>Kontrak</dt>
-          <dd>
-            {game === undefined
-              ? "—"
-              : contractLabel(game.auction.contract, false)}
+          <dd className="contract-fact" title={declarerName}>
+            {game === undefined ? "—" : contractSummaryLabel(contract, declarerName)}
           </dd>
         </div>
         <div>
@@ -96,6 +107,11 @@ export function ActiveTableStatusBar({
           </dd>
         </div>
       </dl>
+      <ConsensusControls
+        table={table}
+        canSendCommand={canSendCommand}
+        onCommand={onCommand}
+      />
       <div className="status-actions">
         <div
           className="connection-status"
@@ -103,7 +119,7 @@ export function ActiveTableStatusBar({
           role="status"
         >
           <span className="status-mark" />
-          {connectionLabels[connectionState]}
+          <span className="connection-label">{connectionLabels[connectionState]}</span>
         </div>
         <details className="table-menu">
           <summary aria-label="Buka menu meja">•••</summary>
@@ -114,7 +130,7 @@ export function ActiveTableStatusBar({
                 {copied ? "Tautan disalin" : "Salin undangan"}
               </button>
             )}
-            <span>Revision {table.revision}</span>
+            <span>Rev {table.revision}</span>
           </div>
         </details>
       </div>

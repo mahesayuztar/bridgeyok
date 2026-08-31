@@ -1,6 +1,9 @@
 import { boardResultLabel, type LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
-import { contractLabel } from "./gameplay-presentation";
+import {
+  contractSummaryLabel,
+  participantNameForSeat,
+} from "./gameplay-presentation";
 
 export function BoardResult({
   table,
@@ -13,11 +16,17 @@ export function BoardResult({
 }) {
   const result = table.game?.result;
   if (result === undefined) return null;
+  const declarerName =
+    result.contract === undefined
+      ? undefined
+      : participantNameForSeat(table, result.contract.declarer);
   return (
     <section className="board-result" aria-labelledby="result-title">
       <p>Board {table.game?.board.number} selesai</p>
       <h2 id="result-title">
-        {result.passedOut ? "Passed out" : contractLabel(result.contract, false)}
+        {result.passedOut
+          ? "Passed out"
+          : contractSummaryLabel(result.contract, declarerName)}
       </h2>
       <strong className="result-outcome">{boardResultLabel(result)}</strong>
       <dl>

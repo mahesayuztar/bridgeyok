@@ -5,6 +5,8 @@ import {
   callLabel,
   cardKey,
   contractLabel,
+  contractSummaryLabel,
+  participantNameForSeat,
   sortCardsDescending,
 } from "./table/gameplay-presentation.ts";
 
@@ -18,16 +20,39 @@ test("gameplay presentation keeps bridge labels stable", () => {
   assert.equal(cardKey({ suit: "H", rank: "T" }), "HT");
 });
 
-test("contract presentation preserves declarer and doubling options", () => {
+test("contract presentation preserves declarer identity and doubling", () => {
   const contract = {
     level: 4,
     strain: "H",
     doubling: "DOUBLED",
     declarer: "N",
   };
-  assert.equal(contractLabel(contract), "4♥ X oleh N");
-  assert.equal(contractLabel(contract, false), "4♥ X");
+  assert.equal(contractLabel(contract), "4♥ X");
+  assert.equal(contractSummaryLabel(contract, "Mahesa"), "4♥ X · N · Mahesa");
+  assert.equal(contractSummaryLabel(contract), "4♥ X · N");
   assert.equal(contractLabel(undefined), "Belum ada kontrak");
+  assert.equal(contractSummaryLabel(undefined), "Belum ada kontrak");
+  assert.equal(
+    contractSummaryLabel({ ...contract, strain: "NT", doubling: "REDOUBLED" }, "Nama pemain yang panjang"),
+    "4NT XX · N · Nama pemain yang panjang",
+  );
+});
+
+test("contract presentation resolves the declarer name from seat assignments", () => {
+  assert.equal(
+    participantNameForSeat(
+      {
+        seats: { N: { participantId: "north" } },
+        participants: [{ id: "north", nickname: "Nara" }],
+      },
+      "N",
+    ),
+    "Nara",
+  );
+  assert.equal(
+    participantNameForSeat({ seats: {}, participants: [] }, "E"),
+    undefined,
+  );
 });
 
 test("dummy presentation sorts ranks descending without mutating the hand", () => {

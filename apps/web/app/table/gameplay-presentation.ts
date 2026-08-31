@@ -44,7 +44,6 @@ export function callKey(call: Call) {
 
 export function contractLabel(
   contract: NonNullable<LiveTableProjection["game"]>["auction"]["contract"],
-  includeDeclarer = true,
 ) {
   if (contract === undefined) return "Belum ada kontrak";
   const doubling =
@@ -54,7 +53,25 @@ export function contractLabel(
         ? " XX"
         : "";
   const strain = contract.strain === "NT" ? "NT" : suitLabels[contract.strain];
-  return `${contract.level}${strain}${doubling}${includeDeclarer ? ` oleh ${contract.declarer}` : ""}`;
+  return `${contract.level}${strain}${doubling}`;
+}
+
+export function contractSummaryLabel(
+  contract: NonNullable<LiveTableProjection["game"]>["auction"]["contract"],
+  declarerName?: string,
+) {
+  if (contract === undefined) return "Belum ada kontrak";
+  const identity = declarerName === undefined ? "" : ` · ${declarerName}`;
+  return `${contractLabel(contract)} · ${contract.declarer}${identity}`;
+}
+
+export function participantNameForSeat(
+  table: LiveTableProjection,
+  seat: NonNullable<LiveTableProjection["viewerSeat"]>,
+) {
+  const participantId = table.seats[seat]?.participantId;
+  return table.participants.find((participant) => participant.id === participantId)
+    ?.nickname;
 }
 
 export function cardKey(card: Card) {

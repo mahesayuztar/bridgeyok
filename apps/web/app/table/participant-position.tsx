@@ -130,7 +130,7 @@ export function ParticipantPosition({
                 <div>
                   <h2 id={dialogTitleId}>{name ?? "Kursi kosong"}</h2>
                   {assignment === undefined ? (
-                    <p>Pilih siapa yang mengisi kursi ini.</p>
+                    <p>{seat} · kosong</p>
                   ) : table.state === "WAITING" ? (
                     <p>
                       {isBot ? "Bot · " : ""}
@@ -159,7 +159,7 @@ export function ParticipantPosition({
                       onCommand("table.take_seat", { seat });
                     }}
                   >
-                    Duduk di kursi
+                    Duduk
                   </button>
                 )}
                 {!canAddBot ? null : (
@@ -197,7 +197,7 @@ export function ParticipantPosition({
                       onCommand("table.leave_seat");
                     }}
                   >
-                    Berdiri dari kursi
+                    Berdiri
                   </button>
                 )}
                 {!canRemove ? null : (
@@ -250,7 +250,7 @@ export function ParticipantPosition({
                   </button>
                 )}
                 {hasPortalActions ? null : (
-                  <p>Belum ada tindakan untuk pemain ini.</p>
+                  <p>Tidak ada tindakan.</p>
                 )}
               </div>
             </section>

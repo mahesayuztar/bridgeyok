@@ -49,7 +49,9 @@ export function TableSurface({
           />
         ),
       )}
-      {children}
+      <div className="board-play-zone" data-board-zone="play">
+        {children}
+      </div>
     </div>
   );
 }

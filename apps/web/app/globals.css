@@ -21,6 +21,13 @@
   --table-ink: #f7f4ea;
   --card: #fffdf7;
   --card-line: #d5d0c7;
+  --card-aspect-ratio: 5 / 7;
+  --card-hand-width: clamp(3.7rem, 5.4vw, 5rem);
+  --card-dummy-width: clamp(2.9rem, 4.2vw, 3.65rem);
+  --card-trick-width: clamp(3rem, 4.4vw, 3.8rem);
+  --card-compact-width: 2.4rem;
+  --board-player-block: 2.5rem;
+  --board-player-inline: 2.5rem;
   --page-gutter: clamp(1.25rem, 4vw, 4rem);
   --content-width: 88rem;
 }
@@ -583,9 +590,10 @@ h2 {
   border: 0.55rem solid var(--table-felt-dark);
 }
 .waiting-center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
+  position: relative;
+  grid-area: play;
+  align-self: center;
+  justify-self: center;
   display: grid;
   min-width: 9rem;
   min-height: 7rem;
@@ -594,7 +602,6 @@ h2 {
   border: 1px solid rgb(255 255 255 / 22%);
   color: var(--table-ink);
   text-align: center;
-  transform: translate(-50%, -50%);
 }
 .waiting-center span {
   margin-top: 0.35rem;
@@ -636,6 +643,8 @@ h2 {
 .active-table-client .table-status-bar {
   position: relative;
   z-index: 30;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   border-color: #b8b09f;
 }
 .table-facts {
@@ -663,6 +672,12 @@ h2 {
   margin: 0;
   font-size: 0.82rem;
   font-weight: 700;
+}
+.contract-fact {
+  max-width: min(22rem, 30vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .status-actions {
   display: flex;
@@ -703,6 +718,100 @@ h2 {
   text-align: left;
   text-decoration: none;
 }
+.consensus-navigation {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.claim-menu {
+  position: relative;
+}
+.claim-menu summary,
+.consensus-action {
+  display: inline-flex;
+  min-height: 2.2rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--foreground);
+  font-size: 0.72rem;
+  font-weight: 700;
+  list-style: none;
+  white-space: nowrap;
+}
+.claim-menu summary {
+  cursor: pointer;
+}
+.claim-menu summary::-webkit-details-marker {
+  display: none;
+}
+.claim-menu summary[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.claim-menu svg,
+.consensus-action svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 1.7;
+}
+.claim-selector,
+.consensus-request {
+  position: absolute;
+  z-index: 55;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: min(20rem, calc(100vw - 1rem));
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 0.5rem 1.2rem rgb(0 0 0 / 18%);
+}
+.claim-selector > strong,
+.consensus-request > strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.78rem;
+}
+.claim-selector > div,
+.consensus-request > div {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+.claim-selector button,
+.consensus-request button {
+  min-width: 0;
+  min-height: 2.1rem;
+  padding: 0.3rem;
+}
+.consensus-request {
+  right: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+.consensus-request > strong {
+  margin: 0;
+}
+.consensus-request > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.consensus-request > div {
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 0.35rem;
+}
 .table-menu span {
   color: var(--muted);
   font-size: 0.7rem;
@@ -740,6 +849,13 @@ h2 {
 
 .table-surface {
   position: relative;
+  display: grid;
+  grid-template-areas:
+    "top top top"
+    "left play right"
+    "bottom bottom bottom";
+  grid-template-columns: var(--board-player-inline) minmax(0, 1fr) var(--board-player-inline);
+  grid-template-rows: var(--board-player-block) minmax(0, 1fr) var(--board-player-block);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -747,45 +863,15 @@ h2 {
   background: var(--table-felt);
   color: var(--table-ink);
 }
-.consensus-controls {
-  position: absolute;
-  z-index: 14;
-  bottom: 0.7rem;
-  left: 0.7rem;
-  display: grid;
-  gap: 0.35rem;
-  max-width: min(22rem, calc(100% - 1.4rem));
-  padding: 0.65rem;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--foreground);
-}
-.consensus-controls > span {
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-.consensus-controls div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-.consensus-controls button {
-  min-height: 2rem;
-  padding: 0.3rem 0.55rem;
-}
-.consensus-actions {
-  display: flex;
-  align-items: flex-end;
-}
-.consensus-actions summary {
-  cursor: pointer;
-  font-weight: 700;
-}
-.consensus-actions details > div {
-  margin-top: 0.4rem;
+.board-play-zone {
+  position: relative;
+  grid-area: play;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 .player-position {
-  position: absolute;
+  position: relative;
   z-index: 12;
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / 18%);
@@ -800,29 +886,26 @@ h2 {
 }
 .player-top,
 .player-bottom {
-  left: 50%;
   width: clamp(12rem, 34vw, 24rem);
-  height: 2.5rem;
-  transform: translateX(-50%);
+  height: var(--board-player-block);
+  justify-self: center;
 }
 .player-top {
-  top: 0;
+  grid-area: top;
 }
 .player-bottom {
-  bottom: 0;
+  grid-area: bottom;
 }
 .player-left,
 .player-right {
-  top: 3rem;
-  bottom: 3rem;
-  width: 2.5rem;
-  height: auto;
+  width: var(--board-player-inline);
+  min-height: 0;
 }
 .player-left {
-  left: 0;
+  grid-area: left;
 }
 .player-right {
-  right: 0;
+  grid-area: right;
 }
 .player-trigger,
 .empty-seat-trigger {
@@ -1126,9 +1209,9 @@ kbd {
 .physical-card {
   position: relative;
   display: inline-flex;
-  flex: 0 0 clamp(3.55rem, 5.1vw, 4.75rem);
-  width: clamp(3.55rem, 5.1vw, 4.75rem);
-  height: clamp(5.1rem, 7.3vw, 6.85rem);
+  flex: 0 0 var(--card-hand-width);
+  width: var(--card-hand-width);
+  aspect-ratio: var(--card-aspect-ratio);
   padding: 0.3rem;
   border: 1px solid var(--card-line);
   border-radius: 3px 3px 1px 1px;
@@ -1137,7 +1220,7 @@ kbd {
   box-shadow: 0 1px 2px rgb(0 0 0 / 28%);
 }
 .hand-cards .physical-card + .physical-card {
-  margin-left: clamp(-2.75rem, -2.8vw, -1.85rem);
+  margin-left: clamp(-2.9rem, -2.8vw, -1.85rem);
 }
 button.physical-card {
   min-height: 0;
@@ -1156,11 +1239,11 @@ button.physical-card:disabled {
   align-items: center;
   flex-direction: column;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.86rem;
+  font-size: clamp(0.88rem, 1.25vw, 1.05rem);
   line-height: 0.85;
 }
 .card-corner span {
-  font-size: 1rem;
+  font-size: 1.08em;
 }
 .card-suit {
   position: absolute;
@@ -1190,24 +1273,21 @@ button.physical-card:disabled {
   align-items: flex-start;
 }
 .own-hand .physical-card {
-  flex-basis: clamp(3.7rem, 5.4vw, 5rem);
-  width: clamp(3.7rem, 5.4vw, 5rem);
-  height: clamp(5.3rem, 7.7vw, 7.2rem);
+  flex-basis: var(--card-hand-width);
+  width: var(--card-hand-width);
 }
 
 .dummy-hand {
   position: absolute;
   z-index: 9;
-
   width: auto;
 }
 
 /* Playing card dummy dibuat lebih besar */
 .dummy-hand .physical-card {
-  flex: 0 0 auto;
-
-  width: 3.5rem;
-  height: 5rem;
+  flex: none;
+  width: var(--card-dummy-width);
+  aspect-ratio: var(--card-aspect-ratio);
 }
 
 /* Reset overlap lama */
@@ -1246,7 +1326,7 @@ button.physical-card:disabled {
    ======================================== */
 
 .dummy-top {
-  top: 3.4rem;
+  top: 0.65rem;
   left: 50%;
 
   transform: translateX(-50%);
@@ -1290,7 +1370,7 @@ button.physical-card:disabled {
 
 .dummy-left {
   top: 50%;
-  left: 3.7rem;
+  left: 0.65rem;
 
   transform: translateY(-50%);
 }
@@ -1328,7 +1408,7 @@ button.physical-card:disabled {
 
 .dummy-right {
   top: 50%;
-  right: 3.7rem;
+  right: 0.65rem;
 
   transform: translateY(-50%);
 }
@@ -1368,7 +1448,7 @@ button.physical-card:disabled {
    ======================================== */
 
 .dummy-bottom {
-  bottom: 3.4rem;
+  bottom: 0.65rem;
   left: 50%;
 
   transform: translateX(-50%);
@@ -1404,19 +1484,19 @@ button.physical-card:disabled {
    ========================================================= */
 
 .current-trick {
-  --trick-card-width: 3.6rem;
-  --trick-card-height: 5.1rem;
+  --trick-card-width: var(--card-trick-width);
+  --trick-card-height: calc(var(--card-trick-width) * 1.4);
 
   /*
    * Jarak horizontal sengaja lebih lebar supaya
    * kartu W/E lebih dekat ke player masing-masing.
    */
-  --trick-side-offset: 2.4rem;
+  --trick-side-offset: clamp(1.4rem, 3vw, 2.4rem);
 
   /*
    * Kartu top diberi ruang dari dummy hand.
    */
-  --trick-top-offset: 1.15rem;
+  --trick-top-offset: 0;
 
   position: absolute;
   z-index: 10;
@@ -1424,8 +1504,8 @@ button.physical-card:disabled {
   top: 50%;
   left: 50%;
 
-  width: clamp(16rem, 27vw, 23rem);
-  height: clamp(11rem, 28vh, 16rem);
+  width: min(22rem, calc(100% - 8rem));
+  height: min(15rem, calc(100% - 3rem));
 
   transform: translate(-50%, -50%);
 }
@@ -1510,7 +1590,7 @@ button.physical-card:disabled {
    ========================================================= */
 
 .trick-bottom {
-  bottom: 0;
+  bottom: var(--trick-top-offset);
   left: 50%;
 
   transform: translateX(-50%);
@@ -1525,7 +1605,7 @@ button.physical-card:disabled {
 .trick-left {
   top: 50%;
 
-  left: calc(var(--trick-side-offset) * -1);
+  left: calc(0rem - var(--trick-side-offset));
 
   transform: translateY(-50%);
 }
@@ -1539,7 +1619,7 @@ button.physical-card:disabled {
 .trick-right {
   top: 50%;
 
-  right: calc(var(--trick-side-offset) * -1);
+  right: calc(0rem - var(--trick-side-offset));
 
   transform: translateY(-50%);
 }
@@ -1566,7 +1646,7 @@ button.physical-card:disabled {
   flex: 0 0 var(--trick-card-width);
 
   width: var(--trick-card-width);
-  height: var(--trick-card-height);
+  aspect-ratio: var(--card-aspect-ratio);
 
   padding: 0.26rem;
 }
@@ -1652,9 +1732,35 @@ button.physical-card:disabled {
 }
 
 @media (max-width: 64rem) {
+  :root {
+    --card-dummy-width: clamp(2.85rem, 4.5vw, 3.2rem);
+    --card-trick-width: clamp(3rem, 4.6vw, 3.25rem);
+  }
+  .waiting-room {
+    grid-template-columns: 1fr;
+  }
+  .waiting-copy h1 {
+    max-width: 14ch;
+  }
+  .table-facts {
+    gap: clamp(0.55rem, 1.5vw, 1rem);
+  }
+  .table-facts div:nth-child(2),
+  .table-facts div:nth-child(3) {
+    display: none;
+  }
+  .contract-fact {
+    max-width: 25vw;
+  }
+  .auction-workspace {
+    width: min(46rem, calc(100% - 4rem));
+  }
+  .board-result {
+    width: min(29rem, calc(100% - 4rem));
+  }
   .dummy-hand .physical-card {
-    width: 3.2rem;
-    height: 4.65rem;
+    width: var(--card-dummy-width);
+    aspect-ratio: var(--card-aspect-ratio);
   }
 
   .dummy-suit-label {
@@ -1664,11 +1770,11 @@ button.physical-card:disabled {
   /* TOP / BOTTOM */
 
   .dummy-top {
-    top: 3.2rem;
+    top: 0.5rem;
   }
 
   .dummy-bottom {
-    bottom: 3.2rem;
+    bottom: 0.5rem;
   }
 
   .dummy-top .hand-cards,
@@ -1687,11 +1793,11 @@ button.physical-card:disabled {
   /* LEFT / RIGHT */
 
   .dummy-left {
-    left: 3.8rem;
+    left: 0.5rem;
   }
 
   .dummy-right {
-    right: 3.8rem;
+    right: 0.5rem;
   }
 
   .dummy-left .hand-cards,
@@ -1712,9 +1818,6 @@ button.physical-card:disabled {
      ===================================================== */
 
   .current-trick {
-    --trick-card-width: 3.25rem;
-    --trick-card-height: 4.65rem;
-
     --trick-side-offset: 1.8rem;
     --trick-top-offset: 0.9rem;
 
@@ -1731,20 +1834,110 @@ button.physical-card:disabled {
     top: calc(50% + 0.55rem);
   }
 
+  .trick-left {
+    left: 0.35rem;
+  }
+
+  .trick-right {
+    right: 0.35rem;
+  }
+
   .card-trick .card-suit {
     font-size: 1.3rem;
   }
 }
 
 @media (max-width: 48rem) {
+  :root {
+    --card-hand-width: clamp(3.35rem, 13vw, 4.25rem);
+    --card-dummy-width: 3rem;
+    --card-trick-width: 2.8rem;
+    --board-player-inline: 2.25rem;
+  }
+  .active-table-client {
+    grid-template-rows: auto minmax(0, 1fr) clamp(7.75rem, 21vh, 9.5rem);
+  }
+  .active-table-client .table-status-bar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.35rem 0.5rem;
+    padding-block: 0.35rem;
+  }
+  .table-facts {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+  .table-facts div:not(:nth-child(1)):not(:nth-child(4)) {
+    display: none;
+  }
+  .table-facts dt {
+    font-size: 0.55rem;
+  }
+  .table-facts dd {
+    font-size: 0.72rem;
+  }
+  .contract-fact {
+    max-width: 36vw;
+  }
+  .consensus-navigation {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+    padding-top: 0.3rem;
+    border-top: 1px solid var(--line);
+  }
+  .status-actions {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .connection-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .claim-selector,
+  .consensus-request {
+    position: fixed;
+    top: 5.8rem;
+    right: 0.5rem;
+  }
+  .auction-workspace {
+    grid-template-columns: 1fr;
+    width: calc(100% - 1rem);
+    max-height: calc(100% - 1rem);
+    overflow: auto;
+  }
+  .auction-table-wrap {
+    max-height: 8rem;
+  }
+  .board-result {
+    width: calc(100% - 1rem);
+    max-height: calc(100% - 1rem);
+    overflow: auto;
+  }
+  .board-result dl {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .board-result dl div:nth-child(3) {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .board-result dl div:nth-child(4) {
+    border-top: 1px solid var(--line);
+  }
+  .own-hand .hand-cards .physical-card + .physical-card {
+    margin-left: -2.55rem;
+  }
   .dummy-hand {
     width: auto;
   }
 
   .dummy-hand .physical-card {
-    flex: 0 0 auto;
-    width: 3rem;
-    height: 4.5rem;
+    flex: none;
+    width: var(--card-dummy-width);
+    aspect-ratio: var(--card-aspect-ratio);
   }
 
   .dummy-suit-label {
@@ -1756,7 +1949,7 @@ button.physical-card:disabled {
      ========================= */
 
   .dummy-top {
-    top: 2.6rem;
+    top: 0.35rem;
   }
 
   .dummy-top .hand-cards {
@@ -1776,7 +1969,7 @@ button.physical-card:disabled {
      ========================= */
 
   .dummy-bottom {
-    bottom: 2.6rem;
+    bottom: 0.35rem;
   }
 
   .dummy-bottom .hand-cards {
@@ -1796,7 +1989,7 @@ button.physical-card:disabled {
      ========================= */
 
   .dummy-left {
-    left: 2.65rem;
+    left: 0.35rem;
   }
 
   .dummy-left .hand-cards {
@@ -1816,7 +2009,7 @@ button.physical-card:disabled {
      ========================= */
 
   .dummy-right {
-    right: 2.65rem;
+    right: 0.35rem;
   }
 
   .dummy-right .hand-cards {
@@ -1848,14 +2041,11 @@ button.physical-card:disabled {
      ===================================================== */
 
   .current-trick {
-    --trick-card-width: 2.8rem;
-    --trick-card-height: 4rem;
-
     /*
      * Jangan terlalu jauh ke player karena viewport
      * sudah sempit.
      */
-    --trick-side-offset: 0.8rem;
+    --trick-side-offset: 0rem;
     --trick-top-offset: 0.55rem;
 
     width: min(13.5rem, calc(100% - 5.5rem));
@@ -1909,19 +2099,22 @@ button.physical-card:disabled {
   .waiting-table {
     min-height: 21rem;
   }
-  .table-facts div:nth-child(3),
-  .table-facts div:nth-child(5) {
+  .table-facts div:not(:nth-child(1)):not(:nth-child(4)) {
     display: none;
+  }
+  .table-facts div:first-child {
+    display: none;
+  }
+  .contract-fact {
+    max-width: 42vw;
+  }
+  .claim-menu summary,
+  .consensus-action {
+    min-height: 2rem;
+    padding: 0.25rem 0.45rem;
   }
   .auction-workspace {
     max-height: calc(100% - 5rem);
-  }
-  .dummy-left,
-  .dummy-right {
-    top: 3rem;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
   }
 }
 

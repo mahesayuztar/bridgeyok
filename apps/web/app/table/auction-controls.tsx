@@ -120,9 +120,7 @@ export function BiddingBox({
           </button>
         ))}
       </div>
-      {selectedLevel === null ? (
-        <p className="bid-hint">Pilih level, lalu pilih strain.</p>
-      ) : (
+      {selectedLevel === null ? null : (
         <div
           className="bid-strains"
           aria-label={`Pilih strain untuk level ${selectedLevel}`}
