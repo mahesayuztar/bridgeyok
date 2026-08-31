@@ -51,7 +51,7 @@ async function takeSeat(page: Page, nickname: string, seat: "N" | "E" | "S" | "W
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect(seatMenu).toBeFocused();
   await seatMenu.click();
-  await page.getByRole("button", { name: "Duduk di kursi" }).click();
+  await page.getByRole("button", { name: "Duduk" }).click();
   await expect(page.getByRole("button", { name: `Buka menu ${nickname}, kursi ${seat}` })).toBeVisible();
 }
 
@@ -120,10 +120,102 @@ function assertPrivateFrames(frames: string[]) {
   }
 }
 
-test("four guests finish boards, recover a controller, and keep hidden hands private", async ({ browser }) => {
+async function assertGameplayGeometry(page: Page) {
+  const geometry = await page.evaluate(() => {
+    const rect = (element: Element | null) => {
+      if (element === null) return null;
+      const box = element.getBoundingClientRect();
+      return {
+        top: box.top,
+        right: box.right,
+        bottom: box.bottom,
+        left: box.left,
+        width: box.width,
+        height: box.height,
+      };
+    };
+    const overlaps = (
+      first: ReturnType<typeof rect>,
+      second: ReturnType<typeof rect>,
+    ) =>
+      first !== null &&
+      second !== null &&
+      first.left < second.right - 1 &&
+      first.right > second.left + 1 &&
+      first.top < second.bottom - 1 &&
+      first.bottom > second.top + 1;
+    const surface = rect(document.querySelector(".table-surface"));
+    const playZone = rect(document.querySelector(".board-play-zone"));
+    const ownHand = rect(document.querySelector(".own-hand"));
+    const dummyCards = [...document.querySelectorAll(".dummy-hand .physical-card")].map(rect);
+    const trickCards = [...document.querySelectorAll(".trick-slot .physical-card")].map(rect);
+    const cards = [...document.querySelectorAll(".physical-card")].map((card) => {
+      const box = card.getBoundingClientRect();
+      const zone = card.closest(".board-play-zone, .own-hand")?.getBoundingClientRect();
+      return {
+        ratio: box.width / box.height,
+        label: card.getAttribute("aria-label"),
+        className: card.className,
+        zoneClassName: card.closest(".board-play-zone, .own-hand")?.className,
+        bounds:
+          zone === undefined
+            ? null
+            : {
+                top: box.top - zone.top,
+                right: zone.right - box.right,
+                bottom: zone.bottom - box.bottom,
+                left: box.left - zone.left,
+              },
+        clipped:
+          zone === undefined ||
+          box.left < zone.left - 1 ||
+          box.right > zone.right + 1 ||
+          box.top < zone.top - 1 ||
+          box.bottom > zone.bottom + 1,
+      };
+    });
+    return {
+      cards,
+      dummyTrickOverlap: dummyCards.some((dummyCard) =>
+        trickCards.some((trickCard) => overlaps(dummyCard, trickCard)),
+      ),
+      ownHandOverlapsSurface: overlaps(ownHand, surface),
+      playZoneInsideSurface:
+        surface !== null &&
+        playZone !== null &&
+        playZone.left >= surface.left &&
+        playZone.right <= surface.right &&
+        playZone.top >= surface.top &&
+        playZone.bottom <= surface.bottom,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      documentOverflow: {
+        x: document.documentElement.scrollWidth > window.innerWidth,
+        y: document.documentElement.scrollHeight > window.innerHeight,
+      },
+    };
+  });
+  expect(geometry.cards.length).toBeGreaterThan(0);
+  expect(geometry.cards.every((card) => card.label !== null)).toBe(true);
+  expect(
+    geometry.cards.filter((card) => Math.abs(card.ratio - 5 / 7) >= 0.035),
+  ).toEqual([]);
+  expect(geometry.cards.filter((card) => card.clipped)).toEqual([]);
+  expect(geometry.dummyTrickOverlap).toBe(false);
+  expect(geometry.ownHandOverlapsSurface).toBe(false);
+  expect(geometry.playZoneInsideSurface).toBe(true);
+  expect(geometry.documentOverflow).toEqual({ x: false, y: false });
+}
+
+test("four guests finish boards, recover a controller, and keep hidden hands private", async ({ browser }, testInfo) => {
   test.setTimeout(180_000);
-  const players = await Promise.all(["Nara", "Eka", "Sari", "Wira"].map(async (nickname) => {
-    const context = await browser.newContext();
+  const profiles = [
+    { nickname: "Nara", viewport: { width: 1920, height: 1080 } },
+    { nickname: "Eka", viewport: { width: 1024, height: 768 } },
+    { nickname: "Sari", viewport: { width: 768, height: 1024 } },
+    { nickname: "Wira", viewport: { width: 390, height: 844 } },
+  ];
+  const players = await Promise.all(profiles.map(async ({ nickname, viewport }) => {
+    const context = await browser.newContext({ viewport });
     const page = await context.newPage();
     const frames: string[] = [];
     const sentFrames: string[] = [];
@@ -166,6 +258,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await takeSeat(west.page, "Wira", "W");
 
   const replacementTab = await north.context.newPage();
+  await replacementTab.setViewportSize({ width: 320, height: 700 });
   await replacementTab.routeWebSocket(/\/v1\/ws/, delayAuthoritativeGameplay);
   replacementTab.on("websocket", (socket) => {
     if (!socket.url().startsWith("ws://localhost:8180")) return;
@@ -209,7 +302,46 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await west.page.getByRole("button", { name: "Ambil alih kendali" }).click();
   await makeCall(west.page, /^Pass/);
 
-  for (let _cardIndex = 0; _cardIndex < 52; _cardIndex++) {
+  await playNextCard(activePages);
+  for (const page of [north.page, replacementTab, east.page, south.page, west.page]) {
+    if (page !== south.page) {
+      await expect(page.locator(".dummy-hand .physical-card")).toHaveCount(13);
+    }
+    await expect(page.locator(".trick-slot .physical-card")).toHaveCount(1);
+    await assertGameplayGeometry(page);
+    await page.screenshot({
+      path: testInfo.outputPath(
+        `gameplay-${page.viewportSize()?.width}x${page.viewportSize()?.height}.png`,
+      ),
+      fullPage: false,
+    });
+  }
+
+  for (let _cardIndex = 1; _cardIndex < 4; _cardIndex++) {
+    await playNextCard(activePages);
+  }
+  const claimTrigger = replacementTab.getByLabel("Ajukan claim");
+  await expect(claimTrigger).toBeVisible();
+  await claimTrigger.focus();
+  await replacementTab.keyboard.press("Enter");
+  await expect(
+    replacementTab.getByRole("group", {
+      name: "Jumlah trick yang diklaim",
+    }),
+  ).toBeVisible();
+  await expect(
+    replacementTab.getByRole("button", { name: /^Claim \d+ trick$/ }).first(),
+  ).toBeEnabled();
+  await claimTrigger.click();
+  await expect(claimTrigger).toBeFocused();
+  await expect.poll(async () => {
+    const availableUndo = await Promise.all(
+      activePages.map((page) => page.getByLabel("Minta undo").count()),
+    );
+    return availableUndo.reduce((total, count) => total + count, 0);
+  }).toBe(1);
+
+  for (let _cardIndex = 4; _cardIndex < 52; _cardIndex++) {
     await playNextCard(activePages);
   }
   for (const page of activePages) {
