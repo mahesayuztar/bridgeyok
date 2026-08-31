@@ -148,8 +148,8 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await expect(north.page.getByRole("button", { name: "Ambil alih kendali" })).toBeVisible();
 
   const activePages = [replacementTab, east.page, south.page, west.page];
-  for (const [playerIndex, page] of activePages.entries()) {
-    await setReady(page, ["Nara", "Eka", "Sari", "Wira"][playerIndex]!);
+  for (const [_playerIndex, page] of activePages.entries()) {
+    await setReady(page, ["Nara", "Eka", "Sari", "Wira"][_playerIndex]!);
   }
   await expect(replacementTab.getByRole("button", { name: "Mulai board" })).toBeEnabled();
   await replacementTab.getByRole("button", { name: "Mulai board" }).click();

@@ -68,14 +68,16 @@ export function ConsensusControls({
         <details>
           <summary>Claim</summary>
           <div>
-            {Array.from({ length: remainingTricks + 1 }, (_, tricks) => (
+            {Array.from({ length: remainingTricks + 1 }, (_, _trickCount) => (
               <button
                 type="button"
-                key={tricks}
+                key={_trickCount}
                 disabled={disabled}
-                onClick={() => onCommand("game.request_claim", { tricks })}
+                onClick={() =>
+                  onCommand("game.request_claim", { tricks: _trickCount })
+                }
               >
-                {tricks}
+                {_trickCount}
               </button>
             ))}
           </div>

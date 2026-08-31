@@ -171,12 +171,14 @@ export default function BridgeTable({
         <WaitingRoom
           table={table}
           orientation={orientation}
-          session={session}
+          presence={session.tableState.presence}
+          inviteCode={session.inviteCode}
           commandDisabled={commandDisabled}
           shareUrl={shareUrl}
           copied={copied}
           onCopy={() => void copyInvite()}
           onLeaveTable={() => void returnToLobby()}
+          onCommand={session.sendCommand}
         />
       </main>
     );
@@ -236,8 +238,9 @@ export default function BridgeTable({
       <TableSurface
         table={table}
         orientation={orientation}
-        session={session}
+        presence={session.tableState.presence}
         commandDisabled={commandDisabled}
+        onCommand={session.sendCommand}
       >
         <ConsensusControls
           table={table}

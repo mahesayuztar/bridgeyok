@@ -1,5 +1,6 @@
 import {
   type LiveTableProjection,
+  type ParticipantPresence,
   type Seat,
   type TableOrientation,
   type VisualPosition,
@@ -12,21 +13,25 @@ const seats: Seat[] = ["N", "E", "S", "W"];
 export function WaitingRoom({
   table,
   orientation,
-  session,
+  presence,
+  inviteCode,
   commandDisabled,
   shareUrl,
   copied,
   onCopy,
   onLeaveTable,
+  onCommand,
 }: {
   table: LiveTableProjection;
   orientation: TableOrientation;
-  session: TableSession;
+  presence: Record<string, ParticipantPresence>;
+  inviteCode: string | null;
   commandDisabled: boolean;
   shareUrl: string;
   copied: boolean;
   onCopy: () => void;
   onLeaveTable: () => void;
+  onCommand: TableSession["sendCommand"];
 }) {
   const allReady = seats.every((seat) => table.seats[seat]?.ready);
   const isOwner = table.viewerRole === "OWNER";
@@ -39,10 +44,10 @@ export function WaitingRoom({
           {table.participants.length}/4 pemain sudah masuk. Pilih kursi, tandai
           siap, lalu pemilik dapat memulai board.
         </p>
-        {session.inviteCode === null ? null : (
+        {inviteCode === null ? null : (
           <div className="invite-inline">
             <span>Kode undangan</span>
-            <strong>{session.inviteCode}</strong>
+            <strong>{inviteCode}</strong>
             <button type="button" onClick={onCopy}>
               {copied ? "Tautan disalin" : "Salin tautan"}
             </button>
@@ -56,16 +61,16 @@ export function WaitingRoom({
             <ParticipantPosition
               key={seat}
               table={table}
-              presence={session.tableState.presence}
+              presence={presence}
               seat={seat}
               position={position}
               disabled={commandDisabled}
               turn={false}
-              onCommand={session.sendCommand}
+              onCommand={onCommand}
               {...(isOwner
                 ? {
                     onRemove: (participantId: string) =>
-                      session.sendCommand("table.remove_participant", {
+                      onCommand("table.remove_participant", {
                         participant_id: participantId,
                       }),
                   }
@@ -94,7 +99,7 @@ export function WaitingRoom({
               type="button"
               disabled={commandDisabled}
               onClick={() =>
-                session.sendCommand("table.lock", { locked: !table.locked })
+                onCommand("table.lock", { locked: !table.locked })
               }
             >
               {table.locked ? "Buka meja" : "Kunci meja"}
@@ -103,14 +108,14 @@ export function WaitingRoom({
               className="start-board-button"
               type="button"
               disabled={commandDisabled || !allReady}
-              onClick={() => session.sendCommand("table.start_game")}
+              onClick={() => onCommand("table.start_game")}
             >
               Mulai board
             </button>
             <button
               type="button"
               disabled={commandDisabled}
-              onClick={() => session.sendCommand("table.finish")}
+              onClick={() => onCommand("table.finish")}
             >
               Akhiri meja
             </button>

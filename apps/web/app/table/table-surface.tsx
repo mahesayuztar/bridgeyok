@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import {
   type LiveTableProjection,
+  type ParticipantPresence,
   type Seat,
   type TableOrientation,
   type VisualPosition,
@@ -11,14 +12,16 @@ import { ParticipantPosition } from "./participant-position";
 export function TableSurface({
   table,
   orientation,
-  session,
+  presence,
   commandDisabled,
+  onCommand,
   children,
 }: {
   table: LiveTableProjection;
   orientation: TableOrientation;
-  session: TableSession;
+  presence: Record<string, ParticipantPresence>;
   commandDisabled: boolean;
+  onCommand: TableSession["sendCommand"];
   children: ReactNode;
 }) {
   const isOwner = table.viewerRole === "OWNER";
@@ -29,16 +32,16 @@ export function TableSurface({
           <ParticipantPosition
             key={seat}
             table={table}
-            presence={session.tableState.presence}
+            presence={presence}
             seat={seat}
             position={position}
             disabled={commandDisabled}
             turn={table.game?.turn === seat}
-            onCommand={session.sendCommand}
+            onCommand={onCommand}
             {...(isOwner
               ? {
                   onRemove: (participantId: string) =>
-                    session.sendCommand("table.remove_participant", {
+                    onCommand("table.remove_participant", {
                       participant_id: participantId,
                     }),
                 }
