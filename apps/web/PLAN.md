@@ -600,8 +600,10 @@ Visual novelty bukan tujuan.
 
 ## 19. Objective GUX — Gameplay UX Reliability & Interaction Refactor
 
-**Status:** PLANNED / NOT STARTED  
-**Priority:** UX correctness dan gameplay feel kira-kira 10× lebih penting daripada decorative polish.  
+**Status:** PLANNED / NOT STARTED
+
+**Priority:** UX correctness dan gameplay feel kira-kira 10× lebih penting daripada decorative polish.
+
 **Character:** frontend-first, regression-sensitive, mengikuti convention meja bridge/BBO yang sudah disetujui, dan bergantung pada realtime core serta pure bridge engine yang ada.
 
 Objective ini memperbaiki feedback aksi yang terlambat, batas component yang terlalu besar, presentasi kartu yang mudah drift, spatial collision, tidak adanya motion/drag/audio fungsional, dan control/copy aktif yang terlalu berat. Ini bukan redesign aturan bridge, izin untuk mengubah protocol secara serampangan, atau alasan menulis ulang pure Go engine. Server dan PostgreSQL tetap authoritative; frontend hanya membuat projection legal lokal terasa segera.

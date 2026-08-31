@@ -1,11 +1,11 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX planned/not started dan menjadi gate untuk ENG-01–03  
-> Disusun: 29 Agustus 2026  
-> Refactor scope: 30 Agustus 2026  
-> Gameplay UX reliability objective: 31 Agustus 2026  
-> Target: aplikasi online duplicate bridge terfokus untuk closed beta kecil  
-> Pemilik dokumen: product/engineering  
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX planned/not started dan menjadi gate untuk ENG-01–03
+> Disusun: 29 Agustus 2026
+> Refactor scope: 30 Agustus 2026
+> Gameplay UX reliability objective: 1 September 2026
+> Target: aplikasi online duplicate bridge terfokus untuk closed beta kecil
+> Pemilik dokumen: product/engineering
 > Aturan perubahan: keputusan yang mengubah protokol, aturan game, data, keamanan, atau biaya harus dicatat sebagai ADR
 
 ---
