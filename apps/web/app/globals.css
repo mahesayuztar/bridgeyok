@@ -214,7 +214,7 @@ h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; text-
 .player-top, .player-bottom { left: 50%; width: clamp(12rem, 34vw, 24rem); height: 2.8rem; transform: translateX(-50%); }
 .player-top { top: 0; }
 .player-bottom { bottom: 0; }
-.player-left, .player-right { top: 50%; width: 3.2rem; height: clamp(9rem, 38%, 15rem); transform: translateY(-50%); }
+.player-left, .player-right { top: .15rem; bottom: .15rem; width: 3.2rem; height: auto; }
 .player-left { left: 0; }
 .player-right { right: 0; }
 .player-trigger, .empty-seat-trigger { display: flex; width: 100%; height: 100%; min-height: 0; align-items: center; gap: .5rem; padding: .3rem .55rem; border: 0; background: transparent; color: var(--table-ink); text-align: left; }
@@ -226,7 +226,7 @@ h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; text-
 .player-copy > span { color: rgb(255 255 255 / 68%); font-size: .65rem; }
 .owner-crown { width: .95rem; height: .95rem; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-linecap: square; stroke-linejoin: miter; stroke-width: 1.7; }
 .player-left .player-trigger, .player-right .player-trigger, .player-left .empty-seat-trigger, .player-right .empty-seat-trigger { flex-direction: column; justify-content: center; padding: .45rem .25rem; text-align: center; }
-.player-left .player-copy strong, .player-right .player-copy strong { max-height: calc(100% - 2rem); writing-mode: vertical-rl; }
+.player-left .player-copy strong, .player-right .player-copy strong { max-height: none; overflow: visible; text-overflow: clip; writing-mode: vertical-rl; }
 .player-left .player-copy > span:not(.sr-only), .player-right .player-copy > span:not(.sr-only) { margin-top: .35rem; writing-mode: vertical-rl; }
 .player-left .empty-seat-trigger > span:last-child, .player-right .empty-seat-trigger > span:last-child { writing-mode: vertical-rl; }
 
@@ -353,7 +353,7 @@ button.physical-card:disabled { opacity: .82; }
   .call-actions button, .bid-levels button, .bid-strains button { min-height: 1.9rem; padding: .15rem; font-size: .75rem; }
   .bid-levels, .bid-strains { gap: .2rem; }
   .player-top, .player-bottom { width: min(12rem, 54vw); height: 2.45rem; }
-  .player-left, .player-right { width: 2.65rem; height: 8rem; }
+  .player-left, .player-right { top: .1rem; bottom: .1rem; width: 2.65rem; height: auto; }
   .player-trigger, .empty-seat-trigger { gap: .35rem; padding: .25rem .35rem; }
   .player-seat { flex-basis: 1.3rem; width: 1.3rem; height: 1.3rem; font-size: .7rem; }
   .player-copy strong { font-size: .65rem; }
