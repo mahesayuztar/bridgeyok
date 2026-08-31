@@ -2,6 +2,7 @@ package table
 
 import (
 	"bytes"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -301,6 +302,30 @@ func TestDecideUndoConsensus(t *testing.T) {
 	}
 	_, domainError := Decide(aggregate, Command{Name: CommandRequestUndo, SessionID: sessionForSeat(t, aggregate, bridge.North)})
 	assertDomainError(t, domainError, ErrorUndoUnavailable)
+}
+
+func TestAggregateConsensusSnapshotRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	call := bridge.Bid(1, bridge.StrainClubs)
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, bridge.North), Call: &call}).NextState
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRequestUndo, SessionID: sessionForSeat(t, aggregate, bridge.North)}).NextState
+
+	encoded, err := json.Marshal(aggregate)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	var decoded Aggregate
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if err := decoded.Validate(); err != nil {
+		t.Fatalf("decoded.Validate() error = %v", err)
+	}
+	if !reflect.DeepEqual(decoded, aggregate) {
+		t.Fatal("consensus snapshot changed during JSON round trip")
+	}
 }
 
 func TestDecideRejectsUnauthorizedConsensusResponses(t *testing.T) {
