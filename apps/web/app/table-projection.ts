@@ -249,13 +249,14 @@ export function normalizeLiveTableProjection(value: unknown): LiveTableProjectio
   }
 
   const participants = normalizeArray(value.participants, (participant) => {
-    if (!isRecord(participant) || typeof participant.id !== "string" || typeof participant.nickname !== "string" || !["OWNER", "PARTICIPANT"].includes(String(participant.role))) {
+    if (!isRecord(participant) || typeof participant.id !== "string" || typeof participant.nickname !== "string" || !["OWNER", "PARTICIPANT"].includes(String(participant.role)) || typeof participant.isBot !== "boolean") {
       return null;
     }
     return {
       id: participant.id,
       nickname: participant.nickname,
-      role: participant.role as "OWNER" | "PARTICIPANT"
+      role: participant.role as "OWNER" | "PARTICIPANT",
+      isBot: participant.isBot
     };
   });
   if (participants === null || (value.seats !== null && value.seats !== undefined && !isRecord(value.seats))) {
@@ -269,13 +270,14 @@ export function normalizeLiveTableProjection(value: unknown): LiveTableProjectio
     if (assignment === null || assignment === undefined) {
       continue;
     }
-    if (!isRecord(assignment) || typeof assignment.participantId !== "string" || typeof assignment.ready !== "boolean" || !isFiniteNumber(assignment.controllerEpoch)) {
+    if (!isRecord(assignment) || typeof assignment.participantId !== "string" || typeof assignment.ready !== "boolean" || !isFiniteNumber(assignment.controllerEpoch) || assignment.isBot !== undefined && typeof assignment.isBot !== "boolean") {
       return null;
     }
     seats[seat] = {
       participantId: assignment.participantId,
       ready: assignment.ready,
-      controllerEpoch: assignment.controllerEpoch
+      controllerEpoch: assignment.controllerEpoch,
+      ...(typeof assignment.isBot === "boolean" ? { isBot: assignment.isBot } : {})
     };
   }
 

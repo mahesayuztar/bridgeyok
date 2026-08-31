@@ -15,7 +15,7 @@ function activeProjection() {
     viewerRole: "OWNER",
     viewerSeat: "N",
     canRequestUndo: true,
-    participants: [{ id: "participant-a", nickname: "Mahesa", role: "OWNER" }],
+    participants: [{ id: "participant-a", nickname: "Mahesa", role: "OWNER", isBot: false }],
     seats: { N: { participantId: "participant-a", ready: true, controllerEpoch: 1 } },
     game: {
       rulesetVersion: "v1",
@@ -62,6 +62,18 @@ test("normalizes claim and undo consensus state", () => {
   assert.deepEqual(table.actionRequest, projection.actionRequest);
   projection.actionRequest.approvedBy = ["invalid"];
   assert.equal(normalizeLiveTableProjection(projection), null);
+});
+
+test("normalizes bot participants and seat assignments", () => {
+  const projection = activeProjection();
+  projection.participants.push({ id: "bot-west", nickname: "Bot", role: "PARTICIPANT", isBot: true });
+  projection.seats.W = { participantId: "bot-west", ready: true, controllerEpoch: 1, isBot: true };
+
+  const table = normalizeLiveTableProjection(projection);
+
+  assert.notEqual(table, null);
+  assert.equal(table.participants[1].isBot, true);
+  assert.equal(table.seats.W.isBot, true);
 });
 
 test("normalizes presence snapshots and rejects malformed timestamps", () => {
