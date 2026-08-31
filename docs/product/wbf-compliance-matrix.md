@@ -14,7 +14,7 @@ This matrix classifies BridgeYok's handling of every numbered WBF law using exac
 
 - `mechanically-enforced`: the applicable correct procedure is calculated by the server, or the online command model makes the irregular action impossible to persist. Rectification paragraphs that assume a physical irregularity are not implemented.
 - `director-judgement`: the law depends on disputed facts, damage assessment, disclosure, tempo, conduct, unauthorized information, an adjusted score, or another human ruling. BridgeYok does not automate that judgement.
-- `not-applicable`: the law concerns a physical board/card procedure, tournament movement, spectator, claim/concession, penalty-card, appeal, or another feature that the MVP deliberately does not provide.
+- `not-applicable`: the law concerns a physical board/card procedure, tournament movement, spectator, penalty-card, appeal, or another feature that the MVP deliberately does not provide.
 
 An illegal command is rejected before an event is produced. A rejection does not change the authoritative aggregate, revision, sequence, or result. Evidence names are executable Go tests unless they point to the product contract.
 
@@ -46,7 +46,7 @@ An illegal command is rejected before an event is produced. A rejection does not
 | 22 | End of Auction | mechanically-enforced | Four initial passes pass out the board; otherwise three passes after a bid set the final contract. `TestAuctionPassedOut`; `TestAuctionDeterminesFinalContractAndFirstDeclarer` |
 | 23 | Comparable Call | director-judgement | Comparable-call assessment exists only after an irregular call, which the online command path does not store. Product Contract sections 9.2 and 14. |
 | 24 | Card Exposed or Led During the Auction | not-applicable | Players cannot expose or lead a physical card through the auction command model. Product Contract sections 9 and 10. |
-| 25 | Legal and Illegal Changes of Call | not-applicable | Accepted calls are immutable and there is no change/undo command; unintended-call rectification is not offered. Product Contract sections 3.2 and 9.2. |
+| 25 | Legal and Illegal Changes of Call | mechanically-enforced | The latest call can only be rolled back through unanimous consent by the other three seats; this house-rule undo is not an automated Law 25 Director rectification. `TestDecideUndoConsensus`; `TestDecideRejectsUnauthorizedConsensusResponses` |
 | 26 | Call Withdrawn, Lead Restrictions | not-applicable | Calls cannot be withdrawn, so withdrawal-based lead restrictions never arise. Product Contract sections 3.2 and 9.2. |
 | 27 | Insufficient Bid | mechanically-enforced | An insufficient bid is rejected without changing auction or table state. `TestAuctionRejectsIllegalCallsWithoutMutation`; `TestDecideRejectsMechanicalIrregularitiesWithoutMutation` |
 | 28 | Calls Considered to Be in Rotation | mechanically-enforced | There is one authoritative caller on turn; no substitute out-of-rotation procedure is accepted. `TestAuctionRejectsIllegalCallsWithoutMutation` |
@@ -68,7 +68,7 @@ An illegal command is rejected before an event is produced. A rejection does not
 | 44 | Sequence and Procedure of Play | mechanically-enforced | Active hand, follow-suit, trump/led-suit winner, and next leader are calculated by the engine. `TestDecideEnforcesFollowSuit`; `TestTrickWinner`; `TestDecideCompletesBoard` |
 | 45 | Card Played | mechanically-enforced | A play names one exact card from the active hand and becomes immutable once accepted. `TestDecideContractAndOpeningLead`; `TestDecideIsDeterministicAndDoesNotMutateInput` |
 | 46 | Incomplete or Invalid Designation of a Card from Dummy | not-applicable | UI/protocol commands identify one exact canonical card; spoken or incomplete designation is absent. Product Contract section 10. |
-| 47 | Retraction of Card Played | not-applicable | No retract or undo command exists; accepted play is immutable. Product Contract sections 3.2 and 10. |
+| 47 | Retraction of Card Played | mechanically-enforced | The latest play can only be rolled back through unanimous consent by the other three seats; unilateral retraction is impossible. `TestDecideUndoConsensus`; `TestDecideRejectsUnauthorizedConsensusResponses` |
 | 48 | Exposure of Declarer's Cards | not-applicable | There are no physical cards; voluntary disclosure outside the application cannot be adjudicated by the engine. Product Contract sections 10, 12, and 14. |
 | 49 | Exposure of a Defender's Cards | not-applicable | There are no physical cards or exposed-card state; hidden projection remains authoritative. Product Contract section 12. |
 | 50 | Disposition of Penalty Card | not-applicable | Penalty cards and their rectification are outside MVP scope. Product Contract section 3.2. |
@@ -89,10 +89,10 @@ An illegal command is rejected before an event is produced. A rejection does not
 | 65 | Arrangement of Tricks | mechanically-enforced | The server stores cards in play order, closes exactly four-card tricks, and records the winner. `TestDecideCompletesBoard`; `TestStateValidateInvariantsRejectsTampering` |
 | 66 | Inspection of Tricks | mechanically-enforced | Current and completed public tricks are retained in ordered authoritative state; no hidden card is inferred. `TestDecideCompletesBoard`; `TestProjectRevealsOnlyDummyAfterOpeningLead` |
 | 67 | Defective Trick | mechanically-enforced | A trick cannot complete with other than four unique, in-order plays. `TestTrickWinnerRejectsInvalidTrick`; `TestStateValidateInvariantsRejectsTampering` |
-| 68 | Claim or Concession of Tricks | not-applicable | Claim and concession commands are explicitly outside MVP scope. Product Contract section 3.2. |
-| 69 | Agreed Claim or Concession | not-applicable | Claim and concession commands are explicitly outside MVP scope. Product Contract section 3.2. |
-| 70 | Contested Claim or Concession | not-applicable | Claim adjudication and contested lines of play are explicitly outside MVP scope. Product Contract sections 3.2 and 14. |
-| 71 | Concession Cancelled | not-applicable | Concessions are not offered. Product Contract section 3.2. |
+| 68 | Claim or Concession of Tricks | mechanically-enforced | A non-dummy player may claim a precise number of remaining tricks only at a completed-trick boundary; claiming zero concedes the remaining tricks. `TestDecideClaimAtTrickBoundary`; `TestDecideRejectsInvalidClaims` |
+| 69 | Agreed Claim or Concession | mechanically-enforced | A claim scores the board only after both opponents accept the exact allocation. `TestDecideClaimConsensus`; `TestDecideClaimAtTrickBoundary` |
+| 70 | Contested Claim or Concession | director-judgement | Any opponent rejection cancels the request and resumes play; adjudicating a contested line remains outside the application. Product Contract sections 10 and 14. |
+| 71 | Concession Cancelled | mechanically-enforced | A zero-trick claim is a concession and only becomes final after both opponents accept; rejection resumes play without changing the board. `TestDecideClaimRejectionResumesPlay`; `TestDecideClaimConsensus` |
 | 72 | General Principles | director-judgement | Intent, damage, concealment, and post-irregularity remedies require a Director; mechanical illegal actions are prevented separately. Product Contract section 14. |
 | 73 | Communication, Behaviour, Tempo and Deception | director-judgement | The 2024 revision covers human communication/tempo/deception findings that the engine cannot infer safely. Product Contract section 14. |
 | 74 | Conduct and Etiquette | director-judgement | Etiquette, annoyance, and pace require human observation and enforcement. Product Contract section 14. |
