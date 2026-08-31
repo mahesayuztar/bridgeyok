@@ -513,6 +513,79 @@ func TestServerTakeoverFencesOldControllerEpoch(t *testing.T) {
 	}
 }
 
+func TestServerTakeoverAuthorizesOnlyRequestingConnection(t *testing.T) {
+	t.Parallel()
+
+	aggregate := realtimeAggregate(t)
+	decision, domainError := table.Decide(aggregate, table.Command{Name: table.CommandTakeSeat, SessionID: realtimeSessionID, Seat: bridge.North})
+	if domainError != nil {
+		t.Fatalf("take seat setup error = %v", domainError)
+	}
+	aggregate = decision.NextState
+	aggregate.Revision = 1
+	aggregate.LastSeq = 1
+	server, _, _ := scriptedServer(t, aggregate, nil, "ticket-first-tab", "ticket-second-tab")
+	httpServer := httptest.NewServer(server)
+	defer httpServer.Close()
+	firstTab := mustDialScripted(t, httpServer.URL, "ticket-first-tab")
+	defer closeClient(t, firstTab)
+	secondTab := mustDialScripted(t, httpServer.URL, "ticket-second-tab")
+	defer closeClient(t, secondTab)
+
+	for _index, client := range []*websocket.Conn{firstTab, secondTab} {
+		writeScripted(t, client, map[string]any{
+			"v": 1, "kind": "command", "name": "table.subscribe", "request_id": "subscribe_tab_0" + string(rune('1'+_index)),
+			"table_id": realtimeTableID, "payload": map[string]any{"last_seen_seq": 1},
+		})
+		readScripted(t, client)
+		readScripted(t, client)
+		readScripted(t, client)
+	}
+
+	writeScripted(t, firstTab, map[string]any{
+		"v": 1, "kind": "command", "name": "table.takeover", "request_id": "takeover_first_tab",
+		"table_id": realtimeTableID, "expected_revision": 1, "controller_epoch": 1, "payload": map[string]any{},
+	})
+	readScripted(t, firstTab)
+	readScripted(t, firstTab)
+	readScripted(t, secondTab)
+
+	writeScripted(t, secondTab, map[string]any{
+		"v": 1, "kind": "command", "name": "table.set_ready", "request_id": "second_tab_without_takeover",
+		"table_id": realtimeTableID, "expected_revision": 2, "controller_epoch": 2, "payload": map[string]any{"ready": true},
+	})
+	staleSecondTab, _ := readScripted(t, secondTab)
+	if staleSecondTab.Code != string(table.ErrorStaleController) || staleSecondTab.Revision != 2 {
+		t.Fatalf("second tab command = %+v, want stale controller at revision 2", staleSecondTab)
+	}
+
+	writeScripted(t, secondTab, map[string]any{
+		"v": 1, "kind": "command", "name": "table.takeover", "request_id": "takeover_second_tab",
+		"table_id": realtimeTableID, "expected_revision": 2, "controller_epoch": 2, "payload": map[string]any{},
+	})
+	readScripted(t, secondTab)
+	readScripted(t, secondTab)
+	readScripted(t, firstTab)
+
+	writeScripted(t, firstTab, map[string]any{
+		"v": 1, "kind": "command", "name": "table.set_ready", "request_id": "first_tab_after_replacement",
+		"table_id": realtimeTableID, "expected_revision": 3, "controller_epoch": 3, "payload": map[string]any{"ready": true},
+	})
+	staleFirstTab, _ := readScripted(t, firstTab)
+	if staleFirstTab.Code != string(table.ErrorStaleController) || staleFirstTab.Revision != 3 {
+		t.Fatalf("first tab command = %+v, want stale controller at revision 3", staleFirstTab)
+	}
+
+	writeScripted(t, secondTab, map[string]any{
+		"v": 1, "kind": "command", "name": "table.set_ready", "request_id": "second_tab_current_controller",
+		"table_id": realtimeTableID, "expected_revision": 3, "controller_epoch": 3, "payload": map[string]any{"ready": true},
+	})
+	accepted, _ := readScripted(t, secondTab)
+	if accepted.Kind != "ack" || accepted.Revision != 4 {
+		t.Fatalf("second tab accepted command = %+v", accepted)
+	}
+}
+
 func TestServerDrainSignalsServiceRestartAndRejectsAdmission(t *testing.T) {
 	t.Parallel()
 

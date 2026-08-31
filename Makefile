@@ -12,7 +12,7 @@ MIGRATION_DATABASE_URL ?= $(DATABASE_URL)
 export DATABASE_URL
 export MIGRATION_DATABASE_URL
 
-.PHONY: help install require-database-url migrate-up migrate-down migrate-status migrate-validate generate generate-db generate-contracts generate-api test-api test-api-integration test-engine test-engine-stress test-engine-fixtures fuzz-engine vet-api vet-engine lint-api lint-engine security-api security-engine gate-engine build-api run-api smoke-api gate-local gate-local-down bootstrap
+.PHONY: help install require-database-url migrate-up migrate-down migrate-status migrate-validate generate generate-db generate-contracts generate-api test-api test-api-integration test-phase3-integration test-web-e2e test-engine test-engine-stress test-engine-fixtures fuzz-engine vet-api vet-engine lint-api lint-engine security-api security-engine gate-engine build-api run-api smoke-api gate-local gate-local-down bootstrap
 
 help:
 	@echo "make bootstrap             Install, migrate Supabase, and generate sources"
@@ -23,6 +23,8 @@ help:
 	@echo "make test-engine-fixtures  Run test-only fixture serialization tests"
 	@echo "make fuzz-engine           Run bounded card, decision, and fixture fuzzing"
 	@echo "make test-api-integration  Run database integration tests"
+	@echo "make test-phase3-integration Run database and realtime PostgreSQL integration tests"
+	@echo "make test-web-e2e          Run the four-context Phase 3 browser gate"
 	@echo "make smoke-api             Verify HTTP, CORS, readiness, and graceful shutdown"
 	@echo "make gate-local            Run HTTPS/WSS deploy and rollback gates with Supabase"
 	@echo "make gate-local-down       Stop the local gate without changing Supabase"
@@ -77,6 +79,12 @@ fuzz-engine:
 
 test-api-integration: require-database-url
 	@TEST_DATABASE_URL="$${DATABASE_URL}" go test -race -tags=integration ./apps/api/internal/database
+
+test-phase3-integration: require-database-url
+	@TEST_DATABASE_URL="$${DATABASE_URL}" go test -race -tags=integration ./apps/api/internal/database ./apps/api/internal/realtime
+
+test-web-e2e: require-database-url
+	@corepack pnpm --filter @bridgeyok/web e2e
 
 vet-api:
 	go vet ./apps/api/...

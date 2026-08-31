@@ -85,6 +85,10 @@ jobs:
           corepack pnpm test
           corepack pnpm build
           corepack pnpm audit --prod --audit-level high
+      - name: Verify Phase 3 browser path
+        run: |
+          corepack pnpm --filter @bridgeyok/web exec playwright install --with-deps chromium
+          make test-web-e2e
       - name: Verify local release drill
         env:
           DATABASE_URL: postgresql://bridgeyok:bridgeyok@host.docker.internal:5432/bridgeyok?sslmode=disable

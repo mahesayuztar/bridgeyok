@@ -100,6 +100,7 @@ type connection struct {
 	stateMutex      sync.Mutex
 	tableID         string
 	participantID   string
+	controllerEpoch int64
 	closeStatus     websocket.StatusCode
 	closeReason     string
 	closeRequested  bool
@@ -552,6 +553,11 @@ func (connection *connection) handleMutation(envelope ClientEnvelope) {
 			return
 		}
 		controllerEpoch = *envelope.ControllerEpoch
+		if envelope.Name != nameTakeover && connection.authorizedControllerEpoch() != controllerEpoch {
+			revision, seq := aggregate.Revision, aggregate.LastSeq
+			connection.sendError(envelope, string(table.ErrorStaleController), false, &revision, &seq)
+			return
+		}
 	} else if envelope.ControllerEpoch != nil || envelope.Name == nameTakeover {
 		revision, seq := aggregate.Revision, aggregate.LastSeq
 		connection.sendError(envelope, string(table.ErrorSeatRequired), false, &revision, &seq)
@@ -583,6 +589,9 @@ func (connection *connection) handleMutation(envelope ClientEnvelope) {
 		revision, seq := result.Outcome.Revision, result.Outcome.LastSeq
 		connection.sendError(envelope, string(result.Outcome.ErrorCode), result.Outcome.ErrorCode == table.ErrorStateChanged, &revision, &seq)
 		return
+	}
+	if command.Name == table.CommandTakeSeat || command.Name == table.CommandTakeoverControl {
+		connection.authorizeController(result.Aggregate)
 	}
 	ack, err := json.Marshal(ackEnvelope{
 		Version: protocolVersion, Kind: "ack", Name: "command.accepted", RequestID: envelope.RequestID,
@@ -769,9 +778,33 @@ func (connection *connection) subscriptionInfo() (string, string) {
 
 func (connection *connection) setSubscription(tableID string, participantID string) {
 	connection.stateMutex.Lock()
+	if connection.tableID != tableID {
+		connection.controllerEpoch = 0
+	}
 	connection.tableID = tableID
 	connection.participantID = participantID
 	connection.stateMutex.Unlock()
+}
+
+func (connection *connection) authorizedControllerEpoch() int64 {
+	connection.stateMutex.Lock()
+	defer connection.stateMutex.Unlock()
+	return connection.controllerEpoch
+}
+
+func (connection *connection) authorizeController(aggregate table.Aggregate) {
+	participant, exists := activeParticipantForSession(aggregate, connection.session.ID)
+	if !exists {
+		return
+	}
+	for _, assignment := range aggregate.Seats {
+		if assignment.ParticipantID == participant.ID {
+			connection.stateMutex.Lock()
+			connection.controllerEpoch = assignment.ControllerEpoch
+			connection.stateMutex.Unlock()
+			return
+		}
+	}
 }
 
 func (connection *connection) isDraining() bool {
