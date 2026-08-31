@@ -31,6 +31,10 @@ const (
 	nameStartGame         = "table.start_game"
 	nameMakeCall          = "game.make_call"
 	namePlayCard          = "game.play_card"
+	nameRequestClaim      = "game.request_claim"
+	nameRespondClaim      = "game.respond_claim"
+	nameRequestUndo       = "game.request_undo"
+	nameRespondUndo       = "game.respond_undo"
 	nameNextBoard         = "table.next_board"
 	nameFinishTable       = "table.finish"
 	nameLeaveTable        = "table.leave"
@@ -223,7 +227,21 @@ func validateMutationPayload(envelope ClientEnvelope) error {
 		if err := decodeStrict(envelope.Payload, &payload); err != nil || payload.Card.Validate() != nil {
 			return fmt.Errorf("card payload is invalid")
 		}
-	case nameLeaveSeat, nameStartGame, nameNextBoard, nameFinishTable, nameLeaveTable, nameTakeover:
+	case nameRequestClaim:
+		var payload struct {
+			Tricks *int `json:"tricks"`
+		}
+		if err := decodeStrict(envelope.Payload, &payload); err != nil || payload.Tricks == nil || *payload.Tricks < 0 || *payload.Tricks > 13 {
+			return fmt.Errorf("claim payload is invalid")
+		}
+	case nameRespondClaim, nameRespondUndo:
+		var payload struct {
+			Accepted *bool `json:"accepted"`
+		}
+		if err := decodeStrict(envelope.Payload, &payload); err != nil || payload.Accepted == nil {
+			return fmt.Errorf("response payload is invalid")
+		}
+	case nameLeaveSeat, nameStartGame, nameNextBoard, nameFinishTable, nameLeaveTable, nameTakeover, nameRequestUndo:
 		if err := decodeEmptyPayload(envelope.Payload); err != nil {
 			return err
 		}
@@ -304,6 +322,29 @@ func tableCommand(envelope ClientEnvelope, random io.Reader, now time.Time) (tab
 			return table.Command{}, fmt.Errorf("decode card command: %w", err)
 		}
 		command.Name, command.Card = table.CommandPlayCard, &payload.Card
+	case nameRequestClaim:
+		var payload struct {
+			Tricks int `json:"tricks"`
+		}
+		if err := decodeStrict(envelope.Payload, &payload); err != nil {
+			return table.Command{}, fmt.Errorf("decode claim command: %w", err)
+		}
+		command.Name, command.ClaimTricks = table.CommandRequestClaim, payload.Tricks
+	case nameRespondClaim, nameRespondUndo:
+		var payload struct {
+			Accepted bool `json:"accepted"`
+		}
+		if err := decodeStrict(envelope.Payload, &payload); err != nil {
+			return table.Command{}, fmt.Errorf("decode response command: %w", err)
+		}
+		command.Accepted = payload.Accepted
+		if envelope.Name == nameRespondClaim {
+			command.Name = table.CommandRespondClaim
+		} else {
+			command.Name = table.CommandRespondUndo
+		}
+	case nameRequestUndo:
+		command.Name = table.CommandRequestUndo
 	case nameFinishTable:
 		command.Name = table.CommandFinishTable
 	case nameLeaveTable:

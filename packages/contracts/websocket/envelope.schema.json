@@ -119,6 +119,18 @@
         "controllerEpoch": { "type": "integer", "minimum": 1 }
       }
     },
+    "actionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "requesterSeat", "approvedBy", "canRespond"],
+      "properties": {
+        "kind": { "enum": ["CLAIM", "UNDO"] },
+        "requesterSeat": { "enum": ["N", "E", "S", "W"] },
+        "claimTricks": { "type": "integer", "minimum": 0, "maximum": 13 },
+        "approvedBy": { "type": "array", "items": { "enum": ["N", "E", "S", "W"] }, "uniqueItems": true },
+        "canRespond": { "type": "boolean" }
+      }
+    },
     "tableProjection": {
       "type": "object",
       "additionalProperties": false,
@@ -132,7 +144,8 @@
         "viewerParticipantId",
         "viewerRole",
         "participants",
-        "seats"
+        "seats",
+        "canRequestUndo"
       ],
       "properties": {
         "tableId": { "$ref": "#/$defs/tableId" },
@@ -156,7 +169,9 @@
             "W": { "$ref": "#/$defs/seatAssignment" }
           }
         },
-        "game": { "type": "object" }
+        "game": { "type": "object" },
+        "actionRequest": { "$ref": "#/$defs/actionRequest" },
+        "canRequestUndo": { "type": "boolean" }
       }
     },
     "projectedEventPayload": {
@@ -204,6 +219,10 @@
             "table.start_game",
             "game.make_call",
             "game.play_card",
+            "game.request_claim",
+            "game.respond_claim",
+            "game.request_undo",
+            "game.respond_undo",
             "table.next_board",
             "table.finish",
             "table.leave",
@@ -296,6 +315,32 @@
           }
         },
         {
+          "if": { "properties": { "name": { "const": "game.request_claim" } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["tricks"],
+                "properties": { "tricks": { "type": "integer", "minimum": 0, "maximum": 13 } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "name": { "enum": ["game.respond_claim", "game.respond_undo"] } }, "required": ["name"] },
+          "then": {
+            "properties": {
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["accepted"],
+                "properties": { "accepted": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        {
           "if": {
             "properties": {
               "name": {
@@ -305,7 +350,8 @@
                   "table.next_board",
                   "table.finish",
                   "table.leave",
-                  "table.takeover"
+                  "table.takeover",
+                  "game.request_undo"
                 ]
               }
             },

@@ -23,7 +23,8 @@
           "role": "OWNER"
         }
       ],
-      "seats": {}
+      "seats": {},
+      "canRequestUndo": false
     }
   }
 }

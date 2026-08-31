@@ -24,6 +24,10 @@ export type MutationCommandEnvelope = {
     | "table.start_game"
     | "game.make_call"
     | "game.play_card"
+    | "game.request_claim"
+    | "game.respond_claim"
+    | "game.request_undo"
+    | "game.respond_undo"
     | "table.next_board"
     | "table.finish"
     | "table.leave"
@@ -108,6 +112,8 @@ export interface TableProjection {
   game?: {
     [k: string]: unknown;
   };
+  actionRequest?: ActionRequest;
+  canRequestUndo: boolean;
 }
 export interface ProjectedParticipant {
   id: string;
@@ -118,6 +124,13 @@ export interface SeatAssignment {
   participantId: string;
   ready: boolean;
   controllerEpoch: number;
+}
+export interface ActionRequest {
+  kind: "CLAIM" | "UNDO";
+  requesterSeat: "N" | "E" | "S" | "W";
+  claimTricks?: number;
+  approvedBy: ("N" | "E" | "S" | "W")[];
+  canRespond: boolean;
 }
 export interface ErrorEnvelope {
   v: Version;
