@@ -132,6 +132,32 @@ func TestProjectRevealsFullDealOnlyAfterScore(t *testing.T) {
 	}
 }
 
+func TestProjectActionRequestEligibility(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	call := bridge.Bid(1, bridge.StrainClubs)
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, bridge.North), Call: &call}).NextState
+	northProjection, domainError := Project(aggregate, sessionForSeat(t, aggregate, bridge.North))
+	if domainError != nil || !northProjection.CanRequestUndo {
+		t.Fatalf("north projection canRequestUndo = %v, error = %v", northProjection.CanRequestUndo, domainError)
+	}
+	eastProjection, domainError := Project(aggregate, sessionForSeat(t, aggregate, bridge.East))
+	if domainError != nil || eastProjection.CanRequestUndo {
+		t.Fatalf("east projection canRequestUndo = %v, error = %v", eastProjection.CanRequestUndo, domainError)
+	}
+
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRequestUndo, SessionID: sessionForSeat(t, aggregate, bridge.North)}).NextState
+	northProjection, domainError = Project(aggregate, sessionForSeat(t, aggregate, bridge.North))
+	if domainError != nil || northProjection.ActionRequest == nil || northProjection.ActionRequest.CanRespond {
+		t.Fatalf("requester projection = %+v, error = %v", northProjection.ActionRequest, domainError)
+	}
+	eastProjection, domainError = Project(aggregate, sessionForSeat(t, aggregate, bridge.East))
+	if domainError != nil || eastProjection.ActionRequest == nil || !eastProjection.ActionRequest.CanRespond {
+		t.Fatalf("responder projection = %+v, error = %v", eastProjection.ActionRequest, domainError)
+	}
+}
+
 func TestProjectReturnsDefensiveCopies(t *testing.T) {
 	t.Parallel()
 

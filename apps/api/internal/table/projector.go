@@ -1,6 +1,10 @@
 package table
 
-import "github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
+import (
+	"slices"
+
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
+)
 
 // Projection is the only client-visible representation of private table state.
 type Projection struct {
@@ -17,6 +21,17 @@ type Projection struct {
 	Participants        []ProjectedParticipant         `json:"participants"`
 	Seats               map[bridge.Seat]SeatAssignment `json:"seats"`
 	Game                *ProjectedGame                 `json:"game,omitempty"`
+	ActionRequest       *ProjectedActionRequest        `json:"actionRequest,omitempty"`
+	CanRequestUndo      bool                           `json:"canRequestUndo"`
+}
+
+// ProjectedActionRequest exposes consensus progress and recipient response eligibility.
+type ProjectedActionRequest struct {
+	Kind          ActionRequestKind `json:"kind"`
+	RequesterSeat bridge.Seat       `json:"requesterSeat"`
+	ClaimTricks   int               `json:"claimTricks,omitempty"`
+	ApprovedBy    []bridge.Seat     `json:"approvedBy"`
+	CanRespond    bool              `json:"canRespond"`
 }
 
 // ProjectedParticipant omits session identifiers from client state.
@@ -74,6 +89,22 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 		if assignment.ParticipantID == viewer.ID {
 			projection.ViewerSeat = seat
 		}
+	}
+	if aggregate.UndoableAction != nil && (aggregate.State == StateActive || aggregate.State == StateBetweenBoards) && projection.ViewerSeat == aggregate.UndoableAction.ActorSeat && aggregate.ActionRequest == nil {
+		projection.CanRequestUndo = true
+	}
+	if aggregate.ActionRequest != nil {
+		request := aggregate.ActionRequest
+		projectedRequest := &ProjectedActionRequest{
+			Kind:          request.Kind,
+			RequesterSeat: request.RequesterSeat,
+			ClaimTricks:   request.ClaimTricks,
+			ApprovedBy:    append([]bridge.Seat(nil), request.ApprovedBy...),
+		}
+		if projection.ViewerSeat.Valid() && projection.ViewerSeat != request.RequesterSeat && !slices.Contains(request.ApprovedBy, projection.ViewerSeat) {
+			projectedRequest.CanRespond = request.Kind == ActionRequestUndo || projection.ViewerSeat.Partnership() != request.RequesterSeat.Partnership()
+		}
+		projection.ActionRequest = projectedRequest
 	}
 	if aggregate.Game == nil {
 		return projection, nil

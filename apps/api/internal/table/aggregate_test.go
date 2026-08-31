@@ -237,6 +237,94 @@ func TestDecideStartPassedOutAndFinish(t *testing.T) {
 	}
 }
 
+func TestDecideClaimConsensus(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	for _, call := range []bridge.Call{bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass()} {
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call}).NextState
+	}
+	aggregate = playTableCards(t, aggregate, 4)
+	requester := aggregate.Game.Auction.Contract.Declarer
+	claimTricks := 7
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRequestClaim, SessionID: sessionForSeat(t, aggregate, requester), ClaimTricks: claimTricks}).NextState
+	if aggregate.ActionRequest == nil || aggregate.ActionRequest.Kind != ActionRequestClaim || aggregate.ActionRequest.ClaimTricks != claimTricks {
+		t.Fatalf("claim request = %+v", aggregate.ActionRequest)
+	}
+	legalCards, bridgeError := aggregate.Game.LegalCards(aggregate.Game.Turn)
+	if bridgeError != nil {
+		t.Fatalf("LegalCards() error = %v", bridgeError)
+	}
+	_, domainError := Decide(aggregate, Command{Name: CommandPlayCard, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Card: &legalCards[0]})
+	assertDomainError(t, domainError, ErrorActionPending)
+
+	opponents := []bridge.Seat{requester.Next(), requester.Next().Next().Next()}
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRespondClaim, SessionID: sessionForSeat(t, aggregate, opponents[0]), Accepted: true}).NextState
+	if aggregate.State != StateActive || len(aggregate.ActionRequest.ApprovedBy) != 1 {
+		t.Fatalf("first claim response state = %+v", aggregate)
+	}
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRespondClaim, SessionID: sessionForSeat(t, aggregate, opponents[1]), Accepted: true}).NextState
+	if aggregate.State != StateBetweenBoards || aggregate.ActionRequest != nil || aggregate.Game == nil || !aggregate.Game.Claimed {
+		t.Fatalf("accepted claim state = %+v", aggregate)
+	}
+}
+
+func TestDecideClaimRejectionResumesPlay(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	for _, call := range []bridge.Call{bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass()} {
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call}).NextState
+	}
+	aggregate = playTableCards(t, aggregate, 4)
+	requester := aggregate.Game.Auction.Contract.Declarer
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRequestClaim, SessionID: sessionForSeat(t, aggregate, requester), ClaimTricks: 5}).NextState
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRespondClaim, SessionID: sessionForSeat(t, aggregate, requester.Next()), Accepted: false}).NextState
+	if aggregate.State != StateActive || aggregate.ActionRequest != nil || aggregate.Game.Claimed {
+		t.Fatalf("rejected claim state = %+v", aggregate)
+	}
+}
+
+func TestDecideUndoConsensus(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	before := aggregate.Game.Clone()
+	call := bridge.Bid(1, bridge.StrainClubs)
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, bridge.North), Call: &call}).NextState
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRequestUndo, SessionID: sessionForSeat(t, aggregate, bridge.North)}).NextState
+	for _, seat := range []bridge.Seat{bridge.East, bridge.South, bridge.West} {
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRespondUndo, SessionID: sessionForSeat(t, aggregate, seat), Accepted: true}).NextState
+	}
+	if aggregate.ActionRequest != nil || aggregate.UndoableAction != nil || !reflect.DeepEqual(*aggregate.Game, before) {
+		t.Fatalf("accepted undo state = %+v", aggregate)
+	}
+	_, domainError := Decide(aggregate, Command{Name: CommandRequestUndo, SessionID: sessionForSeat(t, aggregate, bridge.North)})
+	assertDomainError(t, domainError, ErrorUndoUnavailable)
+}
+
+func TestDecideRejectsUnauthorizedConsensusResponses(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	call := bridge.Bid(1, bridge.StrainClubs)
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, bridge.North), Call: &call}).NextState
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRequestUndo, SessionID: sessionForSeat(t, aggregate, bridge.North)}).NextState
+
+	tests := []struct {
+		name      string
+		sessionID string
+	}{
+		{name: "requester", sessionID: sessionForSeat(t, aggregate, bridge.North)},
+		{name: "duplicate responder", sessionID: sessionForSeat(t, aggregate, bridge.East)},
+	}
+	_, domainError := Decide(aggregate, Command{Name: CommandRespondUndo, SessionID: tests[0].sessionID, Accepted: true})
+	assertDomainError(t, domainError, ErrorResponseNotAllowed)
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRespondUndo, SessionID: tests[1].sessionID, Accepted: true}).NextState
+	_, domainError = Decide(aggregate, Command{Name: CommandRespondUndo, SessionID: tests[1].sessionID, Accepted: true})
+	assertDomainError(t, domainError, ErrorResponseNotAllowed)
+}
+
 func TestDecideRejectsMechanicalIrregularitiesWithoutMutation(t *testing.T) {
 	t.Parallel()
 
@@ -574,6 +662,22 @@ func aggregateWithDummyRevokeAttempt(t *testing.T) (Aggregate, bridge.Card) {
 	}
 	t.Fatal("test deal has no dummy revoke scenario")
 	return Aggregate{}, bridge.Card{}
+}
+
+func playTableCards(t *testing.T, aggregate Aggregate, count int) Aggregate {
+	t.Helper()
+	for _index := 0; _index < count; _index++ {
+		actor := aggregate.Game.Turn
+		if actor == aggregate.Game.Auction.Contract.Dummy() {
+			actor = aggregate.Game.Auction.Contract.Declarer
+		}
+		legalCards, domainError := aggregate.Game.LegalCards(actor)
+		if domainError != nil || len(legalCards) == 0 {
+			t.Fatalf("LegalCards(%s) cards = %d, error = %v", actor, len(legalCards), domainError)
+		}
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandPlayCard, SessionID: sessionForSeat(t, aggregate, actor), Card: &legalCards[0]}).NextState
+	}
+	return aggregate
 }
 
 func acceptedDecision(t *testing.T, aggregate Aggregate, command Command) Decision {

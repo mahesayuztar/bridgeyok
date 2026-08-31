@@ -42,6 +42,10 @@ const (
 	CommandStartGame         CommandName = "START_GAME"
 	CommandMakeCall          CommandName = "MAKE_CALL"
 	CommandPlayCard          CommandName = "PLAY_CARD"
+	CommandRequestClaim      CommandName = "REQUEST_CLAIM"
+	CommandRespondClaim      CommandName = "RESPOND_CLAIM"
+	CommandRequestUndo       CommandName = "REQUEST_UNDO"
+	CommandRespondUndo       CommandName = "RESPOND_UNDO"
 	CommandRequestNextBoard  CommandName = "REQUEST_NEXT_BOARD"
 	CommandFinishTable       CommandName = "FINISH_TABLE"
 	CommandTakeoverControl   CommandName = "TAKEOVER_CONTROL"
@@ -66,7 +70,32 @@ const (
 	ErrorParticipantMissing ErrorCode = "PARTICIPANT_MISSING"
 	ErrorInvalidCommand     ErrorCode = "INVALID_COMMAND"
 	ErrorStaleController    ErrorCode = "STALE_CONTROLLER"
+	ErrorActionPending      ErrorCode = "ACTION_PENDING"
+	ErrorRequestMissing     ErrorCode = "REQUEST_MISSING"
+	ErrorResponseNotAllowed ErrorCode = "RESPONSE_NOT_ALLOWED"
+	ErrorUndoUnavailable    ErrorCode = "UNDO_UNAVAILABLE"
 )
+
+// ActionRequestKind identifies a consensus request that pauses gameplay.
+type ActionRequestKind string
+
+const (
+	ActionRequestClaim ActionRequestKind = "CLAIM"
+	ActionRequestUndo  ActionRequestKind = "UNDO"
+)
+
+// ActionRequest records the public state of one in-progress claim or undo vote.
+type ActionRequest struct {
+	Kind          ActionRequestKind `json:"kind"`
+	RequesterSeat bridge.Seat       `json:"requesterSeat"`
+	ClaimTricks   int               `json:"claimTricks,omitempty"`
+	ApprovedBy    []bridge.Seat     `json:"approvedBy"`
+}
+
+type undoableAction struct {
+	ActorSeat bridge.Seat  `json:"actorSeat"`
+	Game      bridge.State `json:"game"`
+}
 
 // DomainError describes a rejected table command.
 type DomainError struct {
@@ -112,6 +141,8 @@ type Aggregate struct {
 	Participants   []Participant                  `json:"participants"`
 	Seats          map[bridge.Seat]SeatAssignment `json:"seats"`
 	Game           *bridge.State                  `json:"game,omitempty"`
+	ActionRequest  *ActionRequest                 `json:"actionRequest,omitempty"`
+	UndoableAction *undoableAction                `json:"undoableAction,omitempty"`
 }
 
 // Command contains one authenticated table mutation.
@@ -126,6 +157,8 @@ type Command struct {
 	ParticipantID            string
 	Call                     *bridge.Call
 	Card                     *bridge.Card
+	ClaimTricks              int
+	Accepted                 bool
 	Deal                     *bridge.Deal
 	BoardID                  string
 	ControllerEpoch          int64
@@ -294,6 +327,7 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		if seat, seated := next.seatForParticipant(command.ParticipantID); seated {
 			delete(next.Seats, seat)
 		}
+		next.ActionRequest = nil
 		eventType := "PARTICIPANT_REMOVED"
 		if command.Name == CommandExpireParticipant {
 			eventType = "PARTICIPANT_TIMED_OUT"
@@ -326,10 +360,15 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		next.BoardNumber = 1
 		next.BoardID = command.BoardID
 		next.Game = &game
+		next.ActionRequest = nil
+		next.UndoableAction = nil
 		events = []Event{{Type: "BOARD_STARTED", Payload: map[string]any{"boardId": command.BoardID, "boardNumber": 1}}}
 	case CommandMakeCall, CommandPlayCard:
 		if next.State != StateActive || next.Game == nil {
 			return Decision{}, reject(ErrorInvalidState, "table has no active board")
+		}
+		if next.ActionRequest != nil {
+			return Decision{}, reject(ErrorActionPending, "claim or undo response is pending")
 		}
 		seat, seated := next.seatForParticipant(participant.ID)
 		if !seated {
@@ -343,22 +382,104 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		} else {
 			return Decision{}, reject(ErrorInvalidCommand, "game command payload is invalid")
 		}
+		previousGame := next.Game.Clone()
 		gameDecision, domainError := bridge.Decide(*next.Game, gameCommand)
 		if domainError != nil {
 			return Decision{}, reject(ErrorCode(domainError.Code), domainError.Error())
 		}
 		next.Game = &gameDecision.NextState
+		next.UndoableAction = &undoableAction{ActorSeat: seat, Game: previousGame}
 		for _, gameEvent := range gameDecision.Events {
 			events = append(events, Event{Type: string(gameEvent.Type), Payload: gameEvent})
 		}
 		if gameDecision.NextState.Phase == bridge.PhaseBoardScored {
 			next.State = StateBetweenBoards
 		}
+	case CommandRequestClaim:
+		if next.State != StateActive || next.Game == nil {
+			return Decision{}, reject(ErrorInvalidState, "claim requires an active board")
+		}
+		if next.ActionRequest != nil {
+			return Decision{}, reject(ErrorActionPending, "another claim or undo request is pending")
+		}
+		seat, seated := next.seatForParticipant(participant.ID)
+		if !seated {
+			return Decision{}, reject(ErrorSeatRequired, "participant is not seated")
+		}
+		if _, domainError := bridge.Decide(*next.Game, bridge.ClaimCommand(seat, command.ClaimTricks)); domainError != nil {
+			return Decision{}, reject(ErrorCode(domainError.Code), domainError.Error())
+		}
+		next.ActionRequest = &ActionRequest{Kind: ActionRequestClaim, RequesterSeat: seat, ClaimTricks: command.ClaimTricks, ApprovedBy: []bridge.Seat{}}
+		events = []Event{{Type: "CLAIM_REQUESTED", Payload: map[string]any{"requesterSeat": seat, "claimTricks": command.ClaimTricks}}}
+	case CommandRespondClaim:
+		if next.State != StateActive || next.Game == nil || next.ActionRequest == nil || next.ActionRequest.Kind != ActionRequestClaim {
+			return Decision{}, reject(ErrorRequestMissing, "there is no claim awaiting a response")
+		}
+		seat, seated := next.seatForParticipant(participant.ID)
+		if !seated || seat.Partnership() == next.ActionRequest.RequesterSeat.Partnership() || slices.Contains(next.ActionRequest.ApprovedBy, seat) {
+			return Decision{}, reject(ErrorResponseNotAllowed, "seat cannot respond to this claim")
+		}
+		if !command.Accepted {
+			next.ActionRequest = nil
+			events = []Event{{Type: "CLAIM_REJECTED", Payload: map[string]any{"responderSeat": seat}}}
+			break
+		}
+		next.ActionRequest.ApprovedBy = append(next.ActionRequest.ApprovedBy, seat)
+		if len(next.ActionRequest.ApprovedBy) < 2 {
+			events = []Event{{Type: "CLAIM_RESPONSE_RECORDED", Payload: map[string]any{"responderSeat": seat, "accepted": true}}}
+			break
+		}
+		gameDecision, domainError := bridge.Decide(*next.Game, bridge.ClaimCommand(next.ActionRequest.RequesterSeat, next.ActionRequest.ClaimTricks))
+		if domainError != nil {
+			return Decision{}, reject(ErrorCode(domainError.Code), domainError.Error())
+		}
+		next.Game = &gameDecision.NextState
+		next.State = StateBetweenBoards
+		next.ActionRequest = nil
+		next.UndoableAction = nil
+		events = []Event{{Type: "CLAIM_ACCEPTED", Payload: gameDecision.Events[0]}}
+	case CommandRequestUndo:
+		if (next.State != StateActive && next.State != StateBetweenBoards) || next.Game == nil {
+			return Decision{}, reject(ErrorInvalidState, "undo requires a current board")
+		}
+		if next.ActionRequest != nil {
+			return Decision{}, reject(ErrorActionPending, "another claim or undo request is pending")
+		}
+		seat, seated := next.seatForParticipant(participant.ID)
+		if !seated || next.UndoableAction == nil || next.UndoableAction.ActorSeat != seat {
+			return Decision{}, reject(ErrorUndoUnavailable, "only the actor of the latest game action can request undo")
+		}
+		next.ActionRequest = &ActionRequest{Kind: ActionRequestUndo, RequesterSeat: seat, ApprovedBy: []bridge.Seat{}}
+		events = []Event{{Type: "UNDO_REQUESTED", Payload: map[string]any{"requesterSeat": seat}}}
+	case CommandRespondUndo:
+		if (next.State != StateActive && next.State != StateBetweenBoards) || next.Game == nil || next.ActionRequest == nil || next.ActionRequest.Kind != ActionRequestUndo || next.UndoableAction == nil {
+			return Decision{}, reject(ErrorRequestMissing, "there is no undo awaiting a response")
+		}
+		seat, seated := next.seatForParticipant(participant.ID)
+		if !seated || seat == next.ActionRequest.RequesterSeat || slices.Contains(next.ActionRequest.ApprovedBy, seat) {
+			return Decision{}, reject(ErrorResponseNotAllowed, "seat cannot respond to this undo")
+		}
+		if !command.Accepted {
+			next.ActionRequest = nil
+			events = []Event{{Type: "UNDO_REJECTED", Payload: map[string]any{"responderSeat": seat}}}
+			break
+		}
+		next.ActionRequest.ApprovedBy = append(next.ActionRequest.ApprovedBy, seat)
+		if len(next.ActionRequest.ApprovedBy) < 3 {
+			events = []Event{{Type: "UNDO_RESPONSE_RECORDED", Payload: map[string]any{"responderSeat": seat, "accepted": true}}}
+			break
+		}
+		restoredGame := next.UndoableAction.Game.Clone()
+		next.Game = &restoredGame
+		next.State = StateActive
+		next.ActionRequest = nil
+		next.UndoableAction = nil
+		events = []Event{{Type: "UNDO_ACCEPTED", Payload: map[string]any{}}}
 	case CommandRequestNextBoard:
 		if participant.Role != RoleOwner {
 			return Decision{}, reject(ErrorOwnerRequired, "only the owner can start the next board")
 		}
-		if next.State != StateBetweenBoards || command.Deal == nil || command.BoardID == "" {
+		if next.State != StateBetweenBoards || command.Deal == nil || command.BoardID == "" || next.ActionRequest != nil {
 			return Decision{}, reject(ErrorInvalidState, "next board requires a completed board and new deal")
 		}
 		game, err := bridge.NewBoard(next.BoardNumber+1, *command.Deal)
@@ -369,15 +490,19 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		next.BoardNumber++
 		next.BoardID = command.BoardID
 		next.Game = &game
+		next.ActionRequest = nil
+		next.UndoableAction = nil
 		events = []Event{{Type: "BOARD_STARTED", Payload: map[string]any{"boardId": command.BoardID, "boardNumber": next.BoardNumber}}}
 	case CommandFinishTable:
 		if participant.Role != RoleOwner {
 			return Decision{}, reject(ErrorOwnerRequired, "only the owner can finish the table")
 		}
-		if next.State != StateWaiting && next.State != StateBetweenBoards {
+		if next.State != StateWaiting && next.State != StateBetweenBoards || next.ActionRequest != nil {
 			return Decision{}, reject(ErrorInvalidState, "table cannot finish during an active board")
 		}
 		next.State = StateFinished
+		next.ActionRequest = nil
+		next.UndoableAction = nil
 		events = []Event{{Type: "TABLE_FINISHED", Payload: map[string]any{}}}
 	case CommandTakeoverControl:
 		if next.State == StateFinished {
@@ -497,6 +622,53 @@ func (aggregate Aggregate) Validate() error {
 			return fmt.Errorf("game invariant: %w", err)
 		}
 	}
+	if aggregate.ActionRequest != nil {
+		request := aggregate.ActionRequest
+		if aggregate.Game == nil || aggregate.State != StateActive && aggregate.State != StateBetweenBoards || !request.RequesterSeat.Valid() || request.Kind != ActionRequestClaim && request.Kind != ActionRequestUndo {
+			return fmt.Errorf("invalid action request")
+		}
+		requesterAssignment, requesterSeated := aggregate.Seats[request.RequesterSeat]
+		if !requesterSeated || requesterAssignment.ParticipantID == "" {
+			return fmt.Errorf("action requester is not seated")
+		}
+		seenApprovals := make(map[bridge.Seat]struct{}, len(request.ApprovedBy))
+		for _, seat := range request.ApprovedBy {
+			if !seat.Valid() || seat == request.RequesterSeat {
+				return fmt.Errorf("invalid action approval")
+			}
+			if _, duplicate := seenApprovals[seat]; duplicate {
+				return fmt.Errorf("duplicate action approval")
+			}
+			if _, seated := aggregate.Seats[seat]; !seated {
+				return fmt.Errorf("action approver is not seated")
+			}
+			if request.Kind == ActionRequestClaim && seat.Partnership() == request.RequesterSeat.Partnership() {
+				return fmt.Errorf("claim approval must come from an opponent")
+			}
+			seenApprovals[seat] = struct{}{}
+		}
+		if request.Kind == ActionRequestClaim && len(request.ApprovedBy) > 1 || request.Kind == ActionRequestUndo && len(request.ApprovedBy) > 2 {
+			return fmt.Errorf("action request has too many pending approvals")
+		}
+		if request.Kind == ActionRequestClaim {
+			if aggregate.State != StateActive {
+				return fmt.Errorf("claim request requires an active board")
+			}
+			if _, domainError := bridge.Decide(*aggregate.Game, bridge.ClaimCommand(request.RequesterSeat, request.ClaimTricks)); domainError != nil {
+				return fmt.Errorf("invalid claim request: %w", domainError)
+			}
+		} else if aggregate.UndoableAction == nil || aggregate.UndoableAction.ActorSeat != request.RequesterSeat {
+			return fmt.Errorf("undo request does not match the latest action")
+		}
+	}
+	if aggregate.UndoableAction != nil {
+		if aggregate.Game == nil || !aggregate.UndoableAction.ActorSeat.Valid() {
+			return fmt.Errorf("invalid undoable action")
+		}
+		if err := aggregate.UndoableAction.Game.ValidateInvariants(); err != nil {
+			return fmt.Errorf("undo state invariant: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -566,6 +738,16 @@ func (aggregate Aggregate) clone() Aggregate {
 	if aggregate.Game != nil {
 		game := aggregate.Game.Clone()
 		clone.Game = &game
+	}
+	if aggregate.ActionRequest != nil {
+		request := *aggregate.ActionRequest
+		request.ApprovedBy = append([]bridge.Seat(nil), aggregate.ActionRequest.ApprovedBy...)
+		clone.ActionRequest = &request
+	}
+	if aggregate.UndoableAction != nil {
+		undoable := *aggregate.UndoableAction
+		undoable.Game = aggregate.UndoableAction.Game.Clone()
+		clone.UndoableAction = &undoable
 	}
 	return clone
 }
