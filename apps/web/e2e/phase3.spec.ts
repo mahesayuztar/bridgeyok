@@ -13,7 +13,16 @@ async function waitForConnection(page: Page) {
 }
 
 async function takeSeat(page: Page, nickname: string, seat: "N" | "E" | "S" | "W") {
-  await page.getByRole("button", { name: `Duduk ${seat}` }).click();
+  const seatMenu = page.getByRole("button", {
+    name: `Buka menu kursi kosong ${seat}`,
+  });
+  await seatMenu.click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(seatMenu).toBeFocused();
+  await seatMenu.click();
+  await page.getByRole("button", { name: "Duduk di kursi" }).click();
   await expect(page.getByRole("button", { name: `Buka menu ${nickname}, kursi ${seat}` })).toBeVisible();
 }
 
