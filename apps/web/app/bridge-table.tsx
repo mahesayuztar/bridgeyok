@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -25,37 +24,21 @@ import {
   type LiveTableProjection,
   type ParticipantPresence,
   type Seat,
-  type Suit,
   type TableOrientation,
   type VisualPosition,
 } from "./table-state";
+import {
+  callKey,
+  callLabel,
+  contractLabel,
+  suitLabels,
+} from "./table/gameplay-presentation";
+import { BridgeHand, PlayingCard } from "./table/playing-card";
 import { useTableSession, type TableSession } from "./use-table-session";
 
 const SEATS: Seat[] = ["N", "E", "S", "W"];
 const AUCTION_SEATS: Seat[] = ["W", "N", "E", "S"];
 const STRAINS: Array<"C" | "D" | "H" | "S" | "NT"> = ["S", "H", "D", "C", "NT"];
-const SUIT_LABELS: Record<Suit, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
-const DUMMY_SUIT_ORDER: Suit[] = ["S", "H", "D", "C"];
-const CARD_RANK_VALUE: Record<Card["rank"], number> = {
-  A: 14,
-  K: 13,
-  Q: 12,
-  J: 11,
-  T: 10,
-  "9": 9,
-  "8": 8,
-  "7": 7,
-  "6": 6,
-  "5": 5,
-  "4": 4,
-  "3": 3,
-  "2": 2,
-};
-function sortCardsDescending(cards: Card[]) {
-  return [...cards].sort(
-    (a, b) => CARD_RANK_VALUE[b.rank] - CARD_RANK_VALUE[a.rank],
-  );
-}
 const VULNERABILITY_LABELS = {
   NONE: "Tidak ada",
   NS: "NS",
@@ -81,153 +64,6 @@ function participantName(
   return (
     table.participants.find((participant) => participant.id === participantId)
       ?.nickname ?? "Pemain"
-  );
-}
-
-function callLabel(call: Call) {
-  if (call.kind === "PASS") return "Pass";
-  if (call.kind === "DOUBLE") return "X";
-  if (call.kind === "REDOUBLE") return "XX";
-  const strain = call.strain === "NT" ? "NT" : SUIT_LABELS[call.strain ?? "C"];
-  return `${call.level}${strain}`;
-}
-
-function callKey(call: Call) {
-  return `${call.kind}:${call.level ?? ""}:${call.strain ?? ""}`;
-}
-
-function contractLabel(
-  contract: NonNullable<LiveTableProjection["game"]>["auction"]["contract"],
-  includeDeclarer = true,
-) {
-  if (contract === undefined) return "Belum ada kontrak";
-  const doubling =
-    contract.doubling === "DOUBLED"
-      ? " X"
-      : contract.doubling === "REDOUBLED"
-        ? " XX"
-        : "";
-  const strain = contract.strain === "NT" ? "NT" : SUIT_LABELS[contract.strain];
-  return `${contract.level}${strain}${doubling}${includeDeclarer ? ` oleh ${contract.declarer}` : ""}`;
-}
-
-function cardKey(card: Card) {
-  return `${card.suit}${card.rank}`;
-}
-
-function PlayingCard({
-  card,
-  variant,
-  disabled = false,
-  playable = false,
-  onPlay,
-}: {
-  card: Card;
-  variant: "hand" | "dummy" | "trick";
-  disabled?: boolean;
-  playable?: boolean;
-  onPlay?: (card: Card) => void;
-}) {
-  const rank = card.rank === "T" ? "10" : card.rank;
-  const content = (
-    <>
-      <span className="card-corner">
-        <strong>{rank}</strong>
-        <span>{SUIT_LABELS[card.suit]}</span>
-      </span>
-      <span className="card-suit" aria-hidden="true">
-        {SUIT_LABELS[card.suit]}
-      </span>
-    </>
-  );
-  const className = `physical-card suit-${card.suit.toLowerCase()} card-${variant}`;
-  const label = `${rank} ${SUIT_LABELS[card.suit]}`;
-
-  if (onPlay === undefined) {
-    return (
-      <span className={className} aria-label={label}>
-        {content}
-      </span>
-    );
-  }
-  return (
-    <button
-      className={className}
-      type="button"
-      disabled={disabled || !playable}
-      onClick={() => onPlay(card)}
-      aria-label={`Mainkan ${label}`}
-    >
-      {content}
-    </button>
-  );
-}
-
-function BridgeHand({
-  cards,
-  title,
-  variant = "hand",
-  playableCards = [],
-  disabled = false,
-  onPlay,
-  className = "",
-}: {
-  cards: Card[];
-  title: string;
-  variant?: "hand" | "dummy";
-  playableCards?: Card[];
-  disabled?: boolean;
-  onPlay?: (card: Card) => void;
-  className?: string;
-}) {
-  const playableKeys = new Set(playableCards.map(cardKey));
-  const style = { "--card-count": Math.max(cards.length, 1) } as CSSProperties;
-  return (
-    <section
-      className={`bridge-hand ${className}`}
-      data-variant={variant}
-      aria-label={title}
-    >
-      <h3>{title}</h3>
-      <div className="hand-cards" style={style}>
-        {variant === "dummy"
-          ? DUMMY_SUIT_ORDER.map((suit) => {
-              const suitCards = sortCardsDescending(
-                cards.filter((card) => card.suit === suit),
-              );
-
-              return (
-                <div
-                  className={`dummy-suit dummy-suit-${suit.toLowerCase()}`}
-                  key={suit}
-                >
-                  <div className="dummy-suit-cards">
-                    {suitCards.map((card) => (
-                      <PlayingCard
-                        card={card}
-                        variant="dummy"
-                        key={cardKey(card)}
-                        disabled={disabled}
-                        playable={playableKeys.has(cardKey(card))}
-                        {...(onPlay === undefined ? {} : { onPlay })}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })
-          : cards.map((card) => (
-              <PlayingCard
-                card={card}
-                variant={variant}
-                key={cardKey(card)}
-                disabled={disabled}
-                playable={playableKeys.has(cardKey(card))}
-                {...(onPlay === undefined ? {} : { onPlay })}
-              />
-            ))}
-      </div>
-    </section>
   );
 }
 
@@ -653,7 +489,7 @@ function BiddingBox({
                 }}
               >
                 <span className="sr-only">Bid {selectedLevel} </span>
-                {strain === "NT" ? "NT" : SUIT_LABELS[strain]}
+                {strain === "NT" ? "NT" : suitLabels[strain]}
               </button>
             );
           })}
