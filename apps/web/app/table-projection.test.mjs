@@ -14,6 +14,7 @@ function activeProjection() {
     viewerParticipantId: "participant-a",
     viewerRole: "OWNER",
     viewerSeat: "N",
+    canRequestUndo: true,
     participants: [{ id: "participant-a", nickname: "Mahesa", role: "OWNER" }],
     seats: { N: { participantId: "participant-a", ready: true, controllerEpoch: 1 } },
     game: {
@@ -47,6 +48,19 @@ test("rejects malformed nested projection items instead of exposing them to rend
   const projection = activeProjection();
   projection.game.auction.calls = [null];
 
+  assert.equal(normalizeLiveTableProjection(projection), null);
+});
+
+test("normalizes claim and undo consensus state", () => {
+  const projection = activeProjection();
+  projection.actionRequest = { kind: "CLAIM", requesterSeat: "N", claimTricks: 7, approvedBy: ["E"], canRespond: false };
+
+  const table = normalizeLiveTableProjection(projection);
+
+  assert.notEqual(table, null);
+  assert.equal(table.canRequestUndo, true);
+  assert.deepEqual(table.actionRequest, projection.actionRequest);
+  projection.actionRequest.approvedBy = ["invalid"];
   assert.equal(normalizeLiveTableProjection(projection), null);
 });
 

@@ -43,6 +43,14 @@ export function issueFromServer({ code, status, retryable = false, source }: Iss
       return { kind: "validation", title: "Belum giliranmu", detail: "Tunggu pemain yang sedang mendapat giliran.", retryable: false, source };
     case "SEAT_TAKEN":
       return { kind: "validation", title: "Kursi baru saja terisi", detail: "Pilih kursi kosong lain setelah keadaan meja diperbarui.", retryable: false, source };
+    case "ACTION_PENDING":
+      return { kind: "validation", title: "Menunggu keputusan pemain", detail: "Selesaikan permintaan claim atau undo sebelum melanjutkan permainan.", retryable: false, source };
+    case "REQUEST_MISSING":
+      return { kind: "validation", title: "Permintaan sudah selesai", detail: "Claim atau undo ini tidak lagi menunggu jawaban.", retryable: false, source };
+    case "RESPONSE_NOT_ALLOWED":
+      return { kind: "validation", title: "Jawaban tidak diperlukan", detail: "Kursi ini bukan pemilih yang memenuhi syarat atau sudah memberikan jawaban.", retryable: false, source };
+    case "UNDO_UNAVAILABLE":
+      return { kind: "validation", title: "Aksi tidak dapat di-undo", detail: "Hanya pemain yang melakukan aksi game terakhir yang dapat meminta undo.", retryable: false, source };
     case "SERVICE_UNAVAILABLE":
     case "SERVER_BUSY":
     case "INTERNAL_ERROR":

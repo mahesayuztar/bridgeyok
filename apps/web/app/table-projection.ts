@@ -284,6 +284,24 @@ export function normalizeLiveTableProjection(value: unknown): LiveTableProjectio
     return null;
   }
 
+  let actionRequest: LiveTableProjection["actionRequest"];
+  if (value.actionRequest !== null && value.actionRequest !== undefined) {
+    if (!isRecord(value.actionRequest) || !["CLAIM", "UNDO"].includes(String(value.actionRequest.kind)) || !isSeat(value.actionRequest.requesterSeat) || typeof value.actionRequest.canRespond !== "boolean") {
+      return null;
+    }
+    const approvedBy = normalizeArray(value.actionRequest.approvedBy, (seat) => isSeat(seat) ? seat : null);
+    if (approvedBy === null || value.actionRequest.kind === "CLAIM" && !Number.isInteger(value.actionRequest.claimTricks)) {
+      return null;
+    }
+    actionRequest = {
+      kind: value.actionRequest.kind as "CLAIM" | "UNDO",
+      requesterSeat: value.actionRequest.requesterSeat,
+      ...(Number.isInteger(value.actionRequest.claimTricks) ? { claimTricks: value.actionRequest.claimTricks as number } : {}),
+      approvedBy,
+      canRespond: value.actionRequest.canRespond
+    };
+  }
+
   return {
     tableId: value.tableId,
     state: value.state as LiveTableProjection["state"],
@@ -297,7 +315,9 @@ export function normalizeLiveTableProjection(value: unknown): LiveTableProjectio
     ...(isSeat(value.viewerSeat) ? { viewerSeat: value.viewerSeat } : {}),
     participants,
     seats,
-    ...(game === undefined ? {} : { game })
+    ...(game === undefined ? {} : { game }),
+    ...(actionRequest === undefined ? {} : { actionRequest }),
+    canRequestUndo: typeof value.canRequestUndo === "boolean" ? value.canRequestUndo : false
   };
 }
 
