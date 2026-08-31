@@ -1,6 +1,6 @@
 # BridgeYok Web Roadmap
 
-> Status: **PLANNED — GUX Gameplay UX Reliability & Interaction Refactor belum dimulai; Work 1–6 lama complete dan browser/E2E baseline masih pending**
+> Status: **IN PROGRESS — GUX UX-01–UX-03 PASS; UX-04–UX-14 belum dimulai**
 > Last updated: 1 September 2026
 > Scope: guest entry, lobby navigation, actionable errors, controller takeover, table UX/layout, dan objective GUX frontend-first yang regression-sensitive.
 > Implementation must not begin until the visual-reference and projection audits in Work 0 are complete.
@@ -600,7 +600,7 @@ Visual novelty bukan tujuan.
 
 ## 19. Objective GUX — Gameplay UX Reliability & Interaction Refactor
 
-**Status:** IN PROGRESS — UX-01 PASS; UX-02–UX-14 NOT STARTED
+**Status:** IN PROGRESS — UX-01–UX-03 PASS; UX-04–UX-14 NOT STARTED
 
 **Priority:** UX correctness dan gameplay feel kira-kira 10× lebih penting daripada decorative polish.
 
@@ -638,6 +638,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ### UX-02 — Optimistic gameplay state
 
+**Status:** PASS — authoritative projection, request-scoped optimistic call/play operations, ACK lifecycle, event rebase, rollback, and snapshot recovery completed 1 September 2026.
+
 - **Problem:** legal local bid/play baru terlihat setelah database transaction dan socket event; current global pending lock membuat latency tampak seperti frozen UI.
 - **Scope:** explicit authoritative projection, ordered optimistic operations keyed by `request_id` + base revision, projected view, and separate presentation events. Apply legal local call/card immediately; reconcile on ACK/event; rollback/rebase on rejection/conflict; snapshot/resume is ultimate recovery.
 - **Non-goals:** server authority tidak berpindah, offline arbitrary intent tidak diantre, animation state tidak menentukan legality, dan tidak membuat satu mutable object untuk authoritative/optimistic/presentation state.
@@ -651,6 +653,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 - **Completion gate:** UX-02 PASS requires deterministic reconciliation evidence and raw WebSocket assertions; a visually fast animation without rollback/rebase proof is not a pass.
 
 ### UX-03 — Legal action prevention
+
+**Status:** PASS — centralized projected command capability guards and UI/dispatch prevention completed 1 September 2026.
 
 - **Problem:** some predictable rule-invalid actions can still be submitted and surfaced through error UI, conflating bridge legality with infrastructure failure.
 - **Scope:** derive legal calls/cards and availability for turn, role, phase, claim, undo, pending consensus, connection, and controller state; prevent/disable known-invalid triggers before the command path. Remove rule-invalidity toasts for conditions already known locally.
@@ -820,10 +824,10 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ## 20. GATE UX-G1 — Gameplay UX Refactor Complete
 
-Status saat ini: **BLOCKED — UX-01 PASS; UX-02–UX-14 masih NOT STARTED**.
+Status saat ini: **BLOCKED — UX-01–UX-03 PASS; UX-04–UX-14 masih NOT STARTED**.
 
 ```text
-[x] UX-01 PASS  [ ] UX-02 PASS  [ ] UX-03 PASS  [ ] UX-04 PASS
+[x] UX-01 PASS  [x] UX-02 PASS  [x] UX-03 PASS  [ ] UX-04 PASS
 [ ] UX-05 PASS  [ ] UX-06 PASS  [ ] UX-07 PASS  [ ] UX-08 PASS
 [ ] UX-09 PASS  [ ] UX-10 PASS  [ ] UX-11 PASS  [ ] UX-12 PASS
 [ ] UX-13 PASS  [ ] UX-14 PASS
@@ -919,8 +923,8 @@ Record implementation evidence here; all entries begin empty:
 
 ```text
 UX-01 extraction/tests: commits 56ef42b, a9cc5ea, 636255b, f8501ba, 5cf8ab1, a6bfa6d; unit 19/19, typecheck, lint, production build, four-browser Playwright 1/1
-UX-02 reconciliation traces: ______________
-UX-03 no-invalid-frame proof: ______________
+UX-02 reconciliation traces: commits 6e9eaae, c2bde4d; unit ACK/event ordering, rejection/rebase, disconnect/snapshot; four-browser 500 ms delayed ACK/event bid/play proof
+UX-03 no-invalid-frame proof: commits 6e9eaae, c2bde4d; capability matrix 6/6; forced disabled Pass dispatch produced zero mutation frames in four-browser Playwright
 UX-04 motion/skip recordings: ______________
 UX-05 desktop/mobile drag: _________________
 UX-06 viewport screenshots/geometry: _______
@@ -934,9 +938,9 @@ ENG-03 consensus transition report: ________
 
 Known risks discovered in the current repository:
 
-1. ACK is sent before projected broadcast, but client ignores ACK and events lack origin request ID. Reconciliation design must prove safe correlation or introduce the smallest compatible protocol metadata change.
-2. Every event/snapshot currently clears every pending command. Optimistic work requires per-operation settlement/rebase and must not restore the unsafe behavior of arbitrary offline retry.
-3. Global `hasPendingCommand` serializes all UI mutation and can hide race problems during optimistic work; replace only with explicit capability/conflict rules.
+1. ACK revision/sequence plus request ID proved sufficient without a protocol change: ACK marks a request accepted, visible/revision-matched events settle it, event-before-ACK is idempotent, and snapshot remains recovery authority.
+2. Events now reconcile request-scoped operations and preserve still-valid optimistic work; snapshots, disconnects, and conflicts intentionally clear operations without automatic retry.
+3. Command serialization is now an explicit capability/conflict rule at the central dispatch boundary because every mutation uses the current authoritative expected revision; UI controls no longer own an ad hoc global disabled flag.
 4. `CompletedTricks` is already projected to all participants. ENG-01's intended “Dummy all / others last allowed” policy conflicts with that payload and needs a security/product decision before UI.
 5. ENG-02 terminology is unresolved: a single table has no inherent IMP comparison. Raw duplicate score cannot be labeled IMP without a reference result or accepted pair/session model.
 6. ADR-008 and current aggregate explicitly disable consensus whenever a bot is present. ENG-03 is a deliberate future product/architecture supersession and remains gated.
