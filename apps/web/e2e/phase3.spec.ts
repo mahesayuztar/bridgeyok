@@ -97,6 +97,78 @@ async function playNextCard(pages: Page[]) {
   throw new Error("no playable card was exposed to the current controller");
 }
 
+async function dragPlayableCard(page: Page, pointer: "mouse" | "touch") {
+  const card = page.locator('button[aria-label^="Mainkan "]:enabled').last();
+  const handCards = page.locator(
+    ".own-hand .physical-card, .dummy-hand .physical-card",
+  );
+  const board = page.locator(".board-play-zone");
+  await expect(card).toBeVisible();
+  const cardCountBefore = await handCards.count();
+  const cardBox = await card.boundingBox();
+  const boardBox = await board.boundingBox();
+  expect(cardBox).not.toBeNull();
+  expect(boardBox).not.toBeNull();
+  const startX = cardBox!.x + cardBox!.width / 2;
+  const startY = cardBox!.y + cardBox!.height / 2;
+  const endX = boardBox!.x + boardBox!.width / 2;
+  const endY = boardBox!.y + boardBox!.height / 2;
+
+  if (pointer === "mouse") {
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(endX, endY, { steps: 5 });
+    await page.mouse.up();
+  } else {
+    const session = await page.context().newCDPSession(page);
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: startX, y: startY }],
+    });
+    for (let _step = 1; _step <= 5; _step++) {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [
+          {
+            x: startX + ((endX - startX) * _step) / 5,
+            y: startY + ((endY - startY) * _step) / 5,
+          },
+        ],
+      });
+      await page.waitForTimeout(20);
+    }
+    await expect(page.locator('.physical-card[data-dragging="true"]')).toHaveCount(1);
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await session.detach();
+  }
+
+  await expect(handCards).toHaveCount(cardCountBefore - 1, { timeout: 250 });
+}
+
+async function returnCardFromInvalidDrop(page: Page) {
+  const card = page.locator('button[aria-label^="Mainkan "]:enabled').last();
+  const cardBox = await card.boundingBox();
+  expect(cardBox).not.toBeNull();
+  const cardCount = await page.locator(
+    ".own-hand .physical-card, .dummy-hand .physical-card",
+  ).count();
+  await page.mouse.move(
+    cardBox!.x + cardBox!.width / 2,
+    cardBox!.y + cardBox!.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(8, 8, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.locator(
+    ".own-hand .physical-card, .dummy-hand .physical-card",
+  )).toHaveCount(cardCount);
+  await expect(card).toHaveAttribute("data-dragging", "false");
+  await page.waitForTimeout(50);
+}
+
 function assertPrivateFrames(frames: string[]) {
   for (const encoded of frames) {
     let envelope: Record<string, unknown>;
@@ -236,7 +308,49 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     { nickname: "Wira", viewport: { width: 390, height: 844 } },
   ];
   const players = await Promise.all(profiles.map(async ({ nickname, viewport }) => {
-    const context = await browser.newContext({ viewport });
+    const context = await browser.newContext({
+      viewport,
+      hasTouch: viewport.width <= 390,
+    });
+    await context.addInitScript(() => {
+      let ended: (() => void) | undefined;
+      class TestAudioContext {
+        currentTime = 0;
+        destination = {};
+        state = "running";
+        createOscillator() {
+          return {
+            type: "sine",
+            frequency: {
+              setValueAtTime() {},
+              exponentialRampToValueAtTime() {},
+            },
+            connect() {},
+            start() {},
+            stop() {
+              const audioWindow = window as Window & { __turnCueCount?: number };
+              audioWindow.__turnCueCount = (audioWindow.__turnCueCount ?? 0) + 1;
+              queueMicrotask(() => ended?.());
+            },
+            addEventListener(_name: string, listener: () => void) {
+              ended = listener;
+            },
+          };
+        }
+        createGain() {
+          return {
+            gain: {
+              setValueAtTime() {},
+              exponentialRampToValueAtTime() {},
+            },
+            connect() {},
+          };
+        }
+        async resume() {}
+        async close() {}
+      }
+      Object.defineProperty(window, "AudioContext", { value: TestAudioContext });
+    });
     const page = await context.newPage();
     const frames: string[] = [];
     const sentFrames: string[] = [];
@@ -327,6 +441,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await expect(north.page.getByRole("button", { name: "Ambil alih kendali" })).toBeVisible();
 
   const activePages = [replacementTab, east.page, south.page, west.page];
+  await south.page.emulateMedia({ reducedMotion: "reduce" });
   for (const [_playerIndex, page] of activePages.entries()) {
     await setReady(page, ["Nara", "Eka", "Sari", "Wira"][_playerIndex]!);
   }
@@ -351,6 +466,15 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   expect(mutationFrameCount(east.sentFrames)).toBe(invalidFrameCount);
 
   await makeBid(replacementTab, 1, "♣");
+  await expect.poll(() => east.page.evaluate(() =>
+    (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
+  )).toBe(1);
+  await east.page.getByLabel("Buka menu meja").click();
+  await east.page.getByLabel("Suara giliran").uncheck();
+  await expect.poll(() => east.page.evaluate(() =>
+    window.localStorage.getItem("bridgeyok.turnAudioMuted"),
+  )).toBe("true");
+  await east.page.getByLabel("Buka menu meja").click();
   await makeCall(east.page, /^Pass/);
   await makeCall(south.page, /^Pass/);
   await west.page.reload();
@@ -360,7 +484,38 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await west.page.getByRole("button", { name: "Ambil alih kendali" }).click();
   await makeCall(west.page, /^Pass/);
 
-  await playNextCard(activePages);
+  const eastTakeover = east.page.getByRole("button", {
+    name: "Ambil alih kendali",
+  });
+  if (await eastTakeover.isVisible()) await eastTakeover.click();
+  await expect(
+    east.page.locator('button[aria-label^="Mainkan "]:enabled').first(),
+  ).toBeVisible();
+  const eastFramesBeforeDrag = mutationFrameCount(east.sentFrames);
+  await returnCardFromInvalidDrop(east.page);
+  expect(mutationFrameCount(east.sentFrames)).toBe(eastFramesBeforeDrag);
+  await expect(
+    east.page.locator('button[aria-label^="Mainkan "]:enabled').first(),
+  ).toBeVisible();
+  await dragPlayableCard(east.page, "mouse");
+  expect(mutationFrameCount(east.sentFrames)).toBe(eastFramesBeforeDrag + 1);
+  await expect(east.page.locator(".current-trick")).toHaveAttribute(
+    "data-motion-stage",
+    "moving",
+  );
+  await east.page.getByLabel("Buka menu meja").evaluate((element) =>
+    (element as HTMLElement).click(),
+  );
+  await expect(east.page.locator(".current-trick")).toHaveAttribute(
+    "data-motion-stage",
+    "moving",
+  );
+  await east.page.getByLabel("Buka menu meja").evaluate((element) =>
+    (element as HTMLElement).click(),
+  );
+  await expect.poll(() => east.page.evaluate(() =>
+    (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
+  )).toBe(1);
   for (const page of [north.page, replacementTab, east.page, south.page, west.page]) {
     if (page !== south.page) {
       await expect(page.locator(".dummy-hand .physical-card")).toHaveCount(13);
@@ -375,9 +530,23 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     });
   }
 
-  for (let _cardIndex = 1; _cardIndex < 4; _cardIndex++) {
-    await playNextCard(activePages);
-  }
+  await playNextCard(activePages);
+  const westFramesBeforeDrag = mutationFrameCount(west.sentFrames);
+  await dragPlayableCard(west.page, "touch");
+  expect(mutationFrameCount(west.sentFrames)).toBe(westFramesBeforeDrag + 1);
+  await playNextCard(activePages);
+  await expect(east.page.locator(".current-trick")).toHaveAttribute(
+    "data-motion-stage",
+    "winner",
+  );
+  await east.page.locator(".current-trick").click({
+    force: true,
+    position: { x: 8, y: 8 },
+  });
+  await expect(east.page.locator(".current-trick")).not.toHaveAttribute(
+    "data-motion-stage",
+    "winner",
+  );
   await expect.poll(async () => {
     const counts = await trickCounts(replacementTab);
     return counts.won + counts.lost;
