@@ -1,7 +1,7 @@
 # BridgeYok Web Roadmap
 
-> Status: **IN PROGRESS — GUX UX-01–UX-03, UX-06–UX-09, dan UX-11–UX-13 PASS; UX-04–UX-05, UX-10, dan UX-14 belum dimulai**
-> Last updated: 1 September 2026
+> Status: **IN PROGRESS — GUX UX-01–UX-13 PASS; UX-14 belum dimulai**
+> Last updated: 2 September 2026
 > Scope: guest entry, lobby navigation, actionable errors, controller takeover, table UX/layout, dan objective GUX frontend-first yang regression-sensitive.
 > Implementation must not begin until the visual-reference and projection audits in Work 0 are complete.
 
@@ -600,7 +600,7 @@ Visual novelty bukan tujuan.
 
 ## 19. Objective GUX — Gameplay UX Reliability & Interaction Refactor
 
-**Status:** IN PROGRESS — UX-01–UX-03, UX-06–UX-09, and UX-11–UX-13 PASS; UX-04–UX-05, UX-10, and UX-14 NOT STARTED
+**Status:** IN PROGRESS — UX-01–UX-13 PASS; UX-14 NOT STARTED
 
 **Priority:** UX correctness dan gameplay feel kira-kira 10× lebih penting daripada decorative polish.
 
@@ -670,6 +670,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ### UX-04 — Gameplay motion and pacing
 
+**Status:** PASS — ordered play/winner/collection queue, board-only skip, and reduced-motion behavior completed 2 September 2026.
+
 - **Problem:** local/remote cards pop into position and completed tricks disappear immediately, obscuring origin, winner, and action order.
 - **Scope:** central interruptible presentation queue for local own/dummy movement, remote movement from participant side, completed-trick pause, winner indication, and collection. Board click completes current normal gameplay animation.
 - **Non-goals:** animation never delays logical state/legality, no random skip button, no skip from clicks outside board, no ornamental perpetual motion.
@@ -683,6 +685,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 - **Completion gate:** UX-04 PASS requires recorded browser evidence for local, dummy, remote, completed trick, and skip behavior.
 
 ### UX-05 — Card interaction and dragging
+
+**Status:** PASS — canonical pointer controller now supports mouse and touch board drops, invalid return, pointer capture, and exactly-once dispatch completed 2 September 2026.
 
 - **Problem:** playable cards only support click; desktop/mobile drag has no physical pickup/drop feedback or forgiving drop area.
 - **Scope:** Pointer Events interaction for all playable own/dummy cards; entire valid board surface is drop pool; legal release uses the same optimistic play action as click/tap; invalid/cancelled release returns card.
@@ -762,6 +766,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ### UX-10 — Turn audio cues
 
+**Status:** PASS — authoritative false-to-true turn detector, browser-safe Web Audio cue, and persisted table-menu mute completed 2 September 2026.
+
 - **Problem:** auction/play turn transitions can be missed when visual focus is elsewhere.
 - **Scope:** short subtle cue only on transition from not-viewer-turn to viewer-turn in auction or play; prevent rerender/resync spam; browser-safe initialization; reasonable mute in existing menu/preferences location.
 - **Non-goals:** no background music, arcade effects, repeated cue while state remains true, or autoplay-policy workaround.
@@ -838,12 +844,12 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ## 20. GATE UX-G1 — Gameplay UX Refactor Complete
 
-Status saat ini: **BLOCKED — UX-01–UX-03, UX-06–UX-09, and UX-11–UX-13 PASS; UX-04–UX-05, UX-10, and UX-14 masih NOT STARTED**.
+Status saat ini: **BLOCKED — UX-01–UX-13 PASS; UX-14 masih NOT STARTED**.
 
 ```text
-[x] UX-01 PASS  [x] UX-02 PASS  [x] UX-03 PASS  [ ] UX-04 PASS
-[ ] UX-05 PASS  [x] UX-06 PASS  [x] UX-07 PASS  [x] UX-08 PASS
-[x] UX-09 PASS  [ ] UX-10 PASS  [x] UX-11 PASS  [x] UX-12 PASS
+[x] UX-01 PASS  [x] UX-02 PASS  [x] UX-03 PASS  [x] UX-04 PASS
+[x] UX-05 PASS  [x] UX-06 PASS  [x] UX-07 PASS  [x] UX-08 PASS
+[x] UX-09 PASS  [x] UX-10 PASS  [x] UX-11 PASS  [x] UX-12 PASS
 [x] UX-13 PASS  [ ] UX-14 PASS
 ```
 
@@ -939,10 +945,11 @@ Record implementation evidence here; all entries begin empty:
 UX-01 extraction/tests: commits 56ef42b, a9cc5ea, 636255b, f8501ba, 5cf8ab1, a6bfa6d; unit 19/19, typecheck, lint, production build, four-browser Playwright 1/1
 UX-02 reconciliation traces: commits 6e9eaae, c2bde4d; unit ACK/event ordering, rejection/rebase, disconnect/snapshot; four-browser 500 ms delayed ACK/event bid/play proof
 UX-03 no-invalid-frame proof: commits 6e9eaae, c2bde4d; capability matrix 6/6; forced disabled Pass dispatch produced zero mutation frames in four-browser Playwright
-UX-04 motion/skip recordings: ______________
-UX-05 desktop/mobile drag: _________________
+UX-04 motion/skip recordings: commits a432824, 0419430; ordered play/winner/collect unit proof, board click skip, navbar non-skip, 500 ms delayed remote events, and reduced-motion browser profile PASS
+UX-05 desktop/mobile drag: commits a432824, 0419430; real mouse pointer and Chromium CDP touch gesture to full board drop pool, invalid outside return, pickup state, optimistic removal, and exactly-one mutation frame PASS
 UX-06 viewport screenshots/geometry: commits 9275dce, 262b3be; Playwright 1920×1080, 1024×768, 768×1024, 390×844, 320×700; aspect ratio, clipping, board-zone containment, dummy/trick and own-hand/table non-overlap PASS
 UX-07–13 component/browser evidence: UX-07–09 commits 9275dce, 262b3be; UX-11–13 commits 8f535ad, c7f4aeb; formatter suits/NT/X/XX/missing identity/long name PASS; viewer-relative trick mapping NS/EW/0–13/no-seat PASS; selectable invite code without Clipboard API PASS; bot icon N/E/S/W at 1440/1024/390/320 plus portal semantics PASS
+UX-10 turn audio: commits a432824, 0419430; false→true/same-snapshot/scored-board unit proof plus Web Audio enabled/muted and localStorage persistence in four-browser flow PASS
 UX-14 matrix report: _______________________
 UX-G1 review/date: _________________________
 ENG-01 privacy review: _____________________
