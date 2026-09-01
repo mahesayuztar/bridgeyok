@@ -32,6 +32,7 @@ export function useCardDrag(onDrop: () => void) {
       completed: false,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging(true);
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -42,7 +43,6 @@ export function useCardDrag(onDrop: () => void) {
     if (!draggingRef.current && Math.hypot(x, y) < DRAG_THRESHOLD) return;
     event.preventDefault();
     draggingRef.current = true;
-    setDragging(true);
     setOffset({ x, y });
   }
 

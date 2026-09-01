@@ -1,4 +1,9 @@
-import type { GameProjection, LiveTableProjection, Seat } from "./table-state.ts";
+import {
+  oppositeSeat,
+  type GameProjection,
+  type LiveTableProjection,
+  type Seat,
+} from "./table-state.ts";
 
 export const TURN_CUE_PEAK_GAIN = 0.18;
 export const TURN_CUE_DURATION_SECONDS = 0.22;
@@ -8,18 +13,29 @@ export type TurnCueState = {
   boardNumber: number;
   phase: GameProjection["phase"];
   turn: Seat | undefined;
-  viewerSeat: Seat | undefined;
+  viewerTurn: boolean;
   revision: number;
 };
 
 export function turnCueState(table: LiveTableProjection): TurnCueState | null {
   if (table.game === undefined) return null;
+  const { game, viewerSeat } = table;
+  const declarer = game.auction.contract?.declarer;
+  const dummy = declarer === undefined ? undefined : oppositeSeat(declarer);
+  const viewerTurn =
+    game.phase === "AUCTION"
+      ? game.turn === viewerSeat
+      : game.phase === "OPENING_LEAD" || game.phase === "PLAY"
+        ? viewerSeat !== dummy &&
+          (game.turn === viewerSeat ||
+            (viewerSeat === declarer && game.turn === dummy))
+        : false;
   return {
     tableId: table.tableId,
-    boardNumber: table.game.board.number,
-    phase: table.game.phase,
-    turn: table.game.turn,
-    viewerSeat: table.viewerSeat,
+    boardNumber: game.board.number,
+    phase: game.phase,
+    turn: game.turn,
+    viewerTurn,
     revision: table.revision,
   };
 }
@@ -38,7 +54,5 @@ export function shouldPlayTurnCue(
     previous.phase === current.phase &&
     previous.turn === current.turn &&
     previous.revision === current.revision;
-  const wasViewerTurn = previous.turn === previous.viewerSeat;
-  const isViewerTurn = current.turn === current.viewerSeat;
-  return !sameSnapshot && !wasViewerTurn && isViewerTurn;
+  return !sameSnapshot && !previous.viewerTurn && current.viewerTurn;
 }

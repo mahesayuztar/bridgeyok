@@ -7,41 +7,6 @@ export const suitLabels: Record<Suit, string> = {
   C: "♣",
 };
 
-const cardRankValue: Record<Card["rank"], number> = {
-  A: 14,
-  K: 13,
-  Q: 12,
-  J: 11,
-  T: 10,
-  "9": 9,
-  "8": 8,
-  "7": 7,
-  "6": 6,
-  "5": 5,
-  "4": 4,
-  "3": 3,
-  "2": 2,
-};
-
-export function sortCardsDescending(cards: Card[]) {
-  return [...cards].sort(
-    (firstCard, secondCard) =>
-      cardRankValue[secondCard.rank] - cardRankValue[firstCard.rank],
-  );
-}
-
-export function dummySuitCardStacks(cards: Card[]) {
-  const stackCount = Math.ceil(cards.length / 6);
-  if (stackCount === 0) return [];
-  const cardsPerStack = Math.ceil(cards.length / stackCount);
-  return Array.from({ length: stackCount }, (_unused, _stackIndex) =>
-    cards.slice(
-      _stackIndex * cardsPerStack,
-      (_stackIndex + 1) * cardsPerStack,
-    ),
-  );
-}
-
 export function callLabel(call: Call) {
   if (call.kind === "PASS") return "Pass";
   if (call.kind === "DOUBLE") return "X";
@@ -70,20 +35,9 @@ export function contractLabel(
 
 export function contractSummaryLabel(
   contract: NonNullable<LiveTableProjection["game"]>["auction"]["contract"],
-  declarerName?: string,
 ) {
   if (contract === undefined) return "Belum ada kontrak";
-  const identity = declarerName === undefined ? "" : ` · ${declarerName}`;
-  return `${contractLabel(contract)} · ${contract.declarer}${identity}`;
-}
-
-export function participantNameForSeat(
-  table: LiveTableProjection,
-  seat: NonNullable<LiveTableProjection["viewerSeat"]>,
-) {
-  const participantId = table.seats[seat]?.participantId;
-  return table.participants.find((participant) => participant.id === participantId)
-    ?.nickname;
+  return `${contractLabel(contract)} ${contract.declarer}`;
 }
 
 export function viewerTrickCounts(table: LiveTableProjection) {

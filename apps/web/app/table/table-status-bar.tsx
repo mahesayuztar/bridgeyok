@@ -2,10 +2,7 @@ import Link from "next/link";
 import type { LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
 import { ConsensusControls } from "./consensus-controls";
-import {
-  contractSummaryLabel,
-  participantNameForSeat,
-} from "./gameplay-presentation";
+import { contractSummaryLabel } from "./gameplay-presentation";
 import { TrickIndicator } from "./trick-indicator";
 
 const vulnerabilityLabels = {
@@ -65,10 +62,6 @@ export function ActiveTableStatusBar({
 }) {
   const game = table.game;
   const contract = game?.auction.contract;
-  const declarerName =
-    contract === undefined
-      ? undefined
-      : participantNameForSeat(table, contract.declarer);
   return (
     <header className="table-status-bar">
       <Link
@@ -97,8 +90,8 @@ export function ActiveTableStatusBar({
         </div>
         <div>
           <dt>Kontrak</dt>
-          <dd className="contract-fact" title={declarerName}>
-            {game === undefined ? "—" : contractSummaryLabel(contract, declarerName)}
+          <dd className="contract-fact">
+            {game === undefined ? "—" : contractSummaryLabel(contract)}
           </dd>
         </div>
         <div>

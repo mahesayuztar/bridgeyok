@@ -1,14 +1,7 @@
 import type { CSSProperties } from "react";
-import type { Card, Suit } from "../table-state";
-import {
-  cardKey,
-  dummySuitCardStacks,
-  sortCardsDescending,
-  suitLabels,
-} from "./gameplay-presentation";
+import type { Card } from "../table-state";
+import { cardKey, suitLabels } from "./gameplay-presentation";
 import { useCardDrag } from "./use-card-drag";
-
-const dummySuitOrder: Suit[] = ["S", "H", "D", "C"];
 
 export function PlayingCard({
   card,
@@ -95,65 +88,24 @@ export function BridgeHand({
       className={`bridge-hand ${className}`}
       data-variant={variant}
       aria-label={title}
+      style={style}
     >
-      <h3>{title}</h3>
-      <div className="hand-cards" style={style}>
-        {variant === "dummy"
-          ? dummySuitOrder.map((suit) => {
-              const suitCards = sortCardsDescending(
-                cards.filter((card) => card.suit === suit),
-              );
-              const cardStacks = dummySuitCardStacks(suitCards);
-
-              return (
-                <div
-                  className={`dummy-suit dummy-suit-${suit.toLowerCase()}`}
-                  key={suit}
-                  aria-label={`${suitLabels[suit]} ${suitCards.length} kartu`}
-                >
-                  <span className="dummy-suit-label" aria-hidden="true">
-                    {suitLabels[suit]}
-                  </span>
-                  <div
-                    className="dummy-suit-cards"
-                    data-stack-count={cardStacks.length}
-                  >
-                    {cardStacks.map((cardStack, _stackIndex) => (
-                      <div
-                        className="dummy-card-stack"
-                        key={`${suit}-${_stackIndex}`}
-                      >
-                        {cardStack.map((card) => (
-                          <PlayingCard
-                            card={card}
-                            variant="dummy"
-                            key={cardKey(card)}
-                            disabled={disabled}
-                            playable={playableKeys.has(cardKey(card))}
-                            {...(onPlay === undefined ? {} : { onPlay })}
-                          />
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })
-          : cards.map((card, _cardIndex) => (
-              <span
-                className="hand-card-slot"
-                data-card-index={_cardIndex}
-                key={cardKey(card)}
-              >
-                <PlayingCard
-                  card={card}
-                  variant={variant}
-                  disabled={disabled}
-                  playable={playableKeys.has(cardKey(card))}
-                  {...(onPlay === undefined ? {} : { onPlay })}
-                />
-              </span>
-            ))}
+      <div className="hand-cards">
+        {cards.map((card, _cardIndex) => (
+          <span
+            className="hand-card-slot"
+            data-card-index={_cardIndex}
+            key={cardKey(card)}
+          >
+            <PlayingCard
+              card={card}
+              variant={variant}
+              disabled={disabled}
+              playable={playableKeys.has(cardKey(card))}
+              {...(onPlay === undefined ? {} : { onPlay })}
+            />
+          </span>
+        ))}
       </div>
     </section>
   );
