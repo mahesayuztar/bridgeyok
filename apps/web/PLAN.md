@@ -1,6 +1,6 @@
 # BridgeYok Web Roadmap
 
-> Status: **IN PROGRESS — GUX UX-01–UX-03 dan UX-06–UX-09 PASS; UX-04–UX-05 dan UX-10–UX-14 belum dimulai**
+> Status: **IN PROGRESS — GUX UX-01–UX-03, UX-06–UX-09, dan UX-11–UX-13 PASS; UX-04–UX-05, UX-10, dan UX-14 belum dimulai**
 > Last updated: 1 September 2026
 > Scope: guest entry, lobby navigation, actionable errors, controller takeover, table UX/layout, dan objective GUX frontend-first yang regression-sensitive.
 > Implementation must not begin until the visual-reference and projection audits in Work 0 are complete.
@@ -600,7 +600,7 @@ Visual novelty bukan tujuan.
 
 ## 19. Objective GUX — Gameplay UX Reliability & Interaction Refactor
 
-**Status:** IN PROGRESS — UX-01–UX-03 and UX-06–UX-09 PASS; UX-04–UX-05 and UX-10–UX-14 NOT STARTED
+**Status:** IN PROGRESS — UX-01–UX-03, UX-06–UX-09, and UX-11–UX-13 PASS; UX-04–UX-05, UX-10, and UX-14 NOT STARTED
 
 **Priority:** UX correctness dan gameplay feel kira-kira 10× lebih penting daripada decorative polish.
 
@@ -776,6 +776,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ### UX-11 — Trick result visualization
 
+**Status:** PASS — viewer-partnership selector and accessible upright-won/sideways-lost indicator completed 1 September 2026.
+
 - **Problem:** plain `NS–EW` numbers do not express viewer-relative won/lost tricks or create the intended history entry point.
 - **Scope:** compact upright card symbol containing won count and sideways card symbol containing lost count, adjacent and accessible, calculated from viewer partnership.
 - **Non-goals:** no scoring change and no history implementation before UX-G1; during GUX it may be a noninteractive element or disabled future entry point.
@@ -790,6 +792,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ### UX-12 — Invite code
 
+**Status:** PASS — waiting and active table surfaces now expose selectable authorized invite text with no Clipboard API dependency.
+
 - **Problem:** dedicated clipboard button is unnecessary and makes basic sharing depend on Clipboard API.
 - **Scope:** show actual invite code as selectable text in relevant dropdown/menu; remove dedicated copy button; preserve invite URL only where the real product flow needs link sharing.
 - **Non-goals:** no required Clipboard API and no exposure outside authorized table participant UI.
@@ -803,6 +807,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 - **Completion gate:** UX-12 PASS requires manual-copy behavior on desktop/mobile.
 
 ### UX-13 — Bot identity
+
+**Status:** PASS — one participant identity composition places the accessible robot icon after every bot name across all seats and the portal.
 
 - **Problem:** bot identity currently appears as secondary text and placement varies with seat layout.
 - **Scope:** compact robot icon immediately to the right of participant name in all horizontal/vertical positions and portal identity where applicable.
@@ -832,13 +838,13 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ## 20. GATE UX-G1 — Gameplay UX Refactor Complete
 
-Status saat ini: **BLOCKED — UX-01–UX-03 and UX-06–UX-09 PASS; UX-04–UX-05 and UX-10–UX-14 masih NOT STARTED**.
+Status saat ini: **BLOCKED — UX-01–UX-03, UX-06–UX-09, and UX-11–UX-13 PASS; UX-04–UX-05, UX-10, and UX-14 masih NOT STARTED**.
 
 ```text
 [x] UX-01 PASS  [x] UX-02 PASS  [x] UX-03 PASS  [ ] UX-04 PASS
 [ ] UX-05 PASS  [x] UX-06 PASS  [x] UX-07 PASS  [x] UX-08 PASS
-[x] UX-09 PASS  [ ] UX-10 PASS  [ ] UX-11 PASS  [ ] UX-12 PASS
-[ ] UX-13 PASS  [ ] UX-14 PASS
+[x] UX-09 PASS  [ ] UX-10 PASS  [x] UX-11 PASS  [x] UX-12 PASS
+[x] UX-13 PASS  [ ] UX-14 PASS
 ```
 
 Gate hanya PASS bila seluruh fourteen objectives memiliki acceptance, browser/mobile, regression, dan completion evidence. TypeScript compile, satu screenshot, atau happy path desktop tidak cukup. **ENG-01, ENG-02, dan ENG-03 dilarang mulai sebelum UX-G1 PASS.** Jika frontend menemukan engine limitation, catat contract/dependency dan lanjutkan frontend dengan boundary/fixture yang aman. Exception engine sebelum gate hanya boleh dibuat bila frontend contract literal mustahil diselesaikan tanpanya, disertai blocker reproduction, smallest compatible change, ADR amendment, dan explicit approval di roadmap.
@@ -936,7 +942,7 @@ UX-03 no-invalid-frame proof: commits 6e9eaae, c2bde4d; capability matrix 6/6; f
 UX-04 motion/skip recordings: ______________
 UX-05 desktop/mobile drag: _________________
 UX-06 viewport screenshots/geometry: commits 9275dce, 262b3be; Playwright 1920×1080, 1024×768, 768×1024, 390×844, 320×700; aspect ratio, clipping, board-zone containment, dummy/trick and own-hand/table non-overlap PASS
-UX-07–13 component/browser evidence: UX-07–09 commits 9275dce, 262b3be; formatter suits/NT/X/XX/missing identity/long name PASS; navbar disabled/available Claim and Undo, keyboard selector/focus return, contract persistence, concise accessible action labels PASS
+UX-07–13 component/browser evidence: UX-07–09 commits 9275dce, 262b3be; UX-11–13 commits 8f535ad, c7f4aeb; formatter suits/NT/X/XX/missing identity/long name PASS; viewer-relative trick mapping NS/EW/0–13/no-seat PASS; selectable invite code without Clipboard API PASS; bot icon N/E/S/W at 1440/1024/390/320 plus portal semantics PASS
 UX-14 matrix report: _______________________
 UX-G1 review/date: _________________________
 ENG-01 privacy review: _____________________
