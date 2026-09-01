@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { LiveTableProjection } from "./table-state";
-import { shouldPlayTurnCue, turnCueState } from "./turn-cue";
+import {
+  shouldPlayTurnCue,
+  TURN_CUE_DURATION_SECONDS,
+  TURN_CUE_PEAK_GAIN,
+  turnCueState,
+} from "./turn-cue";
 
 const TURN_AUDIO_MUTED_KEY = "bridgeyok.turnAudioMuted";
 
@@ -47,14 +52,23 @@ export function useTurnAudio(table: LiveTableProjection | null) {
       const now = context.currentTime;
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(660, now);
-      oscillator.frequency.exponentialRampToValueAtTime(520, now + 0.12);
+      oscillator.frequency.exponentialRampToValueAtTime(
+        520,
+        now + TURN_CUE_DURATION_SECONDS - 0.04,
+      );
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.055, now + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+      gain.gain.exponentialRampToValueAtTime(
+        TURN_CUE_PEAK_GAIN,
+        now + 0.018,
+      );
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        now + TURN_CUE_DURATION_SECONDS,
+      );
       oscillator.connect(gain);
       gain.connect(context.destination);
       oscillator.start(now);
-      oscillator.stop(now + 0.15);
+      oscillator.stop(now + TURN_CUE_DURATION_SECONDS + 0.01);
       oscillator.addEventListener("ended", () => void context.close(), {
         once: true,
       });

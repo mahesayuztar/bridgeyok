@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { gameplayMotionEvents } from "./gameplay-motion.ts";
-import { shouldPlayTurnCue } from "./turn-cue.ts";
+import {
+  GAMEPLAY_MOTION_DURATION,
+  gameplayMotionEvents,
+  shouldSkipCompletedTrickPause,
+} from "./gameplay-motion.ts";
+import {
+  shouldPlayTurnCue,
+  TURN_CUE_DURATION_SECONDS,
+  TURN_CUE_PEAK_GAIN,
+} from "./turn-cue.ts";
 
 function game({
   boardNumber = 1,
@@ -46,6 +54,28 @@ test("gameplay motion preserves the winner pause before collection", () => {
     "collect",
   ]);
   assert.equal(events[1].trick.winner, "N");
+  assert.equal(GAMEPLAY_MOTION_DURATION.winnerPause, 3_200);
+});
+
+test("a lead in the next trick skips the completed trick pause", () => {
+  const completedTrick = { leader: "N", plays, winner: "N" };
+  assert.equal(
+    shouldSkipCompletedTrickPause(
+      game({ completedTricks: [completedTrick] }),
+      game({
+        completedTricks: [completedTrick],
+        currentTrick: { leader: "N", plays: plays.slice(0, 1) },
+      }),
+    ),
+    true,
+  );
+  assert.equal(
+    shouldSkipCompletedTrickPause(
+      game(),
+      game({ currentTrick: { leader: "N", plays: plays.slice(0, 1) } }),
+    ),
+    false,
+  );
 });
 
 test("gameplay motion syncs instead of replaying on board replacement", () => {
@@ -95,4 +125,10 @@ test("turn cue ignores initial snapshots, rerenders, and scored boards", () => {
     ),
     false,
   );
+});
+
+test("turn cue remains clearly audible without clipping", () => {
+  assert.equal(TURN_CUE_PEAK_GAIN, 0.18);
+  assert.equal(TURN_CUE_DURATION_SECONDS, 0.22);
+  assert.ok(TURN_CUE_PEAK_GAIN < 1);
 });

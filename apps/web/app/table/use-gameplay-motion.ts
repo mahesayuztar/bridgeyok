@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  GAMEPLAY_MOTION_DURATION,
   gameplayMotionEvents,
   gameplayMotionKey,
+  shouldSkipCompletedTrickPause,
   type GameplayMotionEvent,
 } from "../gameplay-motion";
 import type { GameProjection, Seat, Trick } from "../table-state";
@@ -27,6 +29,7 @@ export function useGameplayMotion(game: GameProjection | undefined) {
   const queueRef = useRef<GameplayMotionEvent[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishRef = useRef<(() => void) | null>(null);
+  const activeEventKindRef = useRef<GameplayMotionEvent["kind"] | null>(null);
   const reducedMotionRef = useRef(false);
   const runNextRef = useRef<() => void>(() => undefined);
 
@@ -44,6 +47,7 @@ export function useGameplayMotion(game: GameProjection | undefined) {
     }
 
     setIsAnimating(true);
+    activeEventKindRef.current = event.kind;
     setFrame({
       trick: event.trick,
       stage:
@@ -56,16 +60,19 @@ export function useGameplayMotion(game: GameProjection | undefined) {
     });
     const duration = reducedMotionRef.current
       ? event.kind === "winner"
-        ? 120
-        : 40
+        ? GAMEPLAY_MOTION_DURATION.reducedWinnerPause
+        : event.kind === "play"
+          ? GAMEPLAY_MOTION_DURATION.reducedPlay
+          : GAMEPLAY_MOTION_DURATION.reducedCollect
       : event.kind === "play"
-        ? 200
+        ? GAMEPLAY_MOTION_DURATION.play
         : event.kind === "winner"
-          ? 650
-          : 180;
+          ? GAMEPLAY_MOTION_DURATION.winnerPause
+          : GAMEPLAY_MOTION_DURATION.collect;
     const finish = () => {
       timerRef.current = null;
       finishRef.current = null;
+      activeEventKindRef.current = null;
       if (event.kind === "collect") {
         setFrame({ trick: emptyTrick, stage: "idle" });
       } else if (event.kind === "play") {
@@ -110,7 +117,25 @@ export function useGameplayMotion(game: GameProjection | undefined) {
       queueMicrotask(() => runNextRef.current());
       return;
     }
-    queueRef.current.push(...gameplayMotionEvents(previousGame, game));
+    const events = gameplayMotionEvents(previousGame, game);
+    const skipCompletedPause = shouldSkipCompletedTrickPause(previousGame, game);
+    if (skipCompletedPause) {
+      queueRef.current = queueRef.current.filter(
+        (event) => event.kind !== "winner" && event.kind !== "collect",
+      );
+    }
+    queueRef.current.push(...events);
+    if (
+      skipCompletedPause &&
+      (activeEventKindRef.current === "winner" ||
+        activeEventKindRef.current === "collect") &&
+      timerRef.current !== null &&
+      finishRef.current !== null
+    ) {
+      clearTimeout(timerRef.current);
+      finishRef.current();
+      return;
+    }
     queueMicrotask(() => runNextRef.current());
   }, [game]);
 
@@ -119,6 +144,7 @@ export function useGameplayMotion(game: GameProjection | undefined) {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = null;
       finishRef.current = null;
+      activeEventKindRef.current = null;
       queueRef.current = [];
     },
     [],

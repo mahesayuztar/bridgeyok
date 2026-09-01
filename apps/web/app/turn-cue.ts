@@ -1,5 +1,8 @@
 import type { GameProjection, LiveTableProjection, Seat } from "./table-state.ts";
 
+export const TURN_CUE_PEAK_GAIN = 0.18;
+export const TURN_CUE_DURATION_SECONDS = 0.22;
+
 export type TurnCueState = {
   tableId: string;
   boardNumber: number;

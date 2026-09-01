@@ -6,6 +6,15 @@ export type GameplayMotionEvent =
   | { kind: "collect"; trick: Trick }
   | { kind: "sync"; trick: Trick };
 
+export const GAMEPLAY_MOTION_DURATION = {
+  play: 220,
+  winnerPause: 3_200,
+  collect: 180,
+  reducedPlay: 40,
+  reducedWinnerPause: 1_200,
+  reducedCollect: 40,
+} as const;
+
 function cardKey(trick: Trick) {
   return trick.plays
     .map((play) => `${play.seat}:${play.card.suit}${play.card.rank}`)
@@ -90,4 +99,16 @@ export function gameplayMotionEvents(
   }
 
   return [{ kind: "sync", trick: current.currentTrick }];
+}
+
+export function shouldSkipCompletedTrickPause(
+  previous: GameProjection,
+  current: GameProjection,
+) {
+  return (
+    previous.completedTricks.length > 0 &&
+    current.completedTricks.length === previous.completedTricks.length &&
+    previous.currentTrick.plays.length === 0 &&
+    current.currentTrick.plays.length > 0
+  );
 }
