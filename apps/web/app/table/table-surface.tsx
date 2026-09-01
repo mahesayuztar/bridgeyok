@@ -15,6 +15,7 @@ export function TableSurface({
   presence,
   canSendCommand,
   onCommand,
+  onBoardClick,
   children,
 }: {
   table: LiveTableProjection;
@@ -22,6 +23,7 @@ export function TableSurface({
   presence: Record<string, ParticipantPresence>;
   canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
+  onBoardClick?: () => void;
   children: ReactNode;
 }) {
   const isOwner = table.viewerRole === "OWNER";
@@ -49,7 +51,18 @@ export function TableSurface({
           />
         ),
       )}
-      <div className="board-play-zone" data-board-zone="play">
+      <div
+        className="board-play-zone"
+        data-board-zone="play"
+        onClick={(event) => {
+          if (
+            event.target instanceof Element &&
+            event.target.closest("button, a, input, select, textarea, details, [role='dialog']")
+          )
+            return;
+          onBoardClick?.();
+        }}
+      >
         {children}
       </div>
     </div>

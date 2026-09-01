@@ -1,26 +1,38 @@
 import {
   visualPositionForSeat,
-  type LiveTableProjection,
+  type Seat,
   type TableOrientation,
+  type Trick,
 } from "../table-state";
 import { PlayingCard } from "./playing-card";
 
 export function CurrentTrick({
-  game,
+  trick,
   orientation,
+  stage = "idle",
+  movingSeat,
 }: {
-  game: NonNullable<LiveTableProjection["game"]>;
+  trick: Trick;
   orientation: TableOrientation;
+  stage?: "idle" | "moving" | "winner" | "collecting";
+  movingSeat?: Seat;
 }) {
   return (
-    <div className="current-trick" aria-label="Trick saat ini">
+    <div
+      className="current-trick"
+      aria-label="Trick saat ini"
+      data-motion-stage={stage}
+      data-winner={trick.winner}
+    >
       <span className="trick-center">
-        {game.currentTrick.plays.length === 0 ? "Lead" : ""}
+        {trick.plays.length === 0 ? "Lead" : ""}
       </span>
-      {game.currentTrick.plays.map((play) => (
+      {trick.plays.map((play) => (
         <div
           className={`trick-slot trick-${visualPositionForSeat(orientation, play.seat)}`}
           key={play.seat}
+          data-moving={stage === "moving" && movingSeat === play.seat}
+          data-winner={stage === "winner" && trick.winner === play.seat}
         >
           <span>{play.seat}</span>
           <PlayingCard card={play.card} variant="trick" />

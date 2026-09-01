@@ -2182,6 +2182,88 @@ button.physical-card:disabled {
   }
 }
 
+.table-menu-toggle {
+  display: flex;
+  min-height: auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.7rem;
+  border-top: 1px solid var(--line);
+  color: var(--foreground);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.table-menu-toggle input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--accent-strong);
+}
+button.physical-card:not(:disabled) {
+  cursor: grab;
+  touch-action: none;
+}
+button.physical-card.is-dragging {
+  z-index: 40;
+  cursor: grabbing;
+  transform: translate(var(--drag-x), var(--drag-y)) rotate(1deg) !important;
+  transition: none;
+  will-change: transform;
+}
+.trick-slot[data-moving="true"] .physical-card {
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+.trick-slot[data-moving="true"].trick-top .physical-card {
+  animation-name: card-from-top;
+}
+.trick-slot[data-moving="true"].trick-right .physical-card {
+  animation-name: card-from-right;
+}
+.trick-slot[data-moving="true"].trick-bottom .physical-card {
+  animation-name: card-from-bottom;
+}
+.trick-slot[data-moving="true"].trick-left .physical-card {
+  animation-name: card-from-left;
+}
+.trick-slot[data-winner="true"] .physical-card {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  transform: translateY(-0.2rem);
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.current-trick[data-motion-stage="collecting"] .trick-slot .physical-card {
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity 180ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes card-from-top {
+  from {
+    opacity: 0;
+    transform: translateY(-45%);
+  }
+}
+@keyframes card-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(45%);
+  }
+}
+@keyframes card-from-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(45%);
+  }
+}
+@keyframes card-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-45%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -2197,5 +2279,8 @@ button.physical-card:disabled {
   .loading-spinner {
     border-right-color: currentColor;
     opacity: 0.55;
+  }
+  .trick-slot[data-moving="true"] .physical-card {
+    animation-duration: 40ms !important;
   }
 }

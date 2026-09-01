@@ -21,8 +21,10 @@ import {
   WaitingTableStatusBar,
 } from "./table/table-status-bar";
 import { TableSurface } from "./table/table-surface";
+import { useGameplayMotion } from "./table/use-gameplay-motion";
 import { WaitingRoom } from "./table/waiting-room";
 import { useTableSession } from "./use-table-session";
+import { useTurnAudio } from "./use-turn-audio";
 
 export default function BridgeTable({
   expectedTableId,
@@ -41,6 +43,8 @@ export default function BridgeTable({
   );
   const legalPlay = table === null ? null : playableHand(table);
   const viewerTurn = game?.turn === table?.viewerSeat;
+  const motion = useGameplayMotion(game);
+  const turnAudio = useTurnAudio(session.tableState.table);
 
   useEffect(() => {
     if (session.initializing) return;
@@ -175,6 +179,8 @@ export default function BridgeTable({
         inviteCode={session.inviteCode}
         canSendCommand={session.canSendCommand}
         onCommand={session.sendCommand}
+        soundMuted={turnAudio.muted}
+        onSoundMutedChange={turnAudio.setMuted}
       />
 
       <div className="table-feedback" aria-live="polite">
@@ -214,6 +220,7 @@ export default function BridgeTable({
         presence={session.tableState.presence}
         canSendCommand={session.canSendCommand}
         onCommand={session.sendCommand}
+        onBoardClick={motion.skipCurrent}
       >
         {game?.phase === "AUCTION" ? (
           <div className="auction-workspace">
@@ -249,7 +256,14 @@ export default function BridgeTable({
                 }
               />
             )}
-            <CurrentTrick game={game} orientation={orientation} />
+            <CurrentTrick
+              trick={motion.frame.trick}
+              orientation={orientation}
+              stage={motion.frame.stage}
+              {...(motion.frame.movingSeat === undefined
+                ? {}
+                : { movingSeat: motion.frame.movingSeat })}
+            />
           </>
         ) : null}
         {game?.result === undefined &&

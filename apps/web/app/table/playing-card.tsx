@@ -5,6 +5,7 @@ import {
   sortCardsDescending,
   suitLabels,
 } from "./gameplay-presentation";
+import { useCardDrag } from "./use-card-drag";
 
 const dummySuitOrder: Suit[] = ["S", "H", "D", "C"];
 
@@ -21,6 +22,7 @@ export function PlayingCard({
   playable?: boolean;
   onPlay?: (card: Card) => void;
 }) {
+  const drag = useCardDrag(() => onPlay?.(card));
   const rank = card.rank === "T" ? "10" : card.rank;
   const content = (
     <>
@@ -33,7 +35,7 @@ export function PlayingCard({
       </span>
     </>
   );
-  const className = `physical-card suit-${card.suit.toLowerCase()} card-${variant}`;
+  const className = `physical-card suit-${card.suit.toLowerCase()} card-${variant}${drag.dragging ? " is-dragging" : ""}`;
   const label = `${rank} ${suitLabels[card.suit]}`;
 
   if (onPlay === undefined) {
@@ -48,7 +50,19 @@ export function PlayingCard({
       className={className}
       type="button"
       disabled={disabled || !playable}
-      onClick={() => onPlay(card)}
+      onClick={() => {
+        if (!drag.shouldSuppressClick()) onPlay(card);
+      }}
+      onPointerDown={drag.handlePointerDown}
+      onPointerMove={drag.handlePointerMove}
+      onPointerUp={drag.handlePointerUp}
+      onPointerCancel={drag.handlePointerCancel}
+      onLostPointerCapture={drag.handleLostPointerCapture}
+      style={{
+        "--drag-x": `${drag.offset.x}px`,
+        "--drag-y": `${drag.offset.y}px`,
+      } as CSSProperties}
+      data-dragging={drag.dragging}
       aria-label={`Mainkan ${label}`}
     >
       {content}

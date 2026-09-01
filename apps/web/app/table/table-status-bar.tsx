@@ -52,12 +52,16 @@ export function ActiveTableStatusBar({
   inviteCode,
   canSendCommand,
   onCommand,
+  soundMuted,
+  onSoundMutedChange,
 }: {
   table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
   inviteCode: string | null;
   canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
+  soundMuted: boolean;
+  onSoundMutedChange: (muted: boolean) => void;
 }) {
   const game = table.game;
   const contract = game?.auction.contract;
@@ -126,6 +130,14 @@ export function ActiveTableStatusBar({
                 <code className="invite-code">{inviteCode}</code>
               </span>
             )}
+            <label className="table-menu-toggle">
+              <input
+                type="checkbox"
+                checked={!soundMuted}
+                onChange={(event) => onSoundMutedChange(!event.target.checked)}
+              />
+              Suara giliran
+            </label>
             <span>Rev {table.revision}</span>
           </div>
         </details>
