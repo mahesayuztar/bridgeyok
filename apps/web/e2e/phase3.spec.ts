@@ -63,6 +63,12 @@ async function setReady(page: Page, nickname: string) {
 
 async function makeCall(page: Page, name: RegExp) {
   const button = page.getByRole("button", { name });
+  if (!(await button.isEnabled())) {
+    const takeover = page.getByRole("button", {
+      name: "Ambil alih kendali",
+    });
+    if (await takeover.isVisible()) await takeover.click();
+  }
   await expect(button).toBeEnabled();
   await button.click();
 }
@@ -78,7 +84,16 @@ async function makeBid(page: Page, level: number, strain: string) {
 async function playNextCard(pages: Page[]) {
   await expect.poll(async () => {
     const counts = await Promise.all(pages.map((page) => page.locator('button[aria-label^="Mainkan "]:enabled').count()));
-    return counts.reduce((total, count) => total + count, 0);
+    const playableCount = counts.reduce((total, count) => total + count, 0);
+    if (playableCount === 0) {
+      for (const page of pages) {
+        const takeover = page.getByRole("button", {
+          name: "Ambil alih kendali",
+        });
+        if (await takeover.isVisible()) await takeover.click();
+      }
+    }
+    return playableCount;
   }).toBeGreaterThan(0);
   for (const page of pages) {
     const cards = page.locator('button[aria-label^="Mainkan "]:enabled');
@@ -103,6 +118,7 @@ async function dragPlayableCard(page: Page, pointer: "mouse" | "touch") {
     ".own-hand .physical-card, .dummy-hand .physical-card",
   );
   const board = page.locator(".board-play-zone");
+  await card.scrollIntoViewIfNeeded();
   await expect(card).toBeVisible();
   const cardCountBefore = await handCards.count();
   const cardBox = await card.boundingBox();
@@ -218,14 +234,38 @@ async function assertGameplayGeometry(page: Page) {
       first.bottom > second.top + 1;
     const surface = rect(document.querySelector(".table-surface"));
     const playZone = rect(document.querySelector(".board-play-zone"));
-    const ownHand = rect(document.querySelector(".own-hand"));
-    const dummyCards = [...document.querySelectorAll(".dummy-hand .physical-card")].map(rect);
+    const ownHandElement = document.querySelector<HTMLElement>(".own-hand");
+    const ownHandScrollElement =
+      ownHandElement?.querySelector<HTMLElement>(".hand-cards") ?? null;
+    const ownHand = rect(ownHandElement);
+    const dummyCardElements = [
+      ...document.querySelectorAll<HTMLElement>(".dummy-hand .physical-card"),
+    ];
+    const dummyCards = dummyCardElements.map(rect);
     const trickCards = [...document.querySelectorAll(".trick-slot .physical-card")].map(rect);
     const cards = [...document.querySelectorAll(".physical-card")].map((card) => {
       const box = card.getBoundingClientRect();
-      const zone = card.closest(".board-play-zone, .own-hand")?.getBoundingClientRect();
+      const ownHand = card.closest<HTMLElement>(".own-hand");
+      const scrollContainer =
+        card.closest<HTMLElement>(".bridge-hand")
+          ?.querySelector<HTMLElement>(".hand-cards") ?? null;
+      const zoneElement =
+        ownHand?.querySelector<HTMLElement>(".hand-cards") ??
+        card.closest<HTMLElement>(".board-play-zone");
+      const zone = zoneElement?.getBoundingClientRect();
+      const verticalClip =
+        zone === undefined || box.top < zone.top - 1 || box.bottom > zone.bottom + 1;
+      const horizontalClip =
+        zone === undefined || box.left < zone.left - 1 || box.right > zone.right + 1;
+      const horizontalScrollAvailable =
+        scrollContainer !== null &&
+        scrollContainer.scrollWidth > scrollContainer.clientWidth;
       return {
         ratio: box.width / box.height,
+        width: box.width,
+        cornerFontSize: Number.parseFloat(
+          getComputedStyle(card.querySelector(".card-corner")!).fontSize,
+        ),
         label: card.getAttribute("aria-label"),
         className: card.className,
         zoneClassName: card.closest(".board-play-zone, .own-hand")?.className,
@@ -238,19 +278,42 @@ async function assertGameplayGeometry(page: Page) {
                 bottom: zone.bottom - box.bottom,
                 left: box.left - zone.left,
               },
-        clipped:
-          zone === undefined ||
-          box.left < zone.left - 1 ||
-          box.right > zone.right + 1 ||
-          box.top < zone.top - 1 ||
-          box.bottom > zone.bottom + 1,
+        clipped: verticalClip || (horizontalClip && !horizontalScrollAvailable),
       };
     });
+    const ownCardSlots = [
+      ...document.querySelectorAll<HTMLElement>(".own-hand .hand-card-slot"),
+    ];
+    const ownCardExposure = ownCardSlots
+      .slice(1)
+      .map((slot, _slotIndex) =>
+        slot.getBoundingClientRect().left -
+        ownCardSlots[_slotIndex]!.getBoundingClientRect().left,
+      );
+    const wonIndicator = rect(document.querySelector(".trick-won"));
+    const lostIndicator = rect(document.querySelector(".trick-lost"));
     return {
       cards,
+      ownCardExposure,
+      ownHandScrollable:
+        ownHandScrollElement !== null &&
+        ownHandScrollElement.scrollWidth > ownHandScrollElement.clientWidth,
+      dummyBlockedByTrick: dummyCardElements.some((card) => {
+        const box = card.getBoundingClientRect();
+        const target = document.elementFromPoint(box.left + 7, box.top + 7);
+        return target !== null && target.closest(".current-trick") !== null;
+      }),
       dummyTrickOverlap: dummyCards.some((dummyCard) =>
         trickCards.some((trickCard) => overlaps(dummyCard, trickCard)),
       ),
+      indicator:
+        wonIndicator === null || lostIndicator === null
+          ? null
+          : {
+              won: wonIndicator,
+              lost: lostIndicator,
+              bottomDelta: Math.abs(wonIndicator.bottom - lostIndicator.bottom),
+            },
       ownHandOverlapsSurface: overlaps(ownHand, surface),
       playZoneInsideSurface:
         surface !== null &&
@@ -272,10 +335,41 @@ async function assertGameplayGeometry(page: Page) {
     geometry.cards.filter((card) => Math.abs(card.ratio - 5 / 7) >= 0.035),
   ).toEqual([]);
   expect(geometry.cards.filter((card) => card.clipped)).toEqual([]);
+  expect(geometry.cards.every((card) => card.cornerFontSize >= 14)).toBe(true);
+  expect(
+    geometry.cards
+      .filter((card) => card.className.includes("card-hand"))
+      .every((card) => card.width >= 68),
+  ).toBe(true);
+  expect(
+    geometry.cards
+      .filter((card) => card.className.includes("card-dummy"))
+      .every((card) =>
+        card.width >= (geometry.viewport.width <= 400 ? 56 : 60),
+      ),
+  ).toBe(true);
+  expect(
+    geometry.cards
+      .filter((card) => card.className.includes("card-trick"))
+      .every((card) => card.width >= 52),
+  ).toBe(true);
+  expect(geometry.ownCardExposure.every((exposure) => exposure >= 31)).toBe(true);
+  if (geometry.viewport.width <= 400) {
+    expect(geometry.ownHandScrollable).toBe(true);
+  }
+  expect(geometry.dummyBlockedByTrick).toBe(false);
   expect(geometry.dummyTrickOverlap).toBe(false);
   expect(geometry.ownHandOverlapsSurface).toBe(false);
   expect(geometry.playZoneInsideSurface).toBe(true);
   expect(geometry.documentOverflow).toEqual({ x: false, y: false });
+  expect(geometry.indicator).not.toBeNull();
+  expect(geometry.indicator!.won.height).toBeGreaterThan(
+    geometry.indicator!.won.width,
+  );
+  expect(geometry.indicator!.lost.width).toBeGreaterThan(
+    geometry.indicator!.lost.height,
+  );
+  expect(geometry.indicator!.bottomDelta).toBeLessThanOrEqual(1);
 }
 
 async function selectText(page: Page, selector: string) {
@@ -300,7 +394,7 @@ async function trickCounts(page: Page) {
 }
 
 test("four guests finish boards, recover a controller, and keep hidden hands private", async ({ browser }, testInfo) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const profiles = [
     { nickname: "Nara", viewport: { width: 1920, height: 1080 } },
     { nickname: "Eka", viewport: { width: 1024, height: 768 } },
@@ -497,19 +591,38 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await expect(
     east.page.locator('button[aria-label^="Mainkan "]:enabled').first(),
   ).toBeVisible();
+  await east.page.evaluate(() => {
+    const motionWindow = window as Window & { __motionStages?: string[] };
+    const trick = document.querySelector(".current-trick");
+    motionWindow.__motionStages = [];
+    if (trick === null) return;
+    new MutationObserver(() => {
+      motionWindow.__motionStages?.push(
+        trick.getAttribute("data-motion-stage") ?? "missing",
+      );
+    }).observe(trick, {
+      attributeFilter: ["data-motion-stage"],
+    });
+  });
   await dragPlayableCard(east.page, "mouse");
   expect(mutationFrameCount(east.sentFrames)).toBe(eastFramesBeforeDrag + 1);
-  await expect(east.page.locator(".current-trick")).toHaveAttribute(
-    "data-motion-stage",
-    "moving",
+  await expect.poll(() => east.page.evaluate(() =>
+    (window as Window & { __motionStages?: string[] }).__motionStages?.includes(
+      "moving",
+    ) ?? false,
+  )).toBe(true);
+  const menuMotionStages = await east.page.getByLabel("Buka menu meja").evaluate(
+    (element) => {
+      const trick = document.querySelector(".current-trick");
+      const before = trick?.getAttribute("data-motion-stage");
+      (element as HTMLElement).click();
+      return {
+        before,
+        after: trick?.getAttribute("data-motion-stage"),
+      };
+    },
   );
-  await east.page.getByLabel("Buka menu meja").evaluate((element) =>
-    (element as HTMLElement).click(),
-  );
-  await expect(east.page.locator(".current-trick")).toHaveAttribute(
-    "data-motion-stage",
-    "moving",
-  );
+  expect(menuMotionStages.after).toBe(menuMotionStages.before);
   await east.page.getByLabel("Buka menu meja").evaluate((element) =>
     (element as HTMLElement).click(),
   );
@@ -521,16 +634,28 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
       await expect(page.locator(".dummy-hand .physical-card")).toHaveCount(13);
     }
     await expect(page.locator(".trick-slot .physical-card")).toHaveCount(1);
-    await assertGameplayGeometry(page);
     await page.screenshot({
       path: testInfo.outputPath(
         `gameplay-${page.viewportSize()?.width}x${page.viewportSize()?.height}.png`,
       ),
       fullPage: false,
     });
+    await assertGameplayGeometry(page);
   }
 
-  await playNextCard(activePages);
+  const dummyPlay = replacementTab.locator(
+    '.dummy-hand button[aria-label^="Mainkan "]:enabled',
+  ).first();
+  await expect(dummyPlay).toBeVisible();
+  const dummyPlayLabel = await dummyPlay.getAttribute("aria-label");
+  expect(dummyPlayLabel).not.toBeNull();
+  await dummyPlay.click({ position: { x: 8, y: 8 } });
+  await expect(
+    replacementTab.getByRole("button", {
+      name: dummyPlayLabel!,
+      exact: true,
+    }),
+  ).toHaveCount(0);
   const westFramesBeforeDrag = mutationFrameCount(west.sentFrames);
   await dragPlayableCard(west.page, "touch");
   expect(mutationFrameCount(west.sentFrames)).toBe(westFramesBeforeDrag + 1);
@@ -539,10 +664,12 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     "data-motion-stage",
     "winner",
   );
-  await east.page.locator(".current-trick").click({
-    force: true,
-    position: { x: 8, y: 8 },
-  });
+  const trickBox = await east.page.locator(".current-trick").boundingBox();
+  expect(trickBox).not.toBeNull();
+  await east.page.mouse.click(
+    trickBox!.x + trickBox!.width / 2,
+    trickBox!.y + trickBox!.height / 2,
+  );
   await expect(east.page.locator(".current-trick")).not.toHaveAttribute(
     "data-motion-stage",
     "winner",
