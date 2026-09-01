@@ -6,9 +6,6 @@ import {
   cardKey,
   contractLabel,
   contractSummaryLabel,
-  dummySuitCardStacks,
-  participantNameForSeat,
-  sortCardsDescending,
   viewerTrickCounts,
 } from "./table/gameplay-presentation.ts";
 
@@ -22,7 +19,7 @@ test("gameplay presentation keeps bridge labels stable", () => {
   assert.equal(cardKey({ suit: "H", rank: "T" }), "HT");
 });
 
-test("contract presentation preserves declarer identity and doubling", () => {
+test("contract presentation keeps only contract, doubling, and declarer seat", () => {
   const contract = {
     level: 4,
     strain: "H",
@@ -30,64 +27,13 @@ test("contract presentation preserves declarer identity and doubling", () => {
     declarer: "N",
   };
   assert.equal(contractLabel(contract), "4♥ X");
-  assert.equal(contractSummaryLabel(contract, "Mahesa"), "4♥ X · N · Mahesa");
-  assert.equal(contractSummaryLabel(contract), "4♥ X · N");
+  assert.equal(contractSummaryLabel(contract), "4♥ X N");
   assert.equal(contractLabel(undefined), "Belum ada kontrak");
   assert.equal(contractSummaryLabel(undefined), "Belum ada kontrak");
   assert.equal(
-    contractSummaryLabel({ ...contract, strain: "NT", doubling: "REDOUBLED" }, "Nama pemain yang panjang"),
-    "4NT XX · N · Nama pemain yang panjang",
+    contractSummaryLabel({ ...contract, strain: "NT", doubling: "REDOUBLED" }),
+    "4NT XX N",
   );
-});
-
-test("contract presentation resolves the declarer name from seat assignments", () => {
-  assert.equal(
-    participantNameForSeat(
-      {
-        seats: { N: { participantId: "north" } },
-        participants: [{ id: "north", nickname: "Nara" }],
-      },
-      "N",
-    ),
-    "Nara",
-  );
-  assert.equal(
-    participantNameForSeat({ seats: {}, participants: [] }, "E"),
-    undefined,
-  );
-});
-
-test("dummy presentation sorts ranks descending without mutating the hand", () => {
-  const cards = [
-    { suit: "S", rank: "2" },
-    { suit: "S", rank: "A" },
-    { suit: "S", rank: "T" },
-  ];
-  assert.deepEqual(sortCardsDescending(cards), [
-    { suit: "S", rank: "A" },
-    { suit: "S", rank: "T" },
-    { suit: "S", rank: "2" },
-  ]);
-  assert.deepEqual(cards, [
-    { suit: "S", rank: "2" },
-    { suit: "S", rank: "A" },
-    { suit: "S", rank: "T" },
-  ]);
-});
-
-test("dummy presentation splits extreme suits into short readable stacks", () => {
-  const cards = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3"].map(
-    (rank) => ({ suit: "S", rank }),
-  );
-  assert.deepEqual(
-    dummySuitCardStacks(cards).map((stack) => stack.map((card) => card.rank)),
-    [
-      ["A", "K", "Q", "J", "T", "9"],
-      ["8", "7", "6", "5", "4", "3"],
-    ],
-  );
-  assert.deepEqual(dummySuitCardStacks([]), []);
-  assert.equal(cards.length, 12);
 });
 
 test("trick counts follow the viewer partnership", () => {

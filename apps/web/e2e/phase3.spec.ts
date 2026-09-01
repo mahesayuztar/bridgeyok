@@ -112,8 +112,12 @@ async function playNextCard(pages: Page[]) {
   throw new Error("no playable card was exposed to the current controller");
 }
 
-async function dragPlayableCard(page: Page, pointer: "mouse" | "touch") {
-  const card = page.locator('button[aria-label^="Mainkan "]:enabled').last();
+async function dragPlayableCard(
+  page: Page,
+  pointer: "mouse" | "touch",
+  selector = 'button[aria-label^="Mainkan "]:enabled',
+) {
+  const card = page.locator(selector).last();
   const handCards = page.locator(
     ".own-hand .physical-card, .dummy-hand .physical-card",
   );
@@ -141,12 +145,18 @@ async function dragPlayableCard(page: Page, pointer: "mouse" | "touch") {
       type: "touchStart",
       touchPoints: [{ x: startX, y: startY }],
     });
+    await expect(page.locator('.physical-card[data-dragging="true"]')).toHaveCount(1);
+    const pickupX = startX < endX ? startX + 24 : startX - 24;
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: pickupX, y: startY }],
+    });
     for (let _step = 1; _step <= 5; _step++) {
       await session.send("Input.dispatchTouchEvent", {
         type: "touchMove",
         touchPoints: [
           {
-            x: startX + ((endX - startX) * _step) / 5,
+            x: pickupX + ((endX - pickupX) * _step) / 5,
             y: startY + ((endY - startY) * _step) / 5,
           },
         ],
@@ -243,6 +253,9 @@ async function assertGameplayGeometry(page: Page) {
     ];
     const dummyCards = dummyCardElements.map(rect);
     const trickCards = [...document.querySelectorAll(".trick-slot .physical-card")].map(rect);
+    const dummyHand = rect(document.querySelector(".dummy-hand"));
+    const currentTrick = rect(document.querySelector(".current-trick"));
+    const handCard = rect(document.querySelector(".own-hand .physical-card"));
     const cards = [...document.querySelectorAll(".physical-card")].map((card) => {
       const box = card.getBoundingClientRect();
       const ownHand = card.closest<HTMLElement>(".own-hand");
@@ -298,6 +311,37 @@ async function assertGameplayGeometry(page: Page) {
       ownHandScrollable:
         ownHandScrollElement !== null &&
         ownHandScrollElement.scrollWidth > ownHandScrollElement.clientWidth,
+      dummyHasExtras:
+        document.querySelector(".dummy-hand h3, .dummy-suit, .dummy-suit-label") !==
+        null,
+      dummyCenterDelta:
+        dummyHand === null || playZone === null
+          ? null
+          : Math.abs(
+              dummyHand.left + dummyHand.width / 2 -
+                (playZone.left + playZone.width / 2),
+            ),
+      trickCenterDelta:
+        currentTrick === null || playZone === null
+          ? null
+          : {
+              x: Math.abs(
+                currentTrick.left + currentTrick.width / 2 -
+                  (playZone.left + playZone.width / 2),
+              ),
+              y: Math.abs(
+                currentTrick.top + currentTrick.height / 2 -
+                  (playZone.top + playZone.height / 2),
+              ),
+            },
+      playedCardMatchesHand:
+        handCard !== null &&
+        trickCards.every(
+          (trickCard) =>
+            trickCard !== null &&
+            Math.abs(trickCard.width - handCard.width) <= 1 &&
+            Math.abs(trickCard.height - handCard.height) <= 1,
+        ),
       dummyBlockedByTrick: dummyCardElements.some((card) => {
         const box = card.getBoundingClientRect();
         const target = document.elementFromPoint(box.left + 7, box.top + 7);
@@ -353,9 +397,15 @@ async function assertGameplayGeometry(page: Page) {
       .filter((card) => card.className.includes("card-trick"))
       .every((card) => card.width >= 52),
   ).toBe(true);
-  expect(geometry.ownCardExposure.every((exposure) => exposure >= 31)).toBe(true);
+  expect(geometry.ownCardExposure.every((exposure) => exposure >= 18)).toBe(true);
+  expect(geometry.ownHandScrollable).toBe(false);
+  expect(geometry.dummyHasExtras).toBe(false);
+  expect(geometry.playedCardMatchesHand).toBe(true);
+  expect(geometry.trickCenterDelta).not.toBeNull();
+  expect(geometry.trickCenterDelta!.x).toBeLessThanOrEqual(1);
+  expect(geometry.trickCenterDelta!.y).toBeLessThanOrEqual(1);
   if (geometry.viewport.width <= 400) {
-    expect(geometry.ownHandScrollable).toBe(true);
+    expect(geometry.dummyCenterDelta).toBeLessThanOrEqual(1);
   }
   expect(geometry.dummyBlockedByTrick).toBe(false);
   expect(geometry.dummyTrickOverlap).toBe(false);
@@ -523,6 +573,9 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     socket.on("framereceived", (event) =>
       north.frames.push(String(event.payload)),
     );
+    socket.on("framesent", (event) =>
+      north.sentFrames.push(String(event.payload)),
+    );
   });
   await replacementTab.goto(tableURL);
   await waitForConnection(replacementTab);
@@ -586,6 +639,12 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     east.page.locator('button[aria-label^="Mainkan "]:enabled').first(),
   ).toBeVisible();
   const eastFramesBeforeDrag = mutationFrameCount(east.sentFrames);
+  const declarerCueBeforeLead = await replacementTab.evaluate(() =>
+    (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
+  );
+  const dummyCueBeforeLead = await south.page.evaluate(() =>
+    (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
+  );
   await returnCardFromInvalidDrop(east.page);
   expect(mutationFrameCount(east.sentFrames)).toBe(eastFramesBeforeDrag);
   await expect(
@@ -606,6 +665,13 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   });
   await dragPlayableCard(east.page, "mouse");
   expect(mutationFrameCount(east.sentFrames)).toBe(eastFramesBeforeDrag + 1);
+  await expect.poll(() => replacementTab.evaluate(() =>
+    (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
+  )).toBe(declarerCueBeforeLead + 1);
+  await south.page.waitForTimeout(600);
+  expect(await south.page.evaluate(() =>
+    (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
+  )).toBe(dummyCueBeforeLead);
   await expect.poll(() => east.page.evaluate(() =>
     (window as Window & { __motionStages?: string[] }).__motionStages?.includes(
       "moving",
@@ -645,11 +711,17 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
 
   const dummyPlay = replacementTab.locator(
     '.dummy-hand button[aria-label^="Mainkan "]:enabled',
-  ).first();
+  ).last();
   await expect(dummyPlay).toBeVisible();
   const dummyPlayLabel = await dummyPlay.getAttribute("aria-label");
   expect(dummyPlayLabel).not.toBeNull();
-  await dummyPlay.click({ position: { x: 8, y: 8 } });
+  const dummyFramesBeforeDrag = mutationFrameCount(north.sentFrames);
+  await dragPlayableCard(
+    replacementTab,
+    "touch",
+    '.dummy-hand button[aria-label^="Mainkan "]:enabled',
+  );
+  expect(mutationFrameCount(north.sentFrames)).toBe(dummyFramesBeforeDrag + 1);
   await expect(
     replacementTab.getByRole("button", {
       name: dummyPlayLabel!,
@@ -724,7 +796,15 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     assertPrivateFrames(player.frames);
   }
 
-  await replacementTab.getByRole("button", { name: "Board berikutnya" }).click();
+  await east.page.locator(".board-result").click({ position: { x: 12, y: 12 } });
+  await expect(east.page.locator(".board-result")).toHaveAttribute(
+    "data-exiting",
+    "true",
+  );
+  await expect(east.page.locator(".board-result")).toHaveCount(0);
+  await expect(
+    replacementTab.getByRole("button", { name: "Board berikutnya" }),
+  ).toHaveCount(0);
   await expect(
     replacementTab.locator('.auction-table th[data-turn="true"]'),
   ).toHaveText("E");

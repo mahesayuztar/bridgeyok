@@ -9,6 +9,7 @@ import {
   shouldPlayTurnCue,
   TURN_CUE_DURATION_SECONDS,
   TURN_CUE_PEAK_GAIN,
+  turnCueState,
 } from "./turn-cue.ts";
 
 function game({
@@ -92,7 +93,7 @@ function cueState({ turn, viewerSeat = "N", revision = 1, phase = "PLAY" }) {
     boardNumber: 1,
     phase,
     turn,
-    viewerSeat,
+    viewerTurn: turn === viewerSeat,
     revision,
   };
 }
@@ -122,6 +123,36 @@ test("turn cue ignores initial snapshots, rerenders, and scored boards", () => {
     shouldPlayTurnCue(
       cueState({ turn: "W" }),
       cueState({ turn: "N", revision: 2, phase: "BOARD_SCORED" }),
+    ),
+    false,
+  );
+});
+
+test("turn cue assigns dummy control to declarer and never to dummy", () => {
+  const table = (viewerSeat, turn, revision) => ({
+    tableId: "table-1",
+    revision,
+    viewerSeat,
+    game: {
+      board: { number: 1 },
+      phase: "PLAY",
+      turn,
+      auction: {
+        contract: { declarer: "N" },
+      },
+    },
+  });
+  assert.equal(
+    shouldPlayTurnCue(
+      turnCueState(table("N", "E", 1)),
+      turnCueState(table("N", "S", 2)),
+    ),
+    true,
+  );
+  assert.equal(
+    shouldPlayTurnCue(
+      turnCueState(table("S", "E", 1)),
+      turnCueState(table("S", "S", 2)),
     ),
     false,
   );
