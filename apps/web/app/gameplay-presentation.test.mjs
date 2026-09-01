@@ -8,6 +8,7 @@ import {
   contractSummaryLabel,
   participantNameForSeat,
   sortCardsDescending,
+  viewerTrickCounts,
 } from "./table/gameplay-presentation.ts";
 
 test("gameplay presentation keeps bridge labels stable", () => {
@@ -71,4 +72,39 @@ test("dummy presentation sorts ranks descending without mutating the hand", () =
     { suit: "S", rank: "A" },
     { suit: "S", rank: "T" },
   ]);
+});
+
+test("trick counts follow the viewer partnership", () => {
+  const table = {
+    viewerSeat: "N",
+    game: { tricksNS: 8, tricksEW: 5 },
+  };
+  assert.deepEqual(viewerTrickCounts(table), {
+    viewerPartnership: "NS",
+    won: 8,
+    lost: 5,
+  });
+  assert.deepEqual(viewerTrickCounts({ ...table, viewerSeat: "S" }), {
+    viewerPartnership: "NS",
+    won: 8,
+    lost: 5,
+  });
+  assert.deepEqual(viewerTrickCounts({ ...table, viewerSeat: "E" }), {
+    viewerPartnership: "EW",
+    won: 5,
+    lost: 8,
+  });
+  assert.deepEqual(viewerTrickCounts({ ...table, viewerSeat: "W" }), {
+    viewerPartnership: "EW",
+    won: 5,
+    lost: 8,
+  });
+});
+
+test("trick counts retain an NS-EW fallback without a viewer seat", () => {
+  assert.deepEqual(
+    viewerTrickCounts({ game: { tricksNS: 13, tricksEW: 0 } }),
+    { viewerPartnership: null, won: 13, lost: 0 },
+  );
+  assert.equal(viewerTrickCounts({}), null);
 });

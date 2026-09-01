@@ -19,6 +19,46 @@ function participantName(
   );
 }
 
+function ParticipantIdentity({
+  name,
+  isOwner,
+  isBot,
+  announceBot,
+}: {
+  name: string;
+  isOwner: boolean;
+  isBot: boolean;
+  announceBot: boolean;
+}) {
+  return (
+    <span className="participant-identity">
+      <span className="participant-name">{name}</span>
+      {isOwner ? (
+        <svg
+          className="owner-crown"
+          viewBox="0 0 24 24"
+          role="img"
+          aria-label="Pemilik meja"
+        >
+          <path d="M3 7.5 7.5 12 12 5l4.5 7L21 7.5l-2 10H5l-2-10Zm3 12h12" />
+        </svg>
+      ) : null}
+      {isBot ? (
+        <svg
+          className="bot-icon"
+          viewBox="0 0 24 24"
+          {...(announceBot
+            ? { role: "img", "aria-label": "Bot" }
+            : { "aria-hidden": true })}
+        >
+          <path d="M9 4h6M12 4V2M6.5 8h11A2.5 2.5 0 0 1 20 10.5v7A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-7A2.5 2.5 0 0 1 6.5 8Z" />
+          <path d="M8 13h.01M16 13h.01M8 17h8" />
+        </svg>
+      ) : null}
+    </span>
+  );
+}
+
 export function ParticipantPosition({
   table,
   presence,
@@ -99,17 +139,7 @@ export function ParticipantPosition({
     };
   }, [portalOpen]);
 
-  const crown =
-    participant?.role === "OWNER" ? (
-      <svg
-        className="owner-crown"
-        viewBox="0 0 24 24"
-        role="img"
-        aria-label="Pemilik meja"
-      >
-        <path d="M3 7.5 7.5 12 12 5l4.5 7L21 7.5l-2 10H5l-2-10Zm3 12h12" />
-      </svg>
-    ) : null;
+  const isOwner = participant?.role === "OWNER";
   const portal =
     portalOpen && typeof document !== "undefined"
       ? createPortal(
@@ -128,17 +158,20 @@ export function ParticipantPosition({
               <header>
                 <span className="participant-portal-seat">{seat}</span>
                 <div>
-                  <h2 id={dialogTitleId}>{name ?? "Kursi kosong"}</h2>
+                  <h2 id={dialogTitleId}>
+                    <ParticipantIdentity
+                      name={name ?? "Kursi kosong"}
+                      isOwner={isOwner}
+                      isBot={isBot}
+                      announceBot
+                    />
+                  </h2>
                   {assignment === undefined ? (
                     <p>{seat} · kosong</p>
                   ) : table.state === "WAITING" ? (
-                    <p>
-                      {isBot ? "Bot · " : ""}
-                      {assignment.ready ? "Siap" : "Belum siap"}
-                    </p>
+                    <p>{assignment.ready ? "Siap" : "Belum siap"}</p>
                   ) : null}
                 </div>
-                {crown}
                 <button
                   ref={closeButtonRef}
                   className="participant-portal-close"
@@ -291,19 +324,20 @@ export function ParticipantPosition({
           className="player-trigger"
           type="button"
           onClick={() => setPortalOpen(true)}
-          aria-label={`Buka menu ${name}, kursi ${seat}`}
+          aria-label={`Buka menu ${name}, kursi ${seat}${isBot ? ", bot" : ""}`}
         >
           <span className="player-seat">{seat}</span>
           <span className="player-copy">
             <strong>
-              {name}
-              {crown}
+              <ParticipantIdentity
+                name={name ?? "Pemain"}
+                isOwner={isOwner}
+                isBot={isBot}
+                announceBot={false}
+              />
             </strong>
             {table.state === "WAITING" ? (
-              <span>
-                {isBot ? "Bot · " : ""}
-                {assignment.ready ? "Siap" : "Belum siap"}
-              </span>
+              <span>{assignment.ready ? "Siap" : "Belum siap"}</span>
             ) : null}
             <span className="sr-only">
               {isBot

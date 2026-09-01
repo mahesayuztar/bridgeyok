@@ -16,9 +16,6 @@ export function WaitingRoom({
   presence,
   inviteCode,
   canSendCommand,
-  shareUrl,
-  copied,
-  onCopy,
   onLeaveTable,
   onCommand,
 }: {
@@ -27,9 +24,6 @@ export function WaitingRoom({
   presence: Record<string, ParticipantPresence>;
   inviteCode: string | null;
   canSendCommand: TableSession["canSendCommand"];
-  shareUrl: string;
-  copied: boolean;
-  onCopy: () => void;
   onLeaveTable: () => void;
   onCommand: TableSession["sendCommand"];
 }) {
@@ -47,11 +41,7 @@ export function WaitingRoom({
         {inviteCode === null ? null : (
           <div className="invite-inline">
             <span>Kode undangan</span>
-            <strong>{inviteCode}</strong>
-            <button type="button" onClick={onCopy}>
-              {copied ? "Tautan disalin" : "Salin tautan"}
-            </button>
-            <span className="sr-only">{shareUrl}</span>
+            <code className="invite-code">{inviteCode}</code>
           </div>
         )}
       </div>

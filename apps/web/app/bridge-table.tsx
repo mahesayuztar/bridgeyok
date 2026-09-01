@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import IssueNotice from "./issue-notice";
 import {
   oppositeSeat,
@@ -33,7 +33,6 @@ export default function BridgeTable({
   const session = useTableSession();
   const { canSendCommand, openTable, sendCommand } = session;
   const attemptedTableIdRef = useRef<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const table = session.projectedTable;
   const game = table?.game;
   const orientation = useMemo(
@@ -95,20 +94,6 @@ export default function BridgeTable({
     return () => window.removeEventListener("keydown", handleAuctionKeyboard);
   }, [canSendCommand, game, sendCommand, viewerTurn]);
 
-  const shareUrl = useMemo(() => {
-    if (session.inviteCode === null || typeof window === "undefined") return "";
-    const url = new URL("/lobby", window.location.origin);
-    url.searchParams.set("invite", session.inviteCode);
-    return url.toString();
-  }, [session.inviteCode]);
-
-  async function copyInvite() {
-    if (shareUrl === "") return;
-    await navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2500);
-  }
-
   async function returnToLobby() {
     await session.leaveTable();
     router.replace("/lobby");
@@ -165,9 +150,6 @@ export default function BridgeTable({
           presence={session.tableState.presence}
           inviteCode={session.inviteCode}
           canSendCommand={session.canSendCommand}
-          shareUrl={shareUrl}
-          copied={copied}
-          onCopy={() => void copyInvite()}
           onLeaveTable={() => void returnToLobby()}
           onCommand={session.sendCommand}
         />
@@ -191,8 +173,6 @@ export default function BridgeTable({
         table={table}
         connectionState={session.connectionState}
         inviteCode={session.inviteCode}
-        copied={copied}
-        onCopy={() => void copyInvite()}
         canSendCommand={session.canSendCommand}
         onCommand={session.sendCommand}
       />

@@ -6,6 +6,7 @@ import {
   contractSummaryLabel,
   participantNameForSeat,
 } from "./gameplay-presentation";
+import { TrickIndicator } from "./trick-indicator";
 
 const vulnerabilityLabels = {
   NONE: "Tidak ada",
@@ -49,16 +50,12 @@ export function ActiveTableStatusBar({
   table,
   connectionState,
   inviteCode,
-  copied,
-  onCopy,
   canSendCommand,
   onCommand,
 }: {
   table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
   inviteCode: string | null;
-  copied: boolean;
-  onCopy: () => void;
   canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
 }) {
@@ -102,9 +99,7 @@ export function ActiveTableStatusBar({
         </div>
         <div>
           <dt>Trick</dt>
-          <dd>
-            {game === undefined ? "—" : `${game.tricksNS}–${game.tricksEW}`}
-          </dd>
+          <dd><TrickIndicator table={table} /></dd>
         </div>
       </dl>
       <ConsensusControls
@@ -126,9 +121,10 @@ export function ActiveTableStatusBar({
           <div>
             <Link href="/lobby">Lobby</Link>
             {inviteCode === null ? null : (
-              <button type="button" onClick={onCopy}>
-                {copied ? "Tautan disalin" : "Salin undangan"}
-              </button>
+              <span className="table-menu-invite">
+                <small>Kode undangan</small>
+                <code className="invite-code">{inviteCode}</code>
+              </span>
             )}
             <span>Rev {table.revision}</span>
           </div>

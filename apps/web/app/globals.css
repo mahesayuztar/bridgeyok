@@ -566,7 +566,7 @@ h2 {
   border-bottom: 1px solid var(--line);
 }
 .invite-inline > span,
-.invite-inline strong {
+.invite-inline .invite-code {
   display: block;
 }
 .invite-inline > span {
@@ -575,15 +575,15 @@ h2 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.invite-inline strong {
+.invite-code {
+  user-select: text;
+}
+.invite-inline .invite-code {
   overflow-wrap: anywhere;
-  margin: 0.45rem 0 0.7rem;
+  margin-top: 0.45rem;
+  color: var(--foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9rem;
-}
-.invite-inline button {
-  min-height: auto;
-  padding: 0.35rem 0.55rem;
 }
 .waiting-table {
   min-height: 30rem;
@@ -673,6 +673,30 @@ h2 {
   font-size: 0.82rem;
   font-weight: 700;
 }
+.trick-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  color: var(--foreground);
+  vertical-align: middle;
+}
+.trick-card-count {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  background: var(--card);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.trick-won {
+  width: 1.15rem;
+  height: 1.55rem;
+}
+.trick-lost {
+  width: 1.55rem;
+  height: 1.15rem;
+}
 .contract-fact {
   max-width: min(22rem, 30vw);
   overflow: hidden;
@@ -717,6 +741,23 @@ h2 {
   border: 0;
   text-align: left;
   text-decoration: none;
+}
+.table-menu .table-menu-invite {
+  display: grid;
+  gap: 0.3rem;
+  border-top: 1px solid var(--line);
+}
+.table-menu-invite small {
+  color: var(--muted);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+.table-menu-invite .invite-code {
+  max-width: 18rem;
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
 }
 .consensus-navigation {
   position: relative;
@@ -951,6 +992,18 @@ h2 {
   gap: 0.35rem;
   font-size: 0.8rem;
 }
+.participant-identity {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.32rem;
+}
+.participant-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .player-copy > span {
   color: rgb(255 255 255 / 68%);
   font-size: 0.65rem;
@@ -964,6 +1017,16 @@ h2 {
   stroke-linecap: square;
   stroke-linejoin: miter;
   stroke-width: 1.7;
+}
+.bot-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 1.6;
 }
 .player-left .player-trigger,
 .player-right .player-trigger,
@@ -1009,7 +1072,7 @@ h2 {
 }
 .participant-portal header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
   padding: 1rem;
@@ -1036,7 +1099,8 @@ h2 {
   color: var(--muted);
   font-size: 0.72rem;
 }
-.participant-portal .owner-crown {
+.participant-portal .owner-crown,
+.participant-portal .bot-icon {
   width: 1.25rem;
   height: 1.25rem;
 }
@@ -1866,7 +1930,7 @@ button.physical-card:disabled {
     justify-content: flex-start;
     min-width: 0;
   }
-  .table-facts div:not(:nth-child(1)):not(:nth-child(4)) {
+  .table-facts div:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(5)) {
     display: none;
   }
   .table-facts dt {
@@ -2099,7 +2163,7 @@ button.physical-card:disabled {
   .waiting-table {
     min-height: 21rem;
   }
-  .table-facts div:not(:nth-child(1)):not(:nth-child(4)) {
+  .table-facts div:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(5)) {
     display: none;
   }
   .table-facts div:first-child {

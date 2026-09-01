@@ -62,7 +62,7 @@ export function contractSummaryLabel(
 ) {
   if (contract === undefined) return "Belum ada kontrak";
   const identity = declarerName === undefined ? "" : ` · ${declarerName}`;
-  return `${contractLabel(contract)} · ${contract.declarer}${identity}`;
+  return `${contractLabel(contract)} ${contract.declarer}`;
 }
 
 export function participantNameForSeat(
@@ -72,6 +72,30 @@ export function participantNameForSeat(
   const participantId = table.seats[seat]?.participantId;
   return table.participants.find((participant) => participant.id === participantId)
     ?.nickname;
+}
+
+export function viewerTrickCounts(table: LiveTableProjection) {
+  const game = table.game;
+  if (game === undefined) return null;
+  const viewerPartnership =
+    table.viewerSeat === "N" || table.viewerSeat === "S"
+      ? "NS"
+      : table.viewerSeat === "E" || table.viewerSeat === "W"
+        ? "EW"
+        : null;
+  if (viewerPartnership === null) {
+    return {
+      viewerPartnership,
+      won: game.tricksNS,
+      lost: game.tricksEW,
+    };
+  }
+  const viewerIsNS = viewerPartnership === "NS";
+  return {
+    viewerPartnership,
+    won: viewerIsNS ? game.tricksNS : game.tricksEW,
+    lost: viewerIsNS ? game.tricksEW : game.tricksNS,
+  };
 }
 
 export function cardKey(card: Card) {
