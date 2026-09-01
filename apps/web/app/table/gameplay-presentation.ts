@@ -62,7 +62,7 @@ export function contractSummaryLabel(
 ) {
   if (contract === undefined) return "Belum ada kontrak";
   const identity = declarerName === undefined ? "" : ` · ${declarerName}`;
-  return `${contractLabel(contract)} ${contract.declarer}`;
+  return `${contractLabel(contract)} · ${contract.declarer}${identity}`;
 }
 
 export function participantNameForSeat(
