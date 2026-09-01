@@ -30,6 +30,18 @@ export function sortCardsDescending(cards: Card[]) {
   );
 }
 
+export function dummySuitCardStacks(cards: Card[]) {
+  const stackCount = Math.ceil(cards.length / 6);
+  if (stackCount === 0) return [];
+  const cardsPerStack = Math.ceil(cards.length / stackCount);
+  return Array.from({ length: stackCount }, (_unused, _stackIndex) =>
+    cards.slice(
+      _stackIndex * cardsPerStack,
+      (_stackIndex + 1) * cardsPerStack,
+    ),
+  );
+}
+
 export function callLabel(call: Call) {
   if (call.kind === "PASS") return "Pass";
   if (call.kind === "DOUBLE") return "X";

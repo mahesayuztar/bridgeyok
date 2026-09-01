@@ -260,6 +260,7 @@ export default function BridgeTable({
               trick={motion.frame.trick}
               orientation={orientation}
               stage={motion.frame.stage}
+              {...(dummyPosition === undefined ? {} : { dummyPosition })}
               {...(motion.frame.movingSeat === undefined
                 ? {}
                 : { movingSeat: motion.frame.movingSeat })}

@@ -6,6 +6,7 @@ import {
   cardKey,
   contractLabel,
   contractSummaryLabel,
+  dummySuitCardStacks,
   participantNameForSeat,
   sortCardsDescending,
   viewerTrickCounts,
@@ -72,6 +73,21 @@ test("dummy presentation sorts ranks descending without mutating the hand", () =
     { suit: "S", rank: "A" },
     { suit: "S", rank: "T" },
   ]);
+});
+
+test("dummy presentation splits extreme suits into short readable stacks", () => {
+  const cards = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3"].map(
+    (rank) => ({ suit: "S", rank }),
+  );
+  assert.deepEqual(
+    dummySuitCardStacks(cards).map((stack) => stack.map((card) => card.rank)),
+    [
+      ["A", "K", "Q", "J", "T", "9"],
+      ["8", "7", "6", "5", "4", "3"],
+    ],
+  );
+  assert.deepEqual(dummySuitCardStacks([]), []);
+  assert.equal(cards.length, 12);
 });
 
 test("trick counts follow the viewer partnership", () => {

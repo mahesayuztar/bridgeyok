@@ -22,10 +22,12 @@
   --card: #fffdf7;
   --card-line: #d5d0c7;
   --card-aspect-ratio: 5 / 7;
-  --card-hand-width: clamp(3.7rem, 5.4vw, 5rem);
-  --card-dummy-width: clamp(2.9rem, 4.2vw, 3.65rem);
-  --card-trick-width: clamp(3rem, 4.4vw, 3.8rem);
+  --card-hand-width: clamp(4.75rem, 6.4vw, 6.5rem);
+  --card-dummy-width: clamp(4.25rem, 5.3vw, 5.25rem);
+  --card-trick-width: clamp(3.75rem, 4.8vw, 4.75rem);
   --card-compact-width: 2.4rem;
+  --dummy-card-exposure: 1.7rem;
+  --dummy-side-exposure: 1.55rem;
   --board-player-block: 2.5rem;
   --board-player-inline: 2.5rem;
   --page-gutter: clamp(1.25rem, 4vw, 4rem);
@@ -675,8 +677,8 @@ h2 {
 }
 .trick-indicator {
   display: inline-flex;
-  align-items: center;
-  gap: 0.22rem;
+  align-items: flex-end;
+  gap: 0;
   color: var(--foreground);
   vertical-align: middle;
 }
@@ -685,17 +687,20 @@ h2 {
   place-items: center;
   border: 1px solid currentColor;
   background: var(--card);
-  font-size: 0.68rem;
+  border-width: 2px;
+  font-size: 0.8rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 .trick-won {
-  width: 1.15rem;
-  height: 1.55rem;
+  width: 1.5rem;
+  height: 2.15rem;
 }
 .trick-lost {
-  width: 1.55rem;
-  height: 1.15rem;
+  width: 2.55rem;
+  height: 1.25rem;
+  margin-left: -2px;
 }
 .contract-fact {
   max-width: min(22rem, 30vw);
@@ -2261,6 +2266,368 @@ button.physical-card.is-dragging {
   from {
     opacity: 0;
     transform: translateX(-45%);
+  }
+}
+
+.bridge-hand h3 {
+  margin-bottom: 0.2rem;
+  font-size: 0.72rem;
+}
+.hand-cards {
+  padding-inline: 0.5rem;
+}
+.physical-card {
+  flex-basis: var(--card-hand-width);
+  width: var(--card-hand-width);
+  padding: 0.38rem;
+  border-width: 2px;
+  direction: ltr;
+}
+.card-corner {
+  align-items: flex-start;
+  font-size: clamp(1.2rem, 1.7vw, 1.55rem);
+  font-weight: 800;
+  line-height: 0.82;
+}
+.card-corner span {
+  margin-top: 0.12rem;
+  font-size: 1.12em;
+}
+.card-suit {
+  right: 0.42rem;
+  bottom: 0.32rem;
+  font-size: clamp(2.15rem, 3.3vw, 3.15rem);
+}
+.own-hand {
+  padding-inline: 0.55rem;
+}
+.own-hand .hand-cards {
+  height: calc(100% - 1rem);
+  justify-content: safe center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-color: rgb(255 255 255 / 42%) transparent;
+  scrollbar-width: thin;
+}
+.own-hand .hand-card-slot {
+  position: relative;
+  flex: 1 1 var(--card-hand-width);
+  width: var(--card-hand-width);
+  min-width: 2rem;
+  max-width: var(--card-hand-width);
+  height: calc(var(--card-hand-width) * 1.4 + 0.55rem);
+  scroll-snap-align: start;
+}
+.own-hand .hand-card-slot:last-child {
+  flex: 0 0 var(--card-hand-width);
+}
+.own-hand .hand-card-slot .physical-card {
+  position: absolute;
+  top: 0.45rem;
+  left: 0;
+  margin-left: 0;
+}
+.own-hand button.physical-card:not(:disabled) {
+  touch-action: pan-x;
+}
+.dummy-hand {
+  z-index: 11;
+  max-width: calc(100% - 0.75rem);
+}
+.dummy-hand .physical-card {
+  width: var(--card-dummy-width);
+}
+.dummy-hand .hand-cards .physical-card + .physical-card {
+  margin-left: 0;
+}
+.dummy-suit-label {
+  color: var(--table-ink);
+  font-size: 1.55rem;
+  font-weight: 800;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 35%);
+}
+.dummy-suit-h .dummy-suit-label,
+.dummy-suit-d .dummy-suit-label {
+  color: var(--offline-on-dark);
+}
+.dummy-top,
+.dummy-bottom {
+  left: 50%;
+  max-width: calc(100% - 0.75rem);
+  transform: translateX(-50%);
+}
+.dummy-top {
+  top: 0.4rem;
+}
+.dummy-bottom {
+  bottom: 0.4rem;
+}
+.dummy-top .hand-cards,
+.dummy-bottom .hand-cards {
+  gap: clamp(0.45rem, 1.35vw, 1.15rem);
+}
+.dummy-top .dummy-suit,
+.dummy-bottom .dummy-suit {
+  gap: 0.3rem;
+}
+.dummy-top .dummy-suit-cards,
+.dummy-bottom .dummy-suit-cards {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+.dummy-top .dummy-card-stack,
+.dummy-bottom .dummy-card-stack {
+  display: flex;
+  flex-direction: column;
+}
+.dummy-top .dummy-card-stack .physical-card + .physical-card,
+.dummy-bottom .dummy-card-stack .physical-card + .physical-card {
+  margin-top: calc(
+    var(--dummy-card-exposure) - var(--card-dummy-width) * 1.4
+  );
+}
+.dummy-left,
+.dummy-right {
+  top: 50%;
+  max-height: calc(100% - 0.75rem);
+  transform: translateY(-50%);
+}
+.dummy-left > h3,
+.dummy-right > h3 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.dummy-left {
+  left: 0.35rem;
+}
+.dummy-right {
+  right: 0.35rem;
+}
+.dummy-left .hand-cards,
+.dummy-right .hand-cards {
+  gap: 0.35rem;
+}
+.dummy-left .dummy-suit,
+.dummy-right .dummy-suit {
+  gap: 0.35rem;
+}
+.dummy-left .dummy-suit-cards,
+.dummy-right .dummy-suit-cards {
+  display: grid;
+  grid-auto-flow: row;
+  grid-auto-rows: var(--dummy-card-exposure);
+  grid-template-columns: repeat(4, var(--dummy-side-exposure));
+  padding-right: calc(var(--card-dummy-width) - var(--dummy-side-exposure));
+  padding-bottom: calc(
+    var(--card-dummy-width) * 1.4 - var(--dummy-card-exposure)
+  );
+}
+.dummy-right .dummy-suit-cards {
+  padding-right: 0;
+  padding-left: calc(var(--card-dummy-width) - var(--dummy-side-exposure));
+  direction: rtl;
+}
+.dummy-left .dummy-suit-cards[data-stack-count="0"],
+.dummy-right .dummy-suit-cards[data-stack-count="0"] {
+  padding-block: 0;
+}
+.dummy-left .dummy-card-stack,
+.dummy-right .dummy-card-stack {
+  display: contents;
+}
+.dummy-left .dummy-suit-cards .physical-card,
+.dummy-right .dummy-suit-cards .physical-card {
+  margin: 0;
+}
+.dummy-hand .card-corner {
+  font-size: clamp(1.12rem, 1.5vw, 1.4rem);
+}
+.dummy-hand .card-suit {
+  font-size: clamp(2rem, 2.8vw, 2.75rem);
+}
+.current-trick {
+  z-index: 8;
+  top: 50%;
+  left: 50%;
+  width: min(21rem, calc(100% - 5rem));
+  height: min(14rem, calc(100% - 2rem));
+  pointer-events: none;
+}
+.current-trick[data-dummy-position="top"] {
+  top: 59%;
+}
+.current-trick[data-dummy-position="bottom"] {
+  top: 41%;
+}
+.current-trick[data-dummy-position="left"] {
+  left: 59%;
+}
+.current-trick[data-dummy-position="right"] {
+  left: 41%;
+}
+.card-trick {
+  width: var(--card-trick-width);
+  padding: 0.32rem;
+}
+.card-trick .card-corner {
+  font-size: clamp(0.98rem, 1.25vw, 1.2rem);
+}
+.card-trick .card-corner span {
+  font-size: 1.05em;
+}
+.card-trick .card-suit {
+  right: 0.32rem;
+  bottom: 0.24rem;
+  font-size: clamp(1.75rem, 2.4vw, 2.35rem);
+}
+
+@media (max-width: 64rem) {
+  :root {
+    --card-dummy-width: clamp(3.85rem, 6vw, 4.35rem);
+    --card-trick-width: clamp(3.65rem, 5.8vw, 4.15rem);
+  }
+  .dummy-left .hand-cards,
+  .dummy-right .hand-cards {
+    gap: 0.1rem;
+  }
+  .current-trick {
+    --trick-top-offset: 0;
+    width: min(18rem, calc(100% - 3rem));
+    height: min(12.5rem, calc(100% - 1rem));
+  }
+}
+
+@media (max-width: 48rem) {
+  :root {
+    --card-hand-width: clamp(4.25rem, 18vw, 4.75rem);
+    --card-dummy-width: 3.8rem;
+    --card-trick-width: 3.35rem;
+    --dummy-card-exposure: 1.55rem;
+    --dummy-side-exposure: 1.45rem;
+  }
+  .active-table-client {
+    grid-template-rows: auto minmax(0, 1fr) clamp(8.5rem, 23vh, 10.25rem);
+  }
+  .physical-card {
+    padding: 0.3rem;
+  }
+  .card-corner {
+    font-size: 1.12rem;
+  }
+  .card-suit {
+    right: 0.32rem;
+    bottom: 0.24rem;
+    font-size: 2.15rem;
+  }
+  .own-hand .hand-card-slot {
+    min-width: 2rem;
+  }
+  .dummy-suit-label {
+    font-size: 1.25rem;
+  }
+  .dummy-top .hand-cards,
+  .dummy-bottom .hand-cards {
+    gap: 0.42rem;
+  }
+  .dummy-left .hand-cards,
+  .dummy-right .hand-cards {
+    gap: 0.25rem;
+  }
+  .dummy-left .dummy-suit,
+  .dummy-right .dummy-suit {
+    gap: 0.22rem;
+  }
+  .dummy-hand .card-corner {
+    font-size: 1.05rem;
+  }
+  .dummy-hand .card-corner span {
+    font-size: 1.08em;
+  }
+  .dummy-hand .card-suit {
+    right: 0.28rem;
+    bottom: 0.2rem;
+    font-size: 1.9rem;
+  }
+  .current-trick {
+    width: min(
+      12rem,
+      calc(100% - var(--card-trick-width) * 2)
+    );
+    height: 9rem;
+  }
+  .current-trick[data-dummy-position="top"] {
+    top: 62%;
+  }
+  .current-trick[data-dummy-position="bottom"] {
+    top: 38%;
+  }
+  .current-trick[data-dummy-position="left"],
+  .current-trick[data-dummy-position="right"] {
+    width: 7rem;
+  }
+  .current-trick[data-dummy-position="left"] {
+    right: 0;
+    left: auto;
+    transform: translateY(-50%);
+  }
+  .current-trick[data-dummy-position="right"] {
+    right: auto;
+    left: 0;
+    transform: translateY(-50%);
+  }
+  .card-trick .card-corner {
+    font-size: 0.92rem;
+  }
+  .card-trick .card-corner span {
+    font-size: 1.02em;
+  }
+  .card-trick .card-suit {
+    right: 0.26rem;
+    bottom: 0.18rem;
+    font-size: 1.65rem;
+  }
+  .trick-card-count {
+    font-size: 0.76rem;
+  }
+  .trick-won {
+    width: 1.4rem;
+    height: 2rem;
+  }
+  .trick-lost {
+    width: 2.35rem;
+    height: 1.18rem;
+  }
+}
+
+@media (max-width: 25rem) {
+  :root {
+    --card-dummy-width: 3.5rem;
+    --card-trick-width: 3.25rem;
+  }
+  .dummy-top .hand-cards,
+  .dummy-bottom .hand-cards {
+    justify-content: flex-start;
+    gap: 0;
+    padding-inline: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  .dummy-top,
+  .dummy-bottom {
+    width: 100%;
+    max-width: 100%;
+  }
+  .dummy-top button.physical-card:not(:disabled),
+  .dummy-bottom button.physical-card:not(:disabled) {
+    touch-action: pan-x;
   }
 }
 

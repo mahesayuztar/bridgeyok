@@ -3,6 +3,7 @@ import {
   type Seat,
   type TableOrientation,
   type Trick,
+  type VisualPosition,
 } from "../table-state";
 import { PlayingCard } from "./playing-card";
 
@@ -11,11 +12,13 @@ export function CurrentTrick({
   orientation,
   stage = "idle",
   movingSeat,
+  dummyPosition,
 }: {
   trick: Trick;
   orientation: TableOrientation;
   stage?: "idle" | "moving" | "winner" | "collecting";
   movingSeat?: Seat;
+  dummyPosition?: VisualPosition;
 }) {
   return (
     <div
@@ -23,6 +26,7 @@ export function CurrentTrick({
       aria-label="Trick saat ini"
       data-motion-stage={stage}
       data-winner={trick.winner}
+      data-dummy-position={dummyPosition}
     >
       <span className="trick-center">
         {trick.plays.length === 0 ? "Lead" : ""}
