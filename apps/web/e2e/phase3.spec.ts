@@ -206,6 +206,27 @@ async function assertGameplayGeometry(page: Page) {
   expect(geometry.documentOverflow).toEqual({ x: false, y: false });
 }
 
+async function selectText(page: Page, selector: string) {
+  return page.locator(selector).evaluate((element) => {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    return selection?.toString() ?? "";
+  });
+}
+
+async function trickCounts(page: Page) {
+  const indicator = page.locator(".trick-indicator");
+  await expect(indicator).toBeVisible();
+  return indicator.evaluate((element) => ({
+    won: Number((element as HTMLElement).dataset.won),
+    lost: Number((element as HTMLElement).dataset.lost),
+    partnership: (element as HTMLElement).dataset.partnership,
+  }));
+}
+
 test("four guests finish boards, recover a controller, and keep hidden hands private", async ({ browser }, testInfo) => {
   test.setTimeout(180_000);
   const profiles = [
@@ -241,8 +262,37 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await expect(north.page).toHaveURL(/\/table\/[0-9a-f-]+$/);
   await waitForConnection(north.page);
   const tableURL = north.page.url();
-  const inviteCode = (await north.page.locator(".invite-inline strong").textContent())?.trim();
+  const inviteCode = (await north.page.locator(".invite-inline .invite-code").textContent())?.trim();
   expect(inviteCode).toMatch(/^[A-Z2-7]{26}$/);
+  expect(await selectText(north.page, ".invite-inline .invite-code")).toBe(inviteCode);
+  await expect(north.page.getByRole("button", { name: /Salin/i })).toHaveCount(0);
+
+  const botViewports = {
+    N: { width: 1440, height: 900 },
+    E: { width: 1024, height: 768 },
+    S: { width: 390, height: 844 },
+    W: { width: 320, height: 700 },
+  } as const;
+  for (const seat of ["N", "E", "S", "W"] as const) {
+    await north.page.setViewportSize(botViewports[seat]);
+    await north.page.getByRole("button", { name: `Buka menu kursi kosong ${seat}` }).click();
+    await north.page.getByRole("button", { name: "Tambah bot" }).click();
+    const botTrigger = north.page.getByRole("button", {
+      name: `Buka menu Bot, kursi ${seat}, bot`,
+    });
+    await expect(botTrigger.locator(".bot-icon")).toHaveCount(1);
+    await botTrigger.click();
+    await expect(north.page.getByRole("dialog").getByRole("img", { name: "Bot" })).toBeVisible();
+    await north.page.screenshot({
+      path: testInfo.outputPath(
+        `bot-${seat}-${botViewports[seat].width}x${botViewports[seat].height}.png`,
+      ),
+      fullPage: false,
+    });
+    await north.page.getByRole("button", { name: "Keluarkan bot" }).click();
+    await expect(botTrigger).toHaveCount(0);
+  }
+  await north.page.setViewportSize({ width: 1920, height: 1080 });
 
   for (const player of [east, south, west]) {
     await player.page.getByLabel("Kode undangan").fill(inviteCode!);
@@ -282,7 +332,15 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   }
   await expect(replacementTab.getByRole("button", { name: "Mulai board" })).toBeEnabled();
   await replacementTab.getByRole("button", { name: "Mulai board" }).click();
-  await expect(replacementTab.getByText("Dealer N")).toBeVisible();
+  await expect(
+    replacementTab.locator('.auction-table th[data-turn="true"]'),
+  ).toHaveText("N");
+  await replacementTab.getByLabel("Buka menu meja").click();
+  const activeInviteCode = replacementTab.locator(".table-menu .invite-code");
+  await expect(activeInviteCode).toHaveText(inviteCode!);
+  expect(await selectText(replacementTab, ".table-menu .invite-code")).toBe(inviteCode);
+  await expect(replacementTab.getByRole("button", { name: /Salin/i })).toHaveCount(0);
+  await replacementTab.getByLabel("Buka menu meja").click();
   for (const page of activePages) {
     await expect(page.locator(".own-hand .physical-card")).toHaveCount(13);
   }
@@ -320,6 +378,25 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   for (let _cardIndex = 1; _cardIndex < 4; _cardIndex++) {
     await playNextCard(activePages);
   }
+  await expect.poll(async () => {
+    const counts = await trickCounts(replacementTab);
+    return counts.won + counts.lost;
+  }).toBe(1);
+  const [northTricks, eastTricks, southTricks, westTricks] = await Promise.all(
+    [
+      trickCounts(replacementTab),
+      trickCounts(east.page),
+      trickCounts(south.page),
+      trickCounts(west.page),
+    ],
+  );
+  expect(northTricks.partnership).toBe("NS");
+  expect(southTricks).toEqual(northTricks);
+  expect(eastTricks.partnership).toBe("EW");
+  expect(westTricks).toEqual(eastTricks);
+  expect(northTricks.won).toBe(eastTricks.lost);
+  expect(northTricks.lost).toBe(eastTricks.won);
+  expect(northTricks.won + northTricks.lost).toBe(1);
   const claimTrigger = replacementTab.getByLabel("Ajukan claim");
   await expect(claimTrigger).toBeVisible();
   await claimTrigger.focus();
@@ -352,7 +429,9 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   }
 
   await replacementTab.getByRole("button", { name: "Board berikutnya" }).click();
-  await expect(replacementTab.getByText("Dealer E")).toBeVisible();
+  await expect(
+    replacementTab.locator('.auction-table th[data-turn="true"]'),
+  ).toHaveText("E");
   await makeCall(east.page, /^Pass/);
   await makeCall(south.page, /^Pass/);
   await makeCall(west.page, /^Pass/);
