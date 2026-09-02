@@ -38,7 +38,7 @@ export function CurrentTrick({
           data-moving={stage === "moving" && movingSeat === play.seat}
           data-winner={stage === "winner" && trick.winner === play.seat}
         >
-          <span>{play.seat}</span>
+          <span className="trick-seat-label">{play.seat}</span>
           <PlayingCard card={play.card} variant="trick" />
         </div>
       ))}

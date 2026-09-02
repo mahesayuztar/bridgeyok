@@ -1608,7 +1608,7 @@ button.physical-card:disabled {
   position: absolute;
 }
 
-.trick-slot > span {
+.trick-seat-label {
   position: absolute;
   z-index: 2;
 
@@ -2184,6 +2184,124 @@ button.physical-card:disabled {
   }
   .auction-workspace {
     max-height: calc(100% - 5rem);
+  }
+}
+
+.physical-card.card-drag-preview {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+  pointer-events: none;
+  opacity: 1;
+  filter: none;
+  transition: none;
+  will-change: transform;
+}
+
+button.physical-card.is-dragging {
+  opacity: 0;
+  transform: none !important;
+  transition: none;
+}
+
+.card-trick {
+  opacity: 1;
+  filter: none;
+  mix-blend-mode: normal;
+}
+
+.trick-slot[data-moving="true"].trick-top .physical-card {
+  animation-name: vibrant-card-from-top;
+}
+
+.trick-slot[data-moving="true"].trick-right .physical-card {
+  animation-name: vibrant-card-from-right;
+}
+
+.trick-slot[data-moving="true"].trick-bottom .physical-card {
+  animation-name: vibrant-card-from-bottom;
+}
+
+.trick-slot[data-moving="true"].trick-left .physical-card {
+  animation-name: vibrant-card-from-left;
+}
+
+@keyframes vibrant-card-from-top {
+  from {
+    transform: translateY(-45%);
+  }
+}
+
+@keyframes vibrant-card-from-right {
+  from {
+    transform: translateX(45%);
+  }
+}
+
+@keyframes vibrant-card-from-bottom {
+  from {
+    transform: translateY(45%);
+  }
+}
+
+@keyframes vibrant-card-from-left {
+  from {
+    transform: translateX(-45%);
+  }
+}
+
+.dummy-left,
+.dummy-right {
+  top: 50%;
+  width: min(36%, 58rem);
+  transform: translateY(-50%);
+}
+
+.dummy-left {
+  right: auto;
+  left: 0;
+}
+
+.dummy-right {
+  right: 0;
+  left: auto;
+}
+
+@media (max-width: 48rem) {
+  .active-table-client {
+    grid-template-rows: auto minmax(0, 1fr) clamp(9.5rem, 25vh, 10.5rem);
+  }
+
+  .bridge-hand .hand-cards {
+    display: grid;
+    grid-template-columns:
+      repeat(6, minmax(0, 1fr))
+      var(--card-hand-width);
+    grid-template-rows: repeat(2, 2.75rem);
+    align-items: start;
+  }
+
+  .bridge-hand .hand-card-slot,
+  .bridge-hand .hand-card-slot:last-child {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 2.75rem;
+  }
+
+  .dummy-left,
+  .dummy-right {
+    top: 18%;
+    width: 78%;
+  }
+
+  .dummy-hand .hand-cards {
+    grid-template-rows: repeat(2, 1.6rem);
+  }
+
+  .dummy-hand .hand-card-slot,
+  .dummy-hand .hand-card-slot:last-child {
+    height: 1.6rem;
   }
 }
 
