@@ -7,6 +7,7 @@ import {
   contractLabel,
   contractSummaryLabel,
   organizeCardsForContract,
+  suitOrderForContract,
   viewerTrickCounts,
 } from "./table/gameplay-presentation.ts";
 
@@ -67,6 +68,7 @@ test("contract organizes viewer and dummy suit groups without mutating projectio
     ["D", "S", "S", "H", "C"],
   );
   assert.deepEqual(cards.map((card) => card.suit), ["D", "S", "C", "H", "S"]);
+  assert.deepEqual(suitOrderForContract("D"), ["D", "S", "H", "C"]);
 });
 
 test("trick counts follow the viewer partnership", () => {

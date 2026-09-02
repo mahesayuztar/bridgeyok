@@ -344,6 +344,9 @@ async function assertGameplayGeometry(page: Page) {
     const dummyCardSlots = [
       ...document.querySelectorAll<HTMLElement>(".dummy-hand .hand-card-slot"),
     ];
+    const dummySuitGroups = [
+      ...document.querySelectorAll<HTMLElement>(".dummy-hand .dummy-suit-group"),
+    ];
     const ownCardExposure = ownCardSlots.flatMap((slot, _slotIndex) => {
       const nextSlot = ownCardSlots[_slotIndex + 1];
       if (nextSlot === undefined) return [];
@@ -362,6 +365,22 @@ async function assertGameplayGeometry(page: Page) {
     const dummyCardColumns = new Set(
       dummyCardSlots.map((slot) => Math.round(slot.getBoundingClientRect().left)),
     ).size;
+    const dummySuitGroupRows = new Set(
+      dummySuitGroups.map((group) => Math.round(group.getBoundingClientRect().top)),
+    ).size;
+    const dummySuitSpreads = dummySuitGroups.map((group) => {
+      const groupCards = [
+        ...group.querySelectorAll<HTMLElement>(".physical-card"),
+      ].map(rect);
+      const visibleCards = groupCards.filter(
+        (card): card is NonNullable<typeof card> => card !== null,
+      );
+      if (visibleCards.length === 0) return 0;
+      return (
+        Math.max(...visibleCards.map((card) => card.right)) -
+        Math.min(...visibleCards.map((card) => card.left))
+      );
+    });
     const playedCardsOverlap = trickCards.some((trickCard, _trickIndex) =>
       trickCards
         .slice(_trickIndex + 1)
@@ -379,6 +398,10 @@ async function assertGameplayGeometry(page: Page) {
       dummyHasExtras:
         document.querySelector(".dummy-hand h3, .dummy-suit, .dummy-suit-label") !==
         null,
+      dummySuitGroupCount: dummySuitGroups.length,
+      dummySuitGroupRows,
+      dummySuitOrder: dummySuitGroups.map((group) => group.dataset.suit),
+      dummySuitSpreads,
       dummyPlacement:
         dummyHand === null || playZone === null
           ? null
@@ -440,6 +463,12 @@ async function assertGameplayGeometry(page: Page) {
         playZone.right <= surface.right &&
         playZone.top >= surface.top &&
         playZone.bottom <= surface.bottom,
+      sideParticipantWidths: [
+        ...document.querySelectorAll(".player-left, .player-right"),
+      ].flatMap((participant) => {
+        const box = rect(participant);
+        return box === null ? [] : [box.width];
+      }),
       trickInsidePlayZone:
         currentTrick !== null &&
         playZone !== null &&
@@ -481,6 +510,7 @@ async function assertGameplayGeometry(page: Page) {
   expect(geometry.ownHandScrollable).toBe(false);
   expect(geometry.dummyHasExtras).toBe(false);
   expect(geometry.playedCardsOverlap).toBe(false);
+  expect(geometry.sideParticipantWidths.every((width) => width <= 31)).toBe(true);
   for (const card of geometry.playedCardColors) {
     expect(card).toEqual({
       playedColor: card.sourceColor,
@@ -495,28 +525,34 @@ async function assertGameplayGeometry(page: Page) {
   expect(geometry.trickInsidePlayZone).toBe(true);
   if (geometry.dummyPlacement?.position === "left") {
     expect(geometry.dummyPlacement.leftDelta).toBeLessThanOrEqual(8);
-    expect(geometry.dummyPlacement.height).toBeGreaterThan(
-      geometry.dummyPlacement.width,
+    expect(geometry.dummySuitGroupCount).toBe(4);
+    expect(geometry.dummySuitGroupRows).toBe(4);
+    expect(geometry.dummySuitOrder).toEqual(["C", "H", "S", "D"]);
+    expect(Math.max(...geometry.dummySuitSpreads)).toBeGreaterThan(
+      geometry.cards.find((card) => card.className.includes("card-dummy"))!.width,
     );
-    expect(geometry.dummyPlacement.cardColumns).toBe(1);
   } else if (geometry.dummyPlacement?.position === "right") {
     expect(geometry.dummyPlacement.rightDelta).toBeLessThanOrEqual(8);
-    expect(geometry.dummyPlacement.height).toBeGreaterThan(
-      geometry.dummyPlacement.width,
+    expect(geometry.dummySuitGroupCount).toBe(4);
+    expect(geometry.dummySuitGroupRows).toBe(4);
+    expect(geometry.dummySuitOrder).toEqual(["C", "H", "S", "D"]);
+    expect(Math.max(...geometry.dummySuitSpreads)).toBeGreaterThan(
+      geometry.cards.find((card) => card.className.includes("card-dummy"))!.width,
     );
-    expect(geometry.dummyPlacement.cardColumns).toBe(1);
   } else if (geometry.dummyPlacement?.position === "top") {
     expect(geometry.dummyPlacement.topDelta).toBeLessThanOrEqual(8);
     expect(geometry.dummyPlacement.width).toBeGreaterThan(
       geometry.dummyPlacement.height,
     );
     expect(geometry.dummyPlacement.cardRows).toBe(1);
+    expect(geometry.dummySuitGroupCount).toBe(0);
   } else if (geometry.dummyPlacement?.position === "bottom") {
     expect(geometry.dummyPlacement.bottomDelta).toBeLessThanOrEqual(8);
     expect(geometry.dummyPlacement.width).toBeGreaterThan(
       geometry.dummyPlacement.height,
     );
     expect(geometry.dummyPlacement.cardRows).toBe(1);
+    expect(geometry.dummySuitGroupCount).toBe(0);
   } else if (geometry.dummyPlacement !== null) {
     expect(geometry.dummyPlacement.centerDelta).toBeLessThanOrEqual(1);
   }
@@ -863,6 +899,12 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   for (const page of [replacementTab, east.page, south.page, west.page]) {
     await expect(page.locator(".trick-slot .physical-card")).toHaveCount(4);
     await assertGameplayGeometry(page);
+    await page.screenshot({
+      path: testInfo.outputPath(
+        `gameplay-trick-${page.viewportSize()?.width}x${page.viewportSize()?.height}.png`,
+      ),
+      fullPage: false,
+    });
   }
   const trickBox = await east.page.locator(".current-trick").boundingBox();
   expect(trickBox).not.toBeNull();
