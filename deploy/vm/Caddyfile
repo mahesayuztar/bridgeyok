@@ -1,0 +1,20 @@
+{
+	admin off
+	grace_period 15s
+}
+
+{$API_DOMAIN} {
+	log {
+		format json
+	}
+	reverse_proxy api:8080 {
+		stream_close_delay 5m
+	}
+}
+
+{$APP_DOMAIN} {
+	log {
+		format json
+	}
+	reverse_proxy web:3000
+}

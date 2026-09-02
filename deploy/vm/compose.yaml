@@ -1,0 +1,105 @@
+name: bridgeyok
+
+x-service-defaults: &service-defaults
+  init: true
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+  networks:
+    - app
+
+services:
+  api:
+    <<: *service-defaults
+    image: bridgeyok-api:${RELEASE_ID:-current}
+    build:
+      context: ../..
+      dockerfile: deploy/local/api.Dockerfile
+      args:
+        RELEASE_ID: ${RELEASE_ID:-current}
+    environment:
+      ALLOWED_ORIGINS: https://${APP_DOMAIN:?APP_DOMAIN is required}
+      API_HOST: 0.0.0.0
+      APP_ENV: production
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      DATABASE_MAX_CONNS: ${DATABASE_MAX_CONNS:-4}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      IDLE_TIMEOUT: ${IDLE_TIMEOUT:-60s}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PORT: 8080
+      READ_HEADER_TIMEOUT: ${READ_HEADER_TIMEOUT:-5s}
+      READ_TIMEOUT: ${READ_TIMEOUT:-15s}
+      SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-20s}
+      TABLE_ACTOR_IDLE_TIMEOUT: ${TABLE_ACTOR_IDLE_TIMEOUT:-10m}
+      TABLE_ACTOR_QUEUE_CAPACITY: ${TABLE_ACTOR_QUEUE_CAPACITY:-64}
+      REALTIME_READ_LIMIT_BYTES: ${REALTIME_READ_LIMIT_BYTES:-8192}
+      REALTIME_OUTBOUND_QUEUE_CAPACITY: ${REALTIME_OUTBOUND_QUEUE_CAPACITY:-64}
+      REALTIME_OUTBOUND_QUEUE_BYTES: ${REALTIME_OUTBOUND_QUEUE_BYTES:-262144}
+      REALTIME_WRITE_TIMEOUT: ${REALTIME_WRITE_TIMEOUT:-5s}
+      REALTIME_PING_INTERVAL: ${REALTIME_PING_INTERVAL:-20s}
+      REALTIME_PONG_TIMEOUT: ${REALTIME_PONG_TIMEOUT:-10s}
+      REALTIME_PRESENCE_GRACE_PERIOD: ${REALTIME_PRESENCE_GRACE_PERIOD:-1m}
+      REALTIME_MAX_CONNECTIONS: ${REALTIME_MAX_CONNECTIONS:-256}
+      REALTIME_MAX_CONNECTIONS_PER_SESSION: ${REALTIME_MAX_CONNECTIONS_PER_SESSION:-3}
+      REALTIME_MESSAGE_RATE: ${REALTIME_MESSAGE_RATE:-10}
+      REALTIME_MESSAGE_BURST: ${REALTIME_MESSAGE_BURST:-20}
+      REALTIME_RECOVERY_LIMIT: ${REALTIME_RECOVERY_LIMIT:-128}
+      WRITE_TIMEOUT: ${WRITE_TIMEOUT:-15s}
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+
+  web:
+    <<: *service-defaults
+    image: bridgeyok-web:${RELEASE_ID:-current}
+    build:
+      context: ../..
+      dockerfile: deploy/local/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://${API_DOMAIN:?API_DOMAIN is required}
+        RELEASE_ID: ${RELEASE_ID:-current}
+    environment:
+      API_BASE_URL: http://api:8080
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      PORT: 3000
+    depends_on:
+      api:
+        condition: service_healthy
+    stop_grace_period: 20s
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+      - /workspace/apps/web/.next/cache:size=128m,uid=1000,gid=1000
+
+  edge:
+    <<: *service-defaults
+    image: caddy:2.11.4-alpine
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?API_DOMAIN is required}
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is required}
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    stop_grace_period: 20s
+
+networks:
+  app:
+
+volumes:
+  caddy-config:
+  caddy-data:
