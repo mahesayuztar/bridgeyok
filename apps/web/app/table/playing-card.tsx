@@ -1,10 +1,10 @@
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import type { Card, Contract, Suit, VisualPosition } from "../table-state";
+import type { Card, Contract, VisualPosition } from "../table-state";
 import {
   cardKey,
+  groupCardsForContract,
   organizeCardsForContract,
-  suitOrderForContract,
   suitLabels,
 } from "./gameplay-presentation";
 import { useCardDrag } from "./use-card-drag";
@@ -117,17 +117,9 @@ export function BridgeHand({
   const organizedCards = organizeCardsForContract(cards, contractStrain);
   const sideDummy =
     variant === "dummy" && (position === "left" || position === "right");
-  const cardGroups: Array<{
-    key: string;
-    suit?: Suit;
-    cards: Card[];
-  }> = sideDummy
-    ? suitOrderForContract(contractStrain).map((suit) => ({
-        key: suit,
-        suit,
-        cards: organizedCards.filter((card) => card.suit === suit),
-      }))
-    : [{ key: "hand", cards: organizedCards }];
+  const cardGroups = sideDummy
+    ? groupCardsForContract(cards, contractStrain)
+    : [{ key: "hand", suit: undefined, cards: organizedCards }];
   const style = { "--card-count": Math.max(cards.length, 1) } as CSSProperties;
   return (
     <section
@@ -149,14 +141,6 @@ export function BridgeHand({
                   "aria-label": `${suitLabels[cardGroup.suit]} ${cardGroup.cards.length} kartu`,
                 })}
           >
-            {cardGroup.cards.length === 0 && cardGroup.suit !== undefined ? (
-              <span
-                className={`dummy-void physical-card suit-${cardGroup.suit.toLowerCase()}`}
-                aria-hidden="true"
-              >
-                {suitLabels[cardGroup.suit]}
-              </span>
-            ) : null}
             {cardGroup.cards.map((card, _cardIndex) => (
               <span
                 className="hand-card-slot"

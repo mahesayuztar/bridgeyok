@@ -35,6 +35,20 @@ export function organizeCardsForContract(
   );
 }
 
+export function groupCardsForContract(
+  cards: Card[],
+  strain?: NonNullable<Call["strain"]>,
+) {
+  const organizedCards = organizeCardsForContract(cards, strain);
+  return suitOrderForContract(strain)
+    .map((suit) => ({
+      key: suit,
+      suit,
+      cards: organizedCards.filter((card) => card.suit === suit),
+    }))
+    .filter((cardGroup) => cardGroup.cards.length > 0);
+}
+
 export function callLabel(call: Call) {
   if (call.kind === "PASS") return "Pass";
   if (call.kind === "DOUBLE") return "X";
