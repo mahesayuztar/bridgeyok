@@ -525,6 +525,9 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     }
     function handleOffline() {
       setConnectionState("offline");
+      if (tableStateRef.current.activeTableId !== null) {
+        dispatch({ type: "connectionLost", issue: issueFromFailure(new TypeError("browser offline"), "websocket") });
+      }
       socketRef.current?.close();
     }
     window.addEventListener("online", handleOnline);
