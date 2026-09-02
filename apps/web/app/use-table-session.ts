@@ -169,6 +169,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
   const connectionGenerationRef = useRef(0);
   const refreshPromiseRef = useRef<Promise<GuestCredentials> | null>(null);
   const beginConnectionRef = useRef<((tableId: string) => void) | null>(null);
+  const automaticTakeoverRevisionRef = useRef<number | null>(null);
 
   useEffect(() => {
     tableStateRef.current = tableState;
@@ -300,6 +301,8 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
             socket.close(1000, "stale connection");
             return;
           }
+          automaticTakeoverRevisionRef.current = null;
+          dispatch({ type: "controllerSyncStarted" });
           setConnectionState("syncing");
           const lastSeenSeq = tableStateRef.current.activeTableId === tableId ? tableStateRef.current.lastSeenSeq : 0;
           socket.send(
@@ -718,7 +721,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           title: "Meja masih diselaraskan",
           detail: "Tunggu keadaan terbaru sebelum mengirim aksi berikutnya.",
           retryable: true,
-          action: controllerState === "readyToTakeover" ? "takeover" : "resync",
+          action: "resync",
           source: "websocket"
         }
       });
@@ -746,6 +749,20 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       dispatch({ type: "settled", requestId, issue: issueFromFailure(error, "websocket") });
     }
   }, [canSendCommand]);
+
+  useEffect(() => {
+    const table = tableState.table;
+    if (
+      connectionState !== "connected" ||
+      tableState.controllerState !== "readyToTakeover" ||
+      table?.viewerSeat === undefined ||
+      automaticTakeoverRevisionRef.current === table.revision
+    ) {
+      return;
+    }
+    automaticTakeoverRevisionRef.current = table.revision;
+    sendCommand("table.takeover");
+  }, [connectionState, sendCommand, tableState.controllerState, tableState.table]);
 
   return {
     initializing,

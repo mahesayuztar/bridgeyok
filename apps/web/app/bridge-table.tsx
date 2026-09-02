@@ -143,8 +143,6 @@ export default function BridgeTable({
             onAction={(action) => {
               if (action === "retry") session.reconnect();
               else if (action === "resync") session.resync();
-              else if (action === "takeover")
-                session.sendCommand("table.takeover");
             }}
           />
         )}
@@ -191,8 +189,6 @@ export default function BridgeTable({
             onDismiss={session.dismissIssue}
             onAction={(action) => {
               if (action === "resync") session.resync();
-              else if (action === "takeover")
-                session.sendCommand("table.takeover");
               else if (action === "retry") session.reconnect();
               else if (action === "backToLobby") router.push("/lobby");
               else if (action === "signInAgain")

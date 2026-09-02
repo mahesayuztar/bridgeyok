@@ -11,7 +11,7 @@ import {
 export type CommandCapabilityContext = {
   table: LiveTableProjection | null;
   connected: boolean;
-  controllerState: "current" | "resyncing" | "readyToTakeover" | "takeoverPending";
+  controllerState: "current" | "mirror" | "resyncing" | "readyToTakeover" | "takeoverPending";
   hasPendingCommand: boolean;
 };
 

@@ -63,12 +63,6 @@ async function setReady(page: Page, nickname: string) {
 
 async function makeCall(page: Page, name: RegExp) {
   const button = page.getByRole("button", { name });
-  if (!(await button.isEnabled())) {
-    const takeover = page.getByRole("button", {
-      name: "Ambil alih kendali",
-    });
-    if (await takeover.isVisible()) await takeover.click();
-  }
   await expect(button).toBeEnabled();
   await button.click();
 }
@@ -84,16 +78,7 @@ async function makeBid(page: Page, level: number, strain: string) {
 async function playNextCard(pages: Page[]) {
   await expect.poll(async () => {
     const counts = await Promise.all(pages.map((page) => page.locator('button[aria-label^="Mainkan "]:enabled').count()));
-    const playableCount = counts.reduce((total, count) => total + count, 0);
-    if (playableCount === 0) {
-      for (const page of pages) {
-        const takeover = page.getByRole("button", {
-          name: "Ambil alih kendali",
-        });
-        if (await takeover.isVisible()) await takeover.click();
-      }
-    }
-    return playableCount;
+    return counts.reduce((total, count) => total + count, 0);
   }).toBeGreaterThan(0);
   for (const page of pages) {
     const cards = page.locator('button[aria-label^="Mainkan "]:enabled');
@@ -728,18 +713,22 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   });
   await replacementTab.goto(tableURL);
   await waitForConnection(replacementTab);
+  await expect(replacementTab.getByRole("button", { name: "Kunci meja" })).toBeEnabled();
+  await expect(replacementTab.getByRole("button", { name: "Ambil alih kendali" })).toHaveCount(0);
   await replacementTab.getByRole("button", { name: /^Buka menu Nara, kursi [NESW]$/ }).click();
   await replacementTab.getByRole("button", { name: "Saya siap" }).click();
-  await expect(replacementTab.getByRole("button", { name: "Ambil alih kendali" })).toBeVisible();
-  await replacementTab.getByRole("button", { name: "Ambil alih kendali" }).click();
-  await expect(replacementTab.getByRole("button", { name: "Kunci meja" })).toBeEnabled();
-  await north.page.getByRole("button", { name: "Kunci meja" }).click();
-  await expect(north.page.getByRole("button", { name: "Ambil alih kendali" })).toBeVisible();
 
   const activePages = [replacementTab, east.page, south.page, west.page];
+  for (const page of activePages) {
+    await expect(page.getByRole("button", { name: /^Buka menu Nara, kursi [NESW]$/ }).locator(".player-copy")).toContainText("Siap");
+  }
   await south.page.emulateMedia({ reducedMotion: "reduce" });
-  for (const [_playerIndex, page] of activePages.entries()) {
-    await setReady(page, ["Nara", "Eka", "Sari", "Wira"][_playerIndex]!);
+  for (const [_playerIndex, page] of [east.page, south.page, west.page].entries()) {
+    const nickname = ["Eka", "Sari", "Wira"][_playerIndex]!;
+    await setReady(page, nickname);
+    for (const activePage of activePages) {
+      await expect(activePage.getByRole("button", { name: new RegExp(`^Buka menu ${nickname}, kursi [NESW]$`) }).locator(".player-copy")).toContainText("Siap");
+    }
   }
   await expect(replacementTab.getByRole("button", { name: "Mulai board" })).toBeEnabled();
   await replacementTab.getByRole("button", { name: "Mulai board" }).click();
@@ -775,15 +764,8 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await makeCall(south.page, /^Pass/);
   await west.page.reload();
   await waitForConnection(west.page);
+  await expect(west.page.getByRole("button", { name: "Ambil alih kendali" })).toHaveCount(0);
   await makeCall(west.page, /^Pass/);
-  await expect(west.page.getByRole("button", { name: "Ambil alih kendali" })).toBeVisible();
-  await west.page.getByRole("button", { name: "Ambil alih kendali" }).click();
-  await makeCall(west.page, /^Pass/);
-
-  const eastTakeover = east.page.getByRole("button", {
-    name: "Ambil alih kendali",
-  });
-  if (await eastTakeover.isVisible()) await eastTakeover.click();
   await expect(
     east.page.locator('button[aria-label^="Mainkan "]:enabled').first(),
   ).toBeVisible();

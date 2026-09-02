@@ -109,7 +109,7 @@ export type TableClientState = {
   presence: Record<string, ParticipantPresence>;
   issue: ClientIssue | null;
   notice: string | null;
-  controllerState: "current" | "resyncing" | "readyToTakeover" | "takeoverPending";
+  controllerState: "current" | "mirror" | "resyncing" | "readyToTakeover" | "takeoverPending";
 };
 
 export type TableAction =
@@ -121,6 +121,7 @@ export type TableAction =
   | { type: "pending"; requestId: string; commandName: CommandName; payload: Record<string, unknown> }
   | { type: "ack"; requestId: string; revision: number; seq: number }
   | { type: "settled"; requestId: string; issue?: ClientIssue }
+  | { type: "controllerSyncStarted" }
   | { type: "conflict"; issue: ClientIssue }
   | { type: "connectionLost"; issue: ClientIssue }
   | { type: "issue"; issue: ClientIssue | null }
@@ -159,21 +160,24 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
       }
       const resyncComplete = state.controllerState === "resyncing";
       const readyToTakeover = action.table.viewerSeat !== undefined && (resyncComplete || state.controllerState === "readyToTakeover");
+      const viewerSeat = action.table.viewerSeat;
+      const takeoverConfirmed = state.controllerState === "takeoverPending"
+        && viewerSeat !== undefined
+        && state.table?.seats[viewerSeat]?.controllerEpoch !== action.table.seats[viewerSeat]?.controllerEpoch;
       return {
         ...state,
         table: action.table,
         lastSeenSeq: Math.max(action.seq, action.table.lastSeq),
         pending: {},
         presence: retainActivePresence(state.presence, action.table),
-        issue: readyToTakeover ? {
-          kind: "conflict",
-          title: "Meja sudah selaras",
-          detail: "Keadaan terbaru sudah diterima. Ambil alih bila kamu ingin mengendalikan kursi dari perangkat ini.",
-          retryable: true,
-          action: "takeover",
-          source: "websocket"
-        } : null,
-        controllerState: readyToTakeover ? "readyToTakeover" : "current"
+        issue: null,
+        controllerState: takeoverConfirmed
+          ? "current"
+          : readyToTakeover
+            ? "readyToTakeover"
+            : state.controllerState === "mirror" || state.controllerState === "takeoverPending"
+              ? state.controllerState
+              : "current"
       };
     }
     case "event": {
@@ -181,25 +185,32 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         return state;
       }
       const becameOwner = state.table?.viewerRole === "PARTICIPANT" && action.table.viewerRole === "OWNER";
-      const controllerReplaced = action.eventType === "CONTROLLER_REPLACED" && state.controllerState === "takeoverPending";
+      const viewerSeat = action.table.viewerSeat;
+      const viewerControllerChanged = action.eventType === "CONTROLLER_REPLACED"
+        && viewerSeat !== undefined
+        && state.table?.seats[viewerSeat]?.controllerEpoch !== action.table.seats[viewerSeat]?.controllerEpoch;
+      const controllerReplaced = viewerControllerChanged && state.controllerState === "takeoverPending";
+      const controllerReplacedElsewhere = viewerControllerChanged && state.controllerState === "current";
+      const resyncComplete = state.controllerState === "resyncing";
+      const readyToTakeover = resyncComplete && action.table.viewerSeat !== undefined;
       return {
         ...state,
         table: action.table,
         lastSeenSeq: Math.max(action.seq, action.table.lastSeq),
         pending: reconcilePendingCommands(state.pending, action.table),
         presence: retainActivePresence(state.presence, action.table),
-        issue: controllerReplaced ? null : state.issue,
+        issue: controllerReplaced || resyncComplete ? null : state.issue,
         notice: becameOwner
           ? "Kamu sekarang menjadi master meja."
-          : controllerReplaced
-            ? "Kendali sudah berpindah ke perangkat ini."
-            : action.eventType === "PARTICIPANT_TIMED_OUT"
+          : action.eventType === "PARTICIPANT_TIMED_OUT"
               ? "Pemain offline sudah dikeluarkan dari meja."
               : state.notice,
         controllerState: controllerReplaced
           ? "current"
-          : state.controllerState === "resyncing" && action.table.viewerSeat !== undefined
-            ? "readyToTakeover"
+          : controllerReplacedElsewhere
+            ? "mirror"
+          : resyncComplete
+            ? readyToTakeover ? "readyToTakeover" : "current"
             : state.controllerState
       };
     }
@@ -257,6 +268,8 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
         controllerState: commandName === "table.takeover" && action.issue !== undefined ? "readyToTakeover" : state.controllerState
       };
     }
+    case "controllerSyncStarted":
+      return { ...state, pending: {}, issue: null, controllerState: "resyncing" };
     case "conflict":
       return { ...state, pending: {}, issue: action.issue, notice: null, controllerState: "resyncing" };
     case "connectionLost":

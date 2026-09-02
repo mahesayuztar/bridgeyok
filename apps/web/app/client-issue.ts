@@ -3,7 +3,7 @@ export type ClientIssue = {
   title: string;
   detail: string;
   retryable: boolean;
-  action?: "retry" | "editInvite" | "backToLobby" | "signInAgain" | "resync" | "takeover";
+  action?: "retry" | "editInvite" | "backToLobby" | "signInAgain" | "resync";
   source: "rest" | "websocket" | "browser";
 };
 
@@ -28,7 +28,7 @@ export function issueFromServer({ code, status, retryable = false, source }: Iss
     case "REVISION_CONFLICT":
       return { kind: "conflict", title: "Meja sudah berubah", detail: "Keadaan terbaru perlu diselaraskan sebelum aksi berikutnya.", retryable: true, action: "resync", source };
     case "STALE_CONTROLLER":
-      return { kind: "conflict", title: "Kendali ada di perangkat lain", detail: "Selaraskan meja, lalu ambil alih kendali dari perangkat ini.", retryable: true, action: "resync", source };
+      return { kind: "conflict", title: "Kendali berpindah perangkat", detail: "Meja akan diselaraskan dan kendali otomatis diberikan ke perangkat ini.", retryable: true, action: "resync", source };
     case "SESSION_INACTIVE":
     case "SESSION_INVALID":
     case "UNAUTHORIZED":

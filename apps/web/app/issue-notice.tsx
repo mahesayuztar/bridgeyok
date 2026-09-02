@@ -8,8 +8,7 @@ const ACTION_LABELS: Record<NonNullable<ClientIssue["action"]>, string> = {
   editInvite: "Periksa kode",
   backToLobby: "Kembali ke lobby",
   signInAgain: "Masuk kembali",
-  resync: "Selaraskan meja",
-  takeover: "Ambil alih kendali"
+  resync: "Selaraskan meja"
 };
 
 export default function IssueNotice({ issue, compact = false, onAction, onDismiss }: {

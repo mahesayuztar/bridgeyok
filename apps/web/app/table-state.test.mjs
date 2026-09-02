@@ -164,13 +164,15 @@ test("playable hand supports declarer dummy control and follow suit", () => {
   assert.deepEqual(playableHand(table), { hand: [{ suit: "H", rank: "2" }], source: "dummy" });
 });
 
-test("controller recovery waits for fresh projection and replacement event", () => {
+test("controller recovery automatically requests takeover after a fresh projection", () => {
   const projected = {
     ...tableProjection("table-a", 4),
     viewerSeat: "S",
     seats: { S: { participantId: "viewer", ready: true, controllerEpoch: 1 } }
   };
   const entered = reduceTableState(createEmptyTableState(), { type: "enter", table: projected });
+  const reconnecting = reduceTableState(entered, { type: "controllerSyncStarted" });
+  assert.equal(reconnecting.controllerState, "resyncing");
   const pending = reduceTableState(entered, { type: "pending", requestId: "stale-command", commandName: "game.make_call", payload: {} });
   const issue = { kind: "conflict", title: "Kendali stale", detail: "Selaraskan.", retryable: true, action: "resync", source: "websocket" };
   const syncing = reduceTableState(pending, { type: "conflict", issue });
@@ -185,12 +187,14 @@ test("controller recovery waits for fresh projection and replacement event", () 
   };
   const fresh = reduceTableState(syncing, { type: "snapshot", tableId: "table-a", seq: 5, table: freshProjection });
   assert.equal(fresh.controllerState, "readyToTakeover");
-  assert.equal(fresh.issue.action, "takeover");
+  assert.equal(fresh.issue, null);
   const repeatedSnapshot = reduceTableState(fresh, { type: "snapshot", tableId: "table-a", seq: 5, table: freshProjection });
   assert.equal(repeatedSnapshot.controllerState, "readyToTakeover");
 
   const takeover = reduceTableState(fresh, { type: "pending", requestId: "takeover", commandName: "table.takeover", payload: {} });
   assert.equal(takeover.controllerState, "takeoverPending");
+  const unchangedSnapshot = reduceTableState(takeover, { type: "snapshot", tableId: "table-a", seq: 5, table: freshProjection });
+  assert.equal(unchangedSnapshot.controllerState, "takeoverPending");
   const replaced = reduceTableState(takeover, {
     type: "event",
     tableId: "table-a",
@@ -199,7 +203,32 @@ test("controller recovery waits for fresh projection and replacement event", () 
     table: { ...freshProjection, revision: 6, lastSeq: 6, seats: { S: { participantId: "viewer", ready: true, controllerEpoch: 3 } } }
   });
   assert.equal(replaced.controllerState, "current");
-  assert.equal(replaced.notice, "Kendali sudah berpindah ke perangkat ini.");
+  assert.equal(replaced.notice, null);
+});
+
+test("controller replacement leaves the previous device read-only", () => {
+  const projected = {
+    ...tableProjection("table-a", 4),
+    viewerSeat: "S",
+    seats: { S: { participantId: "viewer", ready: true, controllerEpoch: 1 } }
+  };
+  const entered = reduceTableState(createEmptyTableState(), { type: "enter", table: projected });
+  const replacedElsewhere = reduceTableState(entered, {
+    type: "event",
+    tableId: "table-a",
+    seq: 5,
+    eventType: "CONTROLLER_REPLACED",
+    table: { ...projected, revision: 5, lastSeq: 5, seats: { S: { participantId: "viewer", ready: true, controllerEpoch: 2 } } }
+  });
+  assert.equal(replacedElsewhere.controllerState, "mirror");
+
+  const refreshed = reduceTableState(replacedElsewhere, {
+    type: "snapshot",
+    tableId: "table-a",
+    seq: 5,
+    table: replacedElsewhere.table
+  });
+  assert.equal(refreshed.controllerState, "mirror");
 });
 
 test("table orientation keeps the viewer at the bottom", () => {

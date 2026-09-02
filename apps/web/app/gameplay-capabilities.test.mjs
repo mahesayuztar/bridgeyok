@@ -39,6 +39,7 @@ function context(table = activeTable()) {
 
 test("command capability rejects stale, offline, and concurrent actions", () => {
   assert.equal(canSendTableCommand({ ...context(), connected: false }, "game.make_call", { call: { kind: "PASS" } }), false);
+  assert.equal(canSendTableCommand({ ...context(), controllerState: "mirror" }, "game.make_call", { call: { kind: "PASS" } }), false);
   assert.equal(canSendTableCommand({ ...context(), controllerState: "resyncing" }, "game.make_call", { call: { kind: "PASS" } }), false);
   assert.equal(canSendTableCommand({ ...context(), hasPendingCommand: true }, "game.make_call", { call: { kind: "PASS" } }), false);
 });
@@ -61,7 +62,7 @@ test("play capability enforces card ownership and follow suit", () => {
   assert.equal(canSendTableCommand(context(table), "game.play_card", { card: { suit: "S", rank: "A" } }), false);
 });
 
-test("takeover is only available after a completed resync", () => {
+test("automatic takeover is only available after a completed resync", () => {
   assert.equal(canSendTableCommand({ ...context(), controllerState: "readyToTakeover" }, "table.takeover"), true);
   assert.equal(canSendTableCommand(context(), "table.takeover"), false);
 });
