@@ -20,7 +20,7 @@ ARG RELEASE_ID=local
 LABEL io.bridgeyok.release="${RELEASE_ID}"
 
 RUN apt-get update && \
-    apt-get install --yes --no-install-recommends ca-certificates && \
+    apt-get install --yes --no-install-recommends ca-certificates curl && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd --system bridgeyok && \
     useradd --system --gid bridgeyok --home-dir /workspace bridgeyok && \
@@ -39,5 +39,8 @@ COPY --chown=bridgeyok:bridgeyok scripts/start-local-api.sh ./scripts/start-api.
 USER bridgeyok
 
 EXPOSE 8080 8090
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=3 \
+    CMD ["curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/health/ready"]
 
 ENTRYPOINT ["./scripts/start-api.sh"]
