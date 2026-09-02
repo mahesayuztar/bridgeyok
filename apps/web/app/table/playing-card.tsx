@@ -1,7 +1,11 @@
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import type { Card } from "../table-state";
-import { cardKey, suitLabels } from "./gameplay-presentation";
+import type { Card, Contract } from "../table-state";
+import {
+  cardKey,
+  organizeCardsForContract,
+  suitLabels,
+} from "./gameplay-presentation";
 import { useCardDrag } from "./use-card-drag";
 
 export function PlayingCard({
@@ -95,6 +99,7 @@ export function BridgeHand({
   disabled = false,
   onPlay,
   className = "",
+  contractStrain,
 }: {
   cards: Card[];
   title: string;
@@ -103,8 +108,10 @@ export function BridgeHand({
   disabled?: boolean;
   onPlay?: (card: Card) => void;
   className?: string;
+  contractStrain: Contract["strain"] | undefined;
 }) {
   const playableKeys = new Set(playableCards.map(cardKey));
+  const organizedCards = organizeCardsForContract(cards, contractStrain);
   const style = { "--card-count": Math.max(cards.length, 1) } as CSSProperties;
   return (
     <section
@@ -114,7 +121,7 @@ export function BridgeHand({
       style={style}
     >
       <div className="hand-cards">
-        {cards.map((card, _cardIndex) => (
+        {organizedCards.map((card, _cardIndex) => (
           <span
             className="hand-card-slot"
             data-card-index={_cardIndex}

@@ -7,6 +7,28 @@ export const suitLabels: Record<Suit, string> = {
   C: "♣",
 };
 
+const CONTRACT_SUIT_ORDER: Record<
+  NonNullable<Call["strain"]>,
+  readonly Suit[]
+> = {
+  NT: ["S", "H", "D", "C"],
+  S: ["S", "H", "D", "C"],
+  H: ["H", "S", "C", "D"],
+  D: ["D", "S", "H", "C"],
+  C: ["C", "H", "S", "D"],
+};
+
+export function organizeCardsForContract(
+  cards: Card[],
+  strain?: NonNullable<Call["strain"]>,
+) {
+  const suitOrder = CONTRACT_SUIT_ORDER[strain ?? "NT"];
+  return [...cards].sort(
+    (firstCard, secondCard) =>
+      suitOrder.indexOf(firstCard.suit) - suitOrder.indexOf(secondCard.suit),
+  );
+}
+
 export function callLabel(call: Call) {
   if (call.kind === "PASS") return "Pass";
   if (call.kind === "DOUBLE") return "X";

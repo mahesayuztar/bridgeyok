@@ -244,6 +244,7 @@ export default function BridgeTable({
                 title="Kartu dummy"
                 variant="dummy"
                 cards={game.dummyHand}
+                contractStrain={game.auction.contract?.strain}
                 playableCards={
                   legalPlay?.source === "dummy"
                     ? legalPlay.hand.filter((card) =>
@@ -295,6 +296,7 @@ export default function BridgeTable({
           className="own-hand"
           title="Kartu Anda"
           cards={game.ownHand}
+          contractStrain={game.auction.contract?.strain}
           playableCards={
             legalPlay?.source === "own"
               ? legalPlay.hand.filter((card) =>
