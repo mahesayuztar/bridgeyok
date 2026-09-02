@@ -49,6 +49,8 @@ export function AuctionTable({
   function getCallClass(call?: Call) {
     if (!call || call.kind !== "BID") return "";
 
+    if (call.strain === undefined) return "";
+
     if (call.strain === "NT") return "nt-call";
 
     return callColor[call.strain] ?? "";
