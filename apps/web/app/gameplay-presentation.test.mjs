@@ -6,6 +6,7 @@ import {
   cardKey,
   contractLabel,
   contractSummaryLabel,
+  organizeCardsForContract,
   viewerTrickCounts,
 } from "./table/gameplay-presentation.ts";
 
@@ -34,6 +35,38 @@ test("contract presentation keeps only contract, doubling, and declarer seat", (
     contractSummaryLabel({ ...contract, strain: "NT", doubling: "REDOUBLED" }),
     "4NT XX N",
   );
+});
+
+test("contract organizes viewer and dummy suit groups without mutating projection", () => {
+  const cards = [
+    { suit: "D", rank: "2" },
+    { suit: "S", rank: "A" },
+    { suit: "C", rank: "3" },
+    { suit: "H", rank: "K" },
+    { suit: "S", rank: "Q" },
+  ];
+
+  assert.deepEqual(
+    organizeCardsForContract(cards).map((card) => card.suit),
+    ["S", "S", "H", "D", "C"],
+  );
+  assert.deepEqual(
+    organizeCardsForContract(cards, "S").map((card) => card.suit),
+    ["S", "S", "H", "D", "C"],
+  );
+  assert.deepEqual(
+    organizeCardsForContract(cards, "H").map((card) => card.suit),
+    ["H", "S", "S", "C", "D"],
+  );
+  assert.deepEqual(
+    organizeCardsForContract(cards, "C").map((card) => card.suit),
+    ["C", "H", "S", "S", "D"],
+  );
+  assert.deepEqual(
+    organizeCardsForContract(cards, "D").map((card) => card.suit),
+    ["D", "S", "S", "H", "C"],
+  );
+  assert.deepEqual(cards.map((card) => card.suit), ["D", "S", "C", "H", "S"]);
 });
 
 test("trick counts follow the viewer partnership", () => {
