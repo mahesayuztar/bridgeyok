@@ -6,6 +6,7 @@ import {
   cardKey,
   contractLabel,
   contractSummaryLabel,
+  groupCardsForContract,
   organizeCardsForContract,
   suitOrderForContract,
   viewerTrickCounts,
@@ -69,6 +70,17 @@ test("contract organizes viewer and dummy suit groups without mutating projectio
   );
   assert.deepEqual(cards.map((card) => card.suit), ["D", "S", "C", "H", "S"]);
   assert.deepEqual(suitOrderForContract("D"), ["D", "S", "H", "C"]);
+  assert.deepEqual(
+    groupCardsForContract(
+      [
+        { suit: "S", rank: "A" },
+        { suit: "H", rank: "K" },
+        { suit: "D", rank: "Q" },
+      ],
+      "C",
+    ).map((cardGroup) => cardGroup.suit),
+    ["H", "S", "D"],
+  );
 });
 
 test("trick counts follow the viewer partnership", () => {

@@ -305,6 +305,7 @@ async function assertGameplayGeometry(page: Page) {
       return {
         ratio: box.width / box.height,
         width: box.width,
+        sideDummy: card.closest(".dummy-left, .dummy-right") !== null,
         cornerFontSize: Number.parseFloat(
           getComputedStyle(card.querySelector(".card-corner")!).fontSize,
         ),
@@ -366,6 +367,28 @@ async function assertGameplayGeometry(page: Page) {
         Math.min(...visibleCards.map((card) => card.left))
       );
     });
+    const dummySuitCardCounts = dummySuitGroups.map(
+      (group) => group.querySelectorAll(".physical-card").length,
+    );
+    const dummyPosition = ["top", "right", "bottom", "left"].find((position) =>
+      document.querySelector(".dummy-hand")?.classList.contains(`dummy-${position}`),
+    );
+    const visibleDummyCards = dummyCards.flatMap((card) =>
+      card === null ? [] : [card],
+    );
+    const visibleTrickCards = trickCards.flatMap((card) =>
+      card === null ? [] : [card],
+    );
+    const sideDummyTrickGap =
+      visibleDummyCards.length === 0 || visibleTrickCards.length === 0
+        ? null
+        : dummyPosition === "left"
+          ? Math.min(...visibleTrickCards.map((card) => card.left)) -
+            Math.max(...visibleDummyCards.map((card) => card.right))
+          : dummyPosition === "right"
+            ? Math.min(...visibleDummyCards.map((card) => card.left)) -
+              Math.max(...visibleTrickCards.map((card) => card.right))
+            : null;
     const playedCardsOverlap = trickCards.some((trickCard, _trickIndex) =>
       trickCards
         .slice(_trickIndex + 1)
@@ -385,17 +408,13 @@ async function assertGameplayGeometry(page: Page) {
         null,
       dummySuitGroupCount: dummySuitGroups.length,
       dummySuitGroupRows,
-      dummySuitOrder: dummySuitGroups.map((group) => group.dataset.suit),
       dummySuitSpreads,
+      dummySuitCardCounts,
       dummyPlacement:
         dummyHand === null || playZone === null
           ? null
           : {
-              position: ["top", "right", "bottom", "left"].find((position) =>
-                document
-                  .querySelector(".dummy-hand")
-                  ?.classList.contains(`dummy-${position}`),
-              ),
+              position: dummyPosition,
               leftDelta: Math.abs(dummyHand.left - playZone.left),
               rightDelta: Math.abs(dummyHand.right - playZone.right),
               topDelta: Math.abs(dummyHand.top - playZone.top),
@@ -432,6 +451,7 @@ async function assertGameplayGeometry(page: Page) {
       dummyTrickOverlap: dummyCards.some((dummyCard) =>
         trickCards.some((trickCard) => overlaps(dummyCard, trickCard)),
       ),
+      sideDummyTrickGap,
       indicator:
         wonIndicator === null || lostIndicator === null
           ? null
@@ -471,7 +491,14 @@ async function assertGameplayGeometry(page: Page) {
   expect(geometry.cards.length).toBeGreaterThan(0);
   expect(geometry.cards.every((card) => card.label !== null)).toBe(true);
   expect(
-    geometry.cards.filter((card) => Math.abs(card.ratio - 5 / 7) >= 0.035),
+    geometry.cards
+      .filter((card) => !card.sideDummy)
+      .filter((card) => Math.abs(card.ratio - 5 / 7) >= 0.035),
+  ).toEqual([]);
+  expect(
+    geometry.cards
+      .filter((card) => card.sideDummy)
+      .filter((card) => Math.abs(card.ratio - 7 / 5) >= 0.035),
   ).toEqual([]);
   expect(geometry.cards.filter((card) => card.clipped)).toEqual([]);
   expect(geometry.cards.every((card) => card.cornerFontSize >= 14)).toBe(true);
@@ -510,17 +537,19 @@ async function assertGameplayGeometry(page: Page) {
   expect(geometry.trickInsidePlayZone).toBe(true);
   if (geometry.dummyPlacement?.position === "left") {
     expect(geometry.dummyPlacement.leftDelta).toBeLessThanOrEqual(8);
-    expect(geometry.dummySuitGroupCount).toBe(4);
-    expect(geometry.dummySuitGroupRows).toBe(4);
-    expect(geometry.dummySuitOrder).toEqual(["C", "H", "S", "D"]);
+    expect(geometry.dummySuitGroupCount).toBeGreaterThan(0);
+    expect(geometry.dummySuitGroupRows).toBe(geometry.dummySuitGroupCount);
+    expect(geometry.dummySuitCardCounts.every((count) => count > 0)).toBe(true);
+    expect(geometry.sideDummyTrickGap).toBeGreaterThanOrEqual(6);
     expect(Math.max(...geometry.dummySuitSpreads)).toBeGreaterThan(
       geometry.cards.find((card) => card.className.includes("card-dummy"))!.width,
     );
   } else if (geometry.dummyPlacement?.position === "right") {
     expect(geometry.dummyPlacement.rightDelta).toBeLessThanOrEqual(8);
-    expect(geometry.dummySuitGroupCount).toBe(4);
-    expect(geometry.dummySuitGroupRows).toBe(4);
-    expect(geometry.dummySuitOrder).toEqual(["C", "H", "S", "D"]);
+    expect(geometry.dummySuitGroupCount).toBeGreaterThan(0);
+    expect(geometry.dummySuitGroupRows).toBe(geometry.dummySuitGroupCount);
+    expect(geometry.dummySuitCardCounts.every((count) => count > 0)).toBe(true);
+    expect(geometry.sideDummyTrickGap).toBeGreaterThanOrEqual(6);
     expect(Math.max(...geometry.dummySuitSpreads)).toBeGreaterThan(
       geometry.cards.find((card) => card.className.includes("card-dummy"))!.width,
     );
