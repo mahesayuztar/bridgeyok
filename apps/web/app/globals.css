@@ -28,8 +28,8 @@
   --card-compact-width: 2.4rem;
   --dummy-card-exposure: 1.7rem;
   --dummy-side-exposure: 1.55rem;
-  --board-player-block: 2.5rem;
-  --board-player-inline: 2.5rem;
+  --board-player-block: 1.9rem;
+  --board-player-inline: 1.9rem;
   --page-gutter: clamp(1.25rem, 4vw, 4rem);
   --content-width: 88rem;
 }
@@ -960,8 +960,8 @@ h2 {
   height: 100%;
   min-height: 0;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0.55rem;
+  gap: 0.35rem;
+  padding: 0.15rem 0.4rem;
   border: 0;
   background: transparent;
   color: var(--table-ink);
@@ -973,9 +973,9 @@ h2 {
 }
 .player-seat {
   display: grid;
-  flex: 0 0 1.55rem;
-  width: 1.55rem;
-  height: 1.55rem;
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
   place-items: center;
   border: 1px solid rgb(255 255 255 / 35%);
   font-family: Georgia, "Times New Roman", serif;
@@ -995,7 +995,7 @@ h2 {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 .participant-identity {
   display: inline-flex;
@@ -1039,7 +1039,7 @@ h2 {
 .player-right .empty-seat-trigger {
   flex-direction: column;
   justify-content: center;
-  padding: 0.45rem 0.25rem;
+  padding: 0.3rem 0.1rem;
   text-align: center;
 }
 .player-left .player-copy strong,
@@ -1921,7 +1921,7 @@ button.physical-card:disabled {
     --card-hand-width: clamp(3.35rem, 13vw, 4.25rem);
     --card-dummy-width: 3rem;
     --card-trick-width: 2.8rem;
-    --board-player-inline: 2.25rem;
+    --board-player-inline: 1.7rem;
   }
   .active-table-client {
     grid-template-rows: auto minmax(0, 1fr) clamp(7.75rem, 21vh, 9.5rem);
@@ -2788,6 +2788,10 @@ button.physical-card.is-dragging {
   padding-inline: 0;
 }
 
+.hand-card-group {
+  display: contents;
+}
+
 .bridge-hand .hand-card-slot {
   position: relative;
   width: var(--hand-card-width);
@@ -2830,6 +2834,7 @@ button.physical-card.is-dragging {
 
 .dummy-hand {
   --hand-card-width: var(--card-dummy-width);
+  --dummy-suit-step: clamp(2rem, 4.5vh, 2.5rem);
   z-index: 9;
   max-width: none;
   max-height: none;
@@ -2860,8 +2865,11 @@ button.physical-card.is-dragging {
 .dummy-left,
 .dummy-right {
   top: 50%;
-  width: var(--hand-card-width);
-  height: calc(100% - 0.8rem);
+  width: min(42%, 20rem);
+  height: calc(
+    var(--hand-card-height) + var(--dummy-suit-step) +
+      var(--dummy-suit-step) + var(--dummy-suit-step)
+  );
   transform: translateY(-50%);
 }
 
@@ -2878,23 +2886,49 @@ button.physical-card.is-dragging {
 .dummy-left .hand-cards,
 .dummy-right .hand-cards {
   flex-direction: column;
+  justify-content: flex-start;
+}
+
+.dummy-left .hand-card-group,
+.dummy-right .hand-card-group {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: var(--dummy-suit-step);
+  min-height: var(--dummy-suit-step);
+  flex: 0 0 var(--dummy-suit-step);
+  flex-flow: row nowrap;
   align-items: flex-start;
+}
+
+.dummy-left .hand-card-group:last-child,
+.dummy-right .hand-card-group:last-child {
+  height: var(--hand-card-height);
+  min-height: var(--hand-card-height);
+  flex: 0 0 var(--hand-card-height);
+}
+
+.dummy-right .hand-card-group {
+  justify-content: flex-end;
 }
 
 .dummy-left .hand-card-slot,
 .dummy-right .hand-card-slot {
-  width: var(--hand-card-width);
-  max-width: var(--hand-card-width);
-  height: var(--dummy-card-exposure);
-  max-height: var(--dummy-card-exposure);
-  flex: 1 1 var(--dummy-card-exposure);
+  min-width: clamp(0.9rem, 2.5vw, 1.2rem);
 }
 
-.dummy-left .hand-card-slot:last-child,
-.dummy-right .hand-card-slot:last-child {
+.dummy-void {
+  display: grid;
+  width: var(--hand-card-width);
   height: var(--hand-card-height);
-  max-height: var(--hand-card-height);
-  flex: 0 0 var(--hand-card-height);
+  place-items: start;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1rem, 1.45vw, 1.3rem);
+  font-weight: 800;
+}
+
+.dummy-right .dummy-void {
+  margin-left: auto;
 }
 
 .own-hand button.physical-card:not(:disabled),
@@ -2933,11 +2967,11 @@ button.physical-card.is-dragging {
 }
 
 .current-trick[data-dummy-position="left"] {
-  left: 60%;
+  left: calc(50% + min(21%, 10rem));
 }
 
 .current-trick[data-dummy-position="right"] {
-  left: 40%;
+  left: calc(50% - min(21%, 10rem));
 }
 
 .trick-top,
@@ -3035,11 +3069,11 @@ button.physical-card.is-dragging {
   }
 
   .current-trick[data-dummy-position="left"] {
-    left: 62%;
+    left: calc(50% + min(21%, 10rem));
   }
 
   .current-trick[data-dummy-position="right"] {
-    left: 38%;
+    left: calc(50% - min(21%, 10rem));
   }
 }
 

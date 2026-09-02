@@ -243,6 +243,7 @@ export default function BridgeTable({
                 className={`dummy-hand dummy-${dummyPosition}`}
                 title="Kartu dummy"
                 variant="dummy"
+                position={dummyPosition}
                 cards={game.dummyHand}
                 contractStrain={game.auction.contract?.strain}
                 playableCards={

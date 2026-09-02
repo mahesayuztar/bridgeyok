@@ -18,11 +18,17 @@ const CONTRACT_SUIT_ORDER: Record<
   C: ["C", "H", "S", "D"],
 };
 
+export function suitOrderForContract(
+  strain?: NonNullable<Call["strain"]>,
+) {
+  return CONTRACT_SUIT_ORDER[strain ?? "NT"];
+}
+
 export function organizeCardsForContract(
   cards: Card[],
   strain?: NonNullable<Call["strain"]>,
 ) {
-  const suitOrder = CONTRACT_SUIT_ORDER[strain ?? "NT"];
+  const suitOrder = suitOrderForContract(strain);
   return [...cards].sort(
     (firstCard, secondCard) =>
       suitOrder.indexOf(firstCard.suit) - suitOrder.indexOf(secondCard.suit),

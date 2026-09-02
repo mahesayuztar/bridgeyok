@@ -1,9 +1,10 @@
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import type { Card, Contract } from "../table-state";
+import type { Card, Contract, Suit, VisualPosition } from "../table-state";
 import {
   cardKey,
   organizeCardsForContract,
+  suitOrderForContract,
   suitLabels,
 } from "./gameplay-presentation";
 import { useCardDrag } from "./use-card-drag";
@@ -100,6 +101,7 @@ export function BridgeHand({
   onPlay,
   className = "",
   contractStrain,
+  position,
 }: {
   cards: Card[];
   title: string;
@@ -109,32 +111,68 @@ export function BridgeHand({
   onPlay?: (card: Card) => void;
   className?: string;
   contractStrain: Contract["strain"] | undefined;
+  position?: VisualPosition;
 }) {
   const playableKeys = new Set(playableCards.map(cardKey));
   const organizedCards = organizeCardsForContract(cards, contractStrain);
+  const sideDummy =
+    variant === "dummy" && (position === "left" || position === "right");
+  const cardGroups: Array<{
+    key: string;
+    suit?: Suit;
+    cards: Card[];
+  }> = sideDummy
+    ? suitOrderForContract(contractStrain).map((suit) => ({
+        key: suit,
+        suit,
+        cards: organizedCards.filter((card) => card.suit === suit),
+      }))
+    : [{ key: "hand", cards: organizedCards }];
   const style = { "--card-count": Math.max(cards.length, 1) } as CSSProperties;
   return (
     <section
       className={`bridge-hand ${className}`}
       data-variant={variant}
+      data-layout={sideDummy ? "suit-groups" : "fan"}
       aria-label={title}
       style={style}
     >
       <div className="hand-cards">
-        {organizedCards.map((card, _cardIndex) => (
-          <span
-            className="hand-card-slot"
-            data-card-index={_cardIndex}
-            key={cardKey(card)}
+        {cardGroups.map((cardGroup) => (
+          <div
+            className={`hand-card-group${cardGroup.suit === undefined ? "" : " dummy-suit-group"}`}
+            key={cardGroup.key}
+            {...(cardGroup.suit === undefined
+              ? {}
+              : {
+                  "data-suit": cardGroup.suit,
+                  "aria-label": `${suitLabels[cardGroup.suit]} ${cardGroup.cards.length} kartu`,
+                })}
           >
-            <PlayingCard
-              card={card}
-              variant={variant}
-              disabled={disabled}
-              playable={playableKeys.has(cardKey(card))}
-              {...(onPlay === undefined ? {} : { onPlay })}
-            />
-          </span>
+            {cardGroup.cards.length === 0 && cardGroup.suit !== undefined ? (
+              <span
+                className={`dummy-void physical-card suit-${cardGroup.suit.toLowerCase()}`}
+                aria-hidden="true"
+              >
+                {suitLabels[cardGroup.suit]}
+              </span>
+            ) : null}
+            {cardGroup.cards.map((card, _cardIndex) => (
+              <span
+                className="hand-card-slot"
+                data-card-index={_cardIndex}
+                key={cardKey(card)}
+              >
+                <PlayingCard
+                  card={card}
+                  variant={variant}
+                  disabled={disabled}
+                  playable={playableKeys.has(cardKey(card))}
+                  {...(onPlay === undefined ? {} : { onPlay })}
+                />
+              </span>
+            ))}
+          </div>
         ))}
       </div>
     </section>
