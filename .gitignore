@@ -32,6 +32,8 @@ bin/
 .DS_Store
 .idea/
 .vscode/
+.playwright/
+apps/web/test-results/
 tmp/
 
 # Agent instruction files and all Markdown documentation
