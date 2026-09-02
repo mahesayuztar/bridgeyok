@@ -26,6 +26,8 @@ type StoredIdentity = Pick<GuestCredentials, "sessionId" | "nickname" | "deviceC
 type StoredAccess = Pick<GuestCredentials, "accessToken" | "accessExpiresAt">;
 type StoredTable = { tableId: string; inviteCode?: string };
 
+export type TableRecoveryState = "NO_SESSION" | "SESSION_ONLY" | "TABLE_RECOVERING" | "TABLE_ACTIVE" | "TABLE_EXPIRED";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 const REALTIME_CONNECTION_ROTATION_MS = 285_000;
 const IDENTITY_KEY = "bridgeyok.identity.v1";
@@ -135,6 +137,7 @@ function issueForError(error: unknown): ClientIssue {
 
 export type TableSession = {
   initializing: boolean;
+  recoveryState: TableRecoveryState;
   busy: boolean;
   nickname: string | null;
   connectionState: ConnectionState;
@@ -155,10 +158,11 @@ export type TableSession = {
   sendCommand: (name: CommandName, payload?: Record<string, unknown>) => void;
 };
 
-export function useTableSession({ restoreTable = true }: { restoreTable?: boolean } = {}): TableSession {
+export function useTableSession({ connectOnRestore = true }: { connectOnRestore?: boolean } = {}): TableSession {
   const [tableState, dispatch] = useReducer(reduceTableState, undefined, createEmptyTableState);
   const projectedTable = useMemo(() => projectedTableState(tableState), [tableState]);
-  const [initializing, setInitializing] = useState(restoreTable);
+  const [initializing, setInitializing] = useState(true);
+  const [recoveryState, setRecoveryState] = useState<TableRecoveryState>("TABLE_RECOVERING");
   const [busy, setBusy] = useState(false);
   const [nickname, setNickname] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -256,11 +260,12 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     socketRef.current = null;
   }, []);
 
-  const clearTable = useCallback(() => {
+  const clearTable = useCallback((nextRecoveryState: TableRecoveryState = "SESSION_ONLY") => {
     stopConnection();
     removeStoredValue(browserStorage("local"), TABLE_KEY);
     setInviteCode(null);
     setConnectionState("idle");
+    setRecoveryState(nextRecoveryState);
     dispatch({ type: "clear" });
   }, [stopConnection]);
 
@@ -415,7 +420,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
             }
             dispatch({ type: "presenceChanged", tableId, participant });
           } else if (envelope.kind === "control" && envelope.name === "table.access_revoked") {
-            clearTable();
+            clearTable("TABLE_EXPIRED");
           } else if (envelope.kind === "control" && envelope.name === "server.draining") {
             plannedDisconnect = true;
             setConnectionState("syncing");
@@ -474,15 +479,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       const session = browserStorage("session");
       const identity = readStoredValue<StoredIdentity>(local, IDENTITY_KEY);
       if (identity === null) {
-        setInitializing(false);
-        return;
-      }
-      if (!restoreTable) {
-        const access = readStoredValue<StoredAccess>(session, ACCESS_KEY);
-        if (access !== null && Date.parse(access.accessExpiresAt) > Date.now() + 30_000) {
-          credentialsRef.current = { ...identity, ...access };
-        }
-        setNickname(identity.nickname);
+        setRecoveryState("NO_SESSION");
         setInitializing(false);
         return;
       }
@@ -494,22 +491,32 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
         } else {
           await refreshCredentials(identity);
         }
-        const storedTable = restoreTable ? readStoredValue<StoredTable>(local, TABLE_KEY) : null;
+        const storedTable = readStoredValue<StoredTable>(local, TABLE_KEY);
         if (storedTable !== null && active) {
           const table = normalizeLiveTableProjection(await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(storedTable.tableId)}`));
           if (table !== null) {
             setInviteCode(storedTable.inviteCode ?? null);
             dispatch({ type: "enter", table });
-            beginConnection(table.tableId);
+            setRecoveryState("TABLE_ACTIVE");
+            if (connectOnRestore) {
+              beginConnection(table.tableId);
+            }
           } else {
             removeStoredValue(local, TABLE_KEY);
+            setRecoveryState("TABLE_EXPIRED");
           }
+        } else if (active) {
+          setRecoveryState("SESSION_ONLY");
         }
       } catch (error) {
         if (error instanceof ApiError && (error.code === "SESSION_INVALID" || error.code === "SESSION_INACTIVE")) {
           removeStoredValue(local, IDENTITY_KEY);
           removeStoredValue(session, ACCESS_KEY);
           setNickname(null);
+          setRecoveryState("NO_SESSION");
+        } else if (error instanceof ApiError && error.code === "TABLE_NOT_FOUND") {
+          removeStoredValue(local, TABLE_KEY);
+          setRecoveryState("TABLE_EXPIRED");
         } else {
           dispatch({ type: "issue", issue: issueForError(error) });
         }
@@ -524,7 +531,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       active = false;
       stopConnection();
     };
-  }, [authenticatedRequest, beginConnection, refreshCredentials, restoreTable, stopConnection]);
+  }, [authenticatedRequest, beginConnection, connectOnRestore, refreshCredentials, stopConnection]);
 
   useEffect(() => {
     function handleOnline() {
@@ -559,6 +566,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       credentialsRef.current = credentials;
       persistCredentials(credentials);
       setNickname(credentials.nickname);
+      setRecoveryState("SESSION_ONLY");
       dispatch({ type: "issue", issue: null });
       return true;
     } catch (error) {
@@ -571,7 +579,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
 
   const logout = useCallback(async () => {
     setBusy(true);
-    clearTable();
+    clearTable("NO_SESSION");
     try {
       if (credentialsRef.current !== null) {
         await authenticatedRequest<void>("/v1/guest-sessions/current", { method: "DELETE" });
@@ -598,7 +606,10 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: table.tableId, inviteCode: created.inviteCode });
       setInviteCode(created.inviteCode);
       dispatch({ type: "enter", table });
-      beginConnection(table.tableId);
+      setRecoveryState("TABLE_ACTIVE");
+      if (connectOnRestore) {
+        beginConnection(table.tableId);
+      }
       return table.tableId;
     } catch (error) {
       dispatch({ type: "issue", issue: issueForError(error) });
@@ -606,7 +617,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
     } finally {
       setBusy(false);
     }
-  }, [authenticatedRequest, beginConnection, clearTable]);
+  }, [authenticatedRequest, beginConnection, clearTable, connectOnRestore]);
 
   const joinTable = useCallback(
     async (rawInviteCode: string) => {
@@ -635,7 +646,10 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
         writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: table.tableId, inviteCode: normalizedInviteCode });
         setInviteCode(normalizedInviteCode);
         dispatch({ type: "enter", table });
-        beginConnection(table.tableId);
+        setRecoveryState("TABLE_ACTIVE");
+        if (connectOnRestore) {
+          beginConnection(table.tableId);
+        }
         return table.tableId;
       } catch (error) {
         dispatch({ type: "issue", issue: issueForError(error) });
@@ -644,7 +658,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
         setBusy(false);
       }
     },
-    [authenticatedRequest, beginConnection, clearTable]
+    [authenticatedRequest, beginConnection, clearTable, connectOnRestore]
   );
 
   const openTable = useCallback(async (tableId: string) => {
@@ -660,6 +674,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
       clearTable();
       writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId });
       dispatch({ type: "enter", table });
+      setRecoveryState("TABLE_ACTIVE");
       beginConnection(table.tableId);
       return true;
     } catch (error) {
@@ -784,6 +799,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
 
   return {
     initializing,
+    recoveryState,
     busy,
     nickname,
     connectionState,

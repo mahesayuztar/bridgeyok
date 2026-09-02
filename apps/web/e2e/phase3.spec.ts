@@ -29,6 +29,17 @@ function mutationFrameCount(frames: string[]) {
   }).length;
 }
 
+function maxFrameRevision(frames: string[]) {
+  return frames.reduce((maximum, encoded) => {
+    try {
+      const envelope = JSON.parse(encoded) as Record<string, unknown>;
+      return typeof envelope.revision === "number" ? Math.max(maximum, envelope.revision) : maximum;
+    } catch {
+      return maximum;
+    }
+  }, 0);
+}
+
 async function enterAsGuest(page: Page, nickname: string) {
   await page.goto("/");
   await page.getByLabel("Nama di meja").fill(nickname);
@@ -606,6 +617,19 @@ async function trickCounts(page: Page) {
   }));
 }
 
+test("stale table recovery returns an authenticated guest to the lobby", async ({ page }) => {
+  await enterAsGuest(page, "Raka");
+  await page.evaluate(() => {
+    window.localStorage.setItem("bridgeyok.table.v1", JSON.stringify({ tableId: "00000000-0000-4000-8000-000000000000" }));
+  });
+
+  await page.goto("/");
+
+  await expect(page).toHaveURL(/\/lobby$/);
+  await expect(page.getByRole("button", { name: "Buat meja" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem("bridgeyok.table.v1"))).toBeNull();
+});
+
 test("four guests finish boards, recover a controller, and keep hidden hands private", async ({ browser }, testInfo) => {
   test.setTimeout(300_000);
   const profiles = [
@@ -791,8 +815,34 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await east.page.getByLabel("Buka menu meja").click();
   await makeCall(east.page, /^Pass/);
   await makeCall(south.page, /^Pass/);
-  await west.page.reload();
+  const auctionBeforeClose = await west.page.locator(".auction-table tbody").textContent();
+  const revisionBeforeClose = maxFrameRevision(west.frames);
+  const receivedFrameCountBeforeClose = west.frames.length;
+  const westStorage = await west.context.storageState();
+  await west.context.close();
+  west.context = await browser.newContext({
+    viewport: profiles[3]!.viewport,
+    hasTouch: true,
+    storageState: westStorage,
+  });
+  west.page = await west.context.newPage();
+  await west.page.routeWebSocket(/\/v1\/ws/, delayAuthoritativeGameplay);
+  west.page.on("websocket", (socket) => {
+    if (!socket.url().startsWith("ws://localhost:8180")) return;
+    socket.on("framereceived", (event) => west.frames.push(String(event.payload)));
+    socket.on("framesent", (event) => west.sentFrames.push(String(event.payload)));
+  });
+  await west.page.goto("/");
+  await expect(west.page).toHaveURL(tableURL);
   await waitForConnection(west.page);
+  activePages[3] = west.page;
+  await expect(west.page.getByRole("button", { name: /^Buka menu Wira, kursi W$/ })).toBeVisible();
+  await expect(west.page.locator(".auction-table tbody")).toContainText(auctionBeforeClose ?? "");
+  await expect.poll(() => maxFrameRevision(west.frames.slice(receivedFrameCountBeforeClose))).toBeGreaterThanOrEqual(revisionBeforeClose);
+  await expect.poll(() => west.sentFrames.some((encoded) => {
+    const envelope = JSON.parse(encoded) as Record<string, unknown>;
+    return envelope.kind === "command" && envelope.name === "table.resume";
+  })).toBe(true);
   await expect(west.page.getByRole("button", { name: "Ambil alih kendali" })).toHaveCount(0);
   await makeCall(west.page, /^Pass/);
   await expect(

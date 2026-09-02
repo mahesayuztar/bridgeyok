@@ -52,6 +52,10 @@ export default function BridgeTable({
       router.replace("/");
       return;
     }
+    if (session.recoveryState === "TABLE_EXPIRED") {
+      router.replace("/lobby");
+      return;
+    }
     if (
       table?.tableId !== expectedTableId &&
       attemptedTableIdRef.current !== expectedTableId
@@ -65,6 +69,7 @@ export default function BridgeTable({
     router,
     session.initializing,
     session.nickname,
+    session.recoveryState,
     table?.tableId,
   ]);
 

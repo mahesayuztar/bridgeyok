@@ -2,14 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import IssueNotice from "./issue-notice";
 import { useTableSession } from "./use-table-session";
 
 export default function GuestEntry({ initialInviteCode = "" }: { initialInviteCode?: string }) {
   const router = useRouter();
-  const session = useTableSession({ restoreTable: false });
+  const session = useTableSession({ connectOnRestore: false });
   const [nickname, setNickname] = useState("");
+
+  useEffect(() => {
+    if (session.initializing) {
+      return;
+    }
+    if (session.recoveryState === "TABLE_ACTIVE" && session.tableState.activeTableId !== null) {
+      router.replace(`/table/${session.tableState.activeTableId}`);
+    } else if (session.recoveryState === "TABLE_EXPIRED") {
+      router.replace("/lobby");
+    }
+  }, [router, session.initializing, session.recoveryState, session.tableState.activeTableId]);
 
   async function submitIdentity(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -8,28 +8,24 @@ import { useTableSession } from "../use-table-session";
 
 export default function LobbyClient({ initialInviteCode = "" }: { initialInviteCode?: string }) {
   const router = useRouter();
-  const session = useTableSession();
+  const session = useTableSession({ connectOnRestore: false });
   const [joinCode, setJoinCode] = useState(initialInviteCode.trim().toUpperCase());
 
   useEffect(() => {
     if (!session.initializing && session.nickname === null) {
       router.replace("/");
+    } else if (!session.initializing && session.recoveryState === "TABLE_ACTIVE" && session.tableState.activeTableId !== null) {
+      router.replace(`/table/${session.tableState.activeTableId}`);
     }
-  }, [router, session.initializing, session.nickname]);
+  }, [router, session.initializing, session.nickname, session.recoveryState, session.tableState.activeTableId]);
 
   async function createTable() {
-    const tableId = await session.createTable();
-    if (tableId !== null) {
-      router.push(`/table/${tableId}`);
-    }
+    await session.createTable();
   }
 
   async function submitJoin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const tableId = await session.joinTable(joinCode);
-    if (tableId !== null) {
-      router.push(`/table/${tableId}`);
-    }
+    await session.joinTable(joinCode);
   }
 
   async function logout() {
@@ -95,7 +91,7 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
                 } else if (action === "signInAgain") {
                   void logout();
                 } else if (action === "retry" && joinCode.length > 0) {
-                  void session.joinTable(joinCode).then((tableId) => tableId === null ? undefined : router.push(`/table/${tableId}`));
+                  void session.joinTable(joinCode);
                 }
               }}
             />
