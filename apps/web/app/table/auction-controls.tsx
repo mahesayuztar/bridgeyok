@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   auctionRows,
   type Call,
@@ -13,10 +13,10 @@ import {
 
 const auctionSeats: Seat[] = ["W", "N", "E", "S"];
 const strains: Array<"C" | "D" | "H" | "S" | "NT"> = [
-  "S",
-  "H",
-  "D",
   "C",
+  "D",
+  "H",
+  "S",
   "NT",
 ];
 const actionCalls: Array<{ label: string; call: Call; shortcut: string }> = [
@@ -24,19 +24,38 @@ const actionCalls: Array<{ label: string; call: Call; shortcut: string }> = [
   { label: "X", call: { kind: "DOUBLE" }, shortcut: "X" },
   { label: "XX", call: { kind: "REDOUBLE" }, shortcut: "R" },
 ];
-
+const callColor: Partial<Record<"C" | "D" | "H" | "S" | "NT", string>> = {
+  S: "s-call",
+  H: "h-call",
+  D: "d-call",
+  C: "c-call",
+};
 export function AuctionTable({
   game,
 }: {
   game: NonNullable<LiveTableProjection["game"]>;
 }) {
+  const auctionTableRef = useRef<HTMLDivElement>(null);
   const rows = auctionRows(game.auction.dealer, game.auction.calls);
+
+  useLayoutEffect(() => {
+    const auctionTable = auctionTableRef.current;
+
+    if (auctionTable) {
+      auctionTable.scrollTop = auctionTable.scrollHeight;
+    }
+  }, [game.auction.calls.length]);
+
+  function getCallClass(call?: Call) {
+    if (!call || call.kind !== "BID") return "";
+
+    if (call.strain === "NT") return "nt-call";
+
+    return callColor[call.strain] ?? "";
+  }
+
   return (
-    <div className="auction-table-wrap">
-      <div className="auction-caption">
-        <strong>Lelang</strong>
-        <span>Dealer {game.auction.dealer}</span>
-      </div>
+    <div ref={auctionTableRef} className="auction-table-wrap">
       <table className="auction-table">
         <thead>
           <tr>
@@ -47,21 +66,21 @@ export function AuctionTable({
             ))}
           </tr>
         </thead>
+
         <tbody>
           {rows.map((row, _rowIndex) => (
             <tr key={_rowIndex}>
               {auctionSeats.map((seat) => {
                 const record = row[seat];
+
                 return (
                   <td
                     key={seat}
-                    className={
-                      record?.call.strain === "H" || record?.call.strain === "D"
-                        ? "red-call"
-                        : ""
-                    }
+                    className={getCallClass(record?.call)}
                   >
-                    {record === undefined ? null : callLabel(record.call)}
+                    {record === undefined
+                      ? null
+                      : callLabel(record.call)}
                   </td>
                 );
               })}
@@ -129,7 +148,7 @@ export function BiddingBox({
             const call: Call = { kind: "BID", level: selectedLevel, strain };
             return (
               <button
-                className={strain === "H" || strain === "D" ? "red-call" : ""}
+                className={callColor[strain]}
                 type="button"
                 key={strain}
                 disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}

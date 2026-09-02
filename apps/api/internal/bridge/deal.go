@@ -157,7 +157,7 @@ func (deal *Deal) sortHands() {
 			if left.Suit != right.Suit {
 				return suitValue(left.Suit) < suitValue(right.Suit)
 			}
-			return left.Rank.value() < right.Rank.value()
+			return left.Rank.value() > right.Rank.value()
 		})
 		deal.setHand(seat, hand)
 	}

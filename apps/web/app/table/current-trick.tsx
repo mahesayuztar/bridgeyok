@@ -28,9 +28,6 @@ export function CurrentTrick({
       data-winner={trick.winner}
       data-dummy-position={dummyPosition}
     >
-      <span className="trick-center">
-        {trick.plays.length === 0 ? "Lead" : ""}
-      </span>
       {trick.plays.map((play) => (
         <div
           className={`trick-slot trick-${visualPositionForSeat(orientation, play.seat)}`}
