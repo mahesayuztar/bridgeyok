@@ -295,6 +295,7 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           return;
         }
         const socket = new WebSocket(socketUrl(realtimeTicket.ticket));
+        let serverDraining = false;
         socketRef.current = socket;
         socket.onopen = () => {
           if (connectionGenerationRef.current !== generation) {
@@ -409,8 +410,8 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           } else if (envelope.kind === "control" && envelope.name === "table.access_revoked") {
             clearTable();
           } else if (envelope.kind === "control" && envelope.name === "server.draining") {
-            setConnectionState("degraded");
-            socket.close(1012, "server draining");
+            serverDraining = true;
+            setConnectionState("syncing");
           }
         };
         socket.onclose = (event) => {
@@ -418,8 +419,12 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
             return;
           }
           socketRef.current = null;
-          setConnectionState(navigator.onLine ? "degraded" : "offline");
-          dispatch({ type: "connectionLost", issue: issueFromFailure(new TypeError("socket closed"), "websocket") });
+          const plannedDisconnect = serverDraining || event.code === 1012;
+          setConnectionState(plannedDisconnect ? "syncing" : navigator.onLine ? "degraded" : "offline");
+          dispatch({
+            type: "connectionLost",
+            ...(plannedDisconnect ? {} : { issue: issueFromFailure(new TypeError("socket closed"), "websocket") })
+          });
           const delay = Math.min(10_000, 500 * 2 ** attempt) + Math.floor(Math.random() * 300);
           reconnectTimerRef.current = setTimeout(() => void connect(tableId, generation, attempt + 1), delay);
         };

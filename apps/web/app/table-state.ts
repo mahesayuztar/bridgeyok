@@ -123,7 +123,7 @@ export type TableAction =
   | { type: "settled"; requestId: string; issue?: ClientIssue }
   | { type: "controllerSyncStarted" }
   | { type: "conflict"; issue: ClientIssue }
-  | { type: "connectionLost"; issue: ClientIssue }
+  | { type: "connectionLost"; issue?: ClientIssue }
   | { type: "issue"; issue: ClientIssue | null }
   | { type: "dismissNotice" }
   | { type: "clear" };
@@ -276,7 +276,7 @@ export function reduceTableState(state: TableClientState, action: TableAction): 
       return {
         ...state,
         pending: {},
-        issue: action.issue,
+        issue: action.issue ?? null,
         controllerState: state.controllerState === "takeoverPending" ? "resyncing" : state.controllerState
       };
     case "issue":
