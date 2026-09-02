@@ -41,6 +41,10 @@ test("table reducer clears private state and ignores stale rooms", () => {
   assert.deepEqual(disconnected.pending, {});
   assert.equal(disconnected.issue, issue);
 
+  const plannedDisconnect = reduceTableState(withPending, { type: "connectionLost" });
+  assert.deepEqual(plannedDisconnect.pending, {});
+  assert.equal(plannedDisconnect.issue, null);
+
   const cleared = reduceTableState(withPending, { type: "clear" });
   assert.deepEqual(cleared, createEmptyTableState());
 });
