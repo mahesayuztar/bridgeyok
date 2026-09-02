@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { auctionRows, boardResultLabel, createEmptyTableState, playableHand, projectedTableState, reduceTableState, tableOrientation, visualPositionForSeat } from "./table-state.ts";
+import { auctionRows, boardResultLabel, createEmptyTableState, oppositeSeat, playableHand, projectedTableState, reduceTableState, tableOrientation, visualPositionForSeat } from "./table-state.ts";
 
 function tableProjection(tableId, lastSeq = 0) {
   return {
@@ -206,6 +206,11 @@ test("table orientation keeps the viewer at the bottom", () => {
   const orientation = tableOrientation("N");
   assert.deepEqual(orientation, { top: "S", right: "W", bottom: "N", left: "E" });
   assert.equal(visualPositionForSeat(orientation, "E"), "left");
+  assert.equal(oppositeSeat("E"), "W");
+  assert.equal(
+    visualPositionForSeat(tableOrientation("S"), oppositeSeat("E")),
+    "left",
+  );
 });
 
 test("auction rows preserve W N E S columns and dealer offset", () => {

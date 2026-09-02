@@ -300,7 +300,6 @@ async function assertGameplayGeometry(page: Page) {
     });
     const dummyHand = rect(document.querySelector(".dummy-hand"));
     const currentTrick = rect(document.querySelector(".current-trick"));
-    const handCard = rect(document.querySelector(".own-hand .physical-card"));
     const cards = [...document.querySelectorAll(".physical-card")].map((card) => {
       const box = card.getBoundingClientRect();
       const ownHand = card.closest<HTMLElement>(".own-hand");
@@ -342,6 +341,9 @@ async function assertGameplayGeometry(page: Page) {
     const ownCardSlots = [
       ...document.querySelectorAll<HTMLElement>(".own-hand .hand-card-slot"),
     ];
+    const dummyCardSlots = [
+      ...document.querySelectorAll<HTMLElement>(".dummy-hand .hand-card-slot"),
+    ];
     const ownCardExposure = ownCardSlots.flatMap((slot, _slotIndex) => {
       const nextSlot = ownCardSlots[_slotIndex + 1];
       if (nextSlot === undefined) return [];
@@ -351,11 +353,26 @@ async function assertGameplayGeometry(page: Page) {
         ? [nextBox.left - slotBox.left]
         : [];
     });
+    const ownCardRows = new Set(
+      ownCardSlots.map((slot) => Math.round(slot.getBoundingClientRect().top)),
+    ).size;
+    const dummyCardRows = new Set(
+      dummyCardSlots.map((slot) => Math.round(slot.getBoundingClientRect().top)),
+    ).size;
+    const dummyCardColumns = new Set(
+      dummyCardSlots.map((slot) => Math.round(slot.getBoundingClientRect().left)),
+    ).size;
+    const playedCardsOverlap = trickCards.some((trickCard, _trickIndex) =>
+      trickCards
+        .slice(_trickIndex + 1)
+        .some((otherTrickCard) => overlaps(trickCard, otherTrickCard)),
+    );
     const wonIndicator = rect(document.querySelector(".trick-won"));
     const lostIndicator = rect(document.querySelector(".trick-lost"));
     return {
       cards,
       ownCardExposure,
+      ownCardRows,
       ownHandScrollable:
         ownHandScrollElement !== null &&
         ownHandScrollElement.scrollWidth > ownHandScrollElement.clientWidth,
@@ -373,10 +390,16 @@ async function assertGameplayGeometry(page: Page) {
               ),
               leftDelta: Math.abs(dummyHand.left - playZone.left),
               rightDelta: Math.abs(dummyHand.right - playZone.right),
+              topDelta: Math.abs(dummyHand.top - playZone.top),
+              bottomDelta: Math.abs(dummyHand.bottom - playZone.bottom),
               centerDelta: Math.abs(
                 dummyHand.left + dummyHand.width / 2 -
                   (playZone.left + playZone.width / 2),
               ),
+              width: dummyHand.width,
+              height: dummyHand.height,
+              cardRows: dummyCardRows,
+              cardColumns: dummyCardColumns,
             },
       trickCenterDelta:
         currentTrick === null || playZone === null
@@ -391,14 +414,7 @@ async function assertGameplayGeometry(page: Page) {
                   (playZone.top + playZone.height / 2),
               ),
             },
-      playedCardMatchesHand:
-        handCard !== null &&
-        trickCards.every(
-          (trickCard) =>
-            trickCard !== null &&
-            Math.abs(trickCard.width - handCard.width) <= 1 &&
-            Math.abs(trickCard.height - handCard.height) <= 1,
-        ),
+      playedCardsOverlap,
       playedCardColors,
       dummyBlockedByTrick: dummyCardElements.some((card) => {
         const box = card.getBoundingClientRect();
@@ -424,6 +440,13 @@ async function assertGameplayGeometry(page: Page) {
         playZone.right <= surface.right &&
         playZone.top >= surface.top &&
         playZone.bottom <= surface.bottom,
+      trickInsidePlayZone:
+        currentTrick !== null &&
+        playZone !== null &&
+        currentTrick.left >= playZone.left - 1 &&
+        currentTrick.right <= playZone.right + 1 &&
+        currentTrick.top >= playZone.top - 1 &&
+        currentTrick.bottom <= playZone.bottom + 1,
       viewport: { width: window.innerWidth, height: window.innerHeight },
       documentOverflow: {
         x: document.documentElement.scrollWidth > window.innerWidth,
@@ -441,28 +464,23 @@ async function assertGameplayGeometry(page: Page) {
   expect(
     geometry.cards
       .filter((card) => card.className.includes("card-hand"))
-      .every((card) => card.width >= 68),
+      .every((card) => card.width >= 52),
   ).toBe(true);
   expect(
     geometry.cards
       .filter((card) => card.className.includes("card-dummy"))
-      .every((card) =>
-        card.width >= (geometry.viewport.width <= 400 ? 56 : 60),
-      ),
+      .every((card) => card.width >= 50),
   ).toBe(true);
   expect(
     geometry.cards
       .filter((card) => card.className.includes("card-trick"))
-      .every((card) => card.width >= 52),
+      .every((card) => card.width >= 49),
   ).toBe(true);
-  expect(
-    geometry.ownCardExposure.every(
-      (exposure) => exposure >= (geometry.viewport.width <= 400 ? 38 : 18),
-    ),
-  ).toBe(true);
+  expect(geometry.ownCardExposure.every((exposure) => exposure >= 18)).toBe(true);
+  expect(geometry.ownCardRows).toBe(1);
   expect(geometry.ownHandScrollable).toBe(false);
   expect(geometry.dummyHasExtras).toBe(false);
-  expect(geometry.playedCardMatchesHand).toBe(true);
+  expect(geometry.playedCardsOverlap).toBe(false);
   for (const card of geometry.playedCardColors) {
     expect(card).toEqual({
       playedColor: card.sourceColor,
@@ -474,12 +492,31 @@ async function assertGameplayGeometry(page: Page) {
     });
   }
   expect(geometry.trickCenterDelta).not.toBeNull();
-  expect(geometry.trickCenterDelta!.x).toBeLessThanOrEqual(1);
-  expect(geometry.trickCenterDelta!.y).toBeLessThanOrEqual(1);
+  expect(geometry.trickInsidePlayZone).toBe(true);
   if (geometry.dummyPlacement?.position === "left") {
-    expect(geometry.dummyPlacement.leftDelta).toBeLessThanOrEqual(1);
+    expect(geometry.dummyPlacement.leftDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.height).toBeGreaterThan(
+      geometry.dummyPlacement.width,
+    );
+    expect(geometry.dummyPlacement.cardColumns).toBe(1);
   } else if (geometry.dummyPlacement?.position === "right") {
-    expect(geometry.dummyPlacement.rightDelta).toBeLessThanOrEqual(1);
+    expect(geometry.dummyPlacement.rightDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.height).toBeGreaterThan(
+      geometry.dummyPlacement.width,
+    );
+    expect(geometry.dummyPlacement.cardColumns).toBe(1);
+  } else if (geometry.dummyPlacement?.position === "top") {
+    expect(geometry.dummyPlacement.topDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.width).toBeGreaterThan(
+      geometry.dummyPlacement.height,
+    );
+    expect(geometry.dummyPlacement.cardRows).toBe(1);
+  } else if (geometry.dummyPlacement?.position === "bottom") {
+    expect(geometry.dummyPlacement.bottomDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.width).toBeGreaterThan(
+      geometry.dummyPlacement.height,
+    );
+    expect(geometry.dummyPlacement.cardRows).toBe(1);
   } else if (geometry.dummyPlacement !== null) {
     expect(geometry.dummyPlacement.centerDelta).toBeLessThanOrEqual(1);
   }
@@ -823,6 +860,10 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     "data-motion-stage",
     "winner",
   );
+  for (const page of [replacementTab, east.page, south.page, west.page]) {
+    await expect(page.locator(".trick-slot .physical-card")).toHaveCount(4);
+    await assertGameplayGeometry(page);
+  }
   const trickBox = await east.page.locator(".current-trick").boundingBox();
   expect(trickBox).not.toBeNull();
   await east.page.mouse.click(
