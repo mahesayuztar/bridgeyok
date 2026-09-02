@@ -27,6 +27,7 @@ type StoredAccess = Pick<GuestCredentials, "accessToken" | "accessExpiresAt">;
 type StoredTable = { tableId: string; inviteCode?: string };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+const REALTIME_CONNECTION_ROTATION_MS = 285_000;
 const IDENTITY_KEY = "bridgeyok.identity.v1";
 const ACCESS_KEY = "bridgeyok.access.v1";
 const TABLE_KEY = "bridgeyok.table.v1";
@@ -295,7 +296,8 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           return;
         }
         const socket = new WebSocket(socketUrl(realtimeTicket.ticket));
-        let serverDraining = false;
+        let plannedDisconnect = false;
+        let rotationTimer: ReturnType<typeof setTimeout> | null = null;
         socketRef.current = socket;
         socket.onopen = () => {
           if (connectionGenerationRef.current !== generation) {
@@ -305,6 +307,11 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           automaticTakeoverRevisionRef.current = null;
           dispatch({ type: "controllerSyncStarted" });
           setConnectionState("syncing");
+          rotationTimer = setTimeout(() => {
+            plannedDisconnect = true;
+            setConnectionState("syncing");
+            socket.close(4000, "connection rotation");
+          }, REALTIME_CONNECTION_ROTATION_MS);
           const lastSeenSeq = tableStateRef.current.activeTableId === tableId ? tableStateRef.current.lastSeenSeq : 0;
           socket.send(
             JSON.stringify({
@@ -410,20 +417,23 @@ export function useTableSession({ restoreTable = true }: { restoreTable?: boolea
           } else if (envelope.kind === "control" && envelope.name === "table.access_revoked") {
             clearTable();
           } else if (envelope.kind === "control" && envelope.name === "server.draining") {
-            serverDraining = true;
+            plannedDisconnect = true;
             setConnectionState("syncing");
           }
         };
         socket.onclose = (event) => {
+          if (rotationTimer !== null) {
+            clearTimeout(rotationTimer);
+          }
           if (connectionGenerationRef.current !== generation || event.code === 1000) {
             return;
           }
           socketRef.current = null;
-          const plannedDisconnect = serverDraining || event.code === 1012;
-          setConnectionState(plannedDisconnect ? "syncing" : navigator.onLine ? "degraded" : "offline");
+          const reconnectSilently = plannedDisconnect || event.code === 1012;
+          setConnectionState(reconnectSilently ? "syncing" : navigator.onLine ? "degraded" : "offline");
           dispatch({
             type: "connectionLost",
-            ...(plannedDisconnect ? {} : { issue: issueFromFailure(new TypeError("socket closed"), "websocket") })
+            ...(reconnectSilently ? {} : { issue: issueFromFailure(new TypeError("socket closed"), "websocket") })
           });
           const delay = Math.min(10_000, 500 * 2 ** attempt) + Math.floor(Math.random() * 300);
           reconnectTimerRef.current = setTimeout(() => void connect(tableId, generation, attempt + 1), delay);
