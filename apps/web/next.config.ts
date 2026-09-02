@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
-  output: "standalone",
+  // output: "standalone",
   allowedDevOrigins: ["192.168.1.6"],
   async headers() {
     return [
