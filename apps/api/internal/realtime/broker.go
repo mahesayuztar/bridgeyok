@@ -13,18 +13,16 @@ import (
 )
 
 type broker struct {
-	logger            *slog.Logger
-	gracePeriod       time.Duration
-	now               func() time.Time
-	expireParticipant func(context.Context, string, string, uint64)
-	mutex             sync.Mutex
-	rooms             map[string]map[*connection]struct{}
-	presence          map[string]map[string]*presenceEntry
+	logger   *slog.Logger
+	now      func() time.Time
+	mutex    sync.Mutex
+	rooms    map[string]map[*connection]struct{}
+	presence map[string]map[string]*presenceEntry
 }
 
-func newBroker(logger *slog.Logger, gracePeriod time.Duration, now func() time.Time, expireParticipant func(context.Context, string, string, uint64)) *broker {
+func newBroker(logger *slog.Logger, now func() time.Time) *broker {
 	return &broker{
-		logger: logger, gracePeriod: gracePeriod, now: now, expireParticipant: expireParticipant,
+		logger: logger, now: now,
 		rooms: make(map[string]map[*connection]struct{}), presence: make(map[string]map[string]*presenceEntry),
 	}
 }
@@ -174,11 +172,6 @@ func (broker *broker) removeLocked(client *connection, tableID string) {
 func (broker *broker) drain() {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	for _, entries := range broker.presence {
-		for _, entry := range entries {
-			broker.cancelExpiryLocked(entry)
-		}
-	}
 	broker.rooms = make(map[string]map[*connection]struct{})
 	broker.presence = make(map[string]map[string]*presenceEntry)
 }

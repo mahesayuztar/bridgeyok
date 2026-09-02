@@ -94,7 +94,6 @@ export type ParticipantPresence = {
   participantId: string;
   online: boolean;
   offlineSince?: string;
-  expiresAt?: string;
 };
 
 export type VisualPosition = "top" | "right" | "bottom" | "left";

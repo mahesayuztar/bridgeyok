@@ -411,40 +411,37 @@ func TestServerRejectsTableSubscriptionForNonParticipant(t *testing.T) {
 	}
 }
 
-func TestServerOwnerExpiryPromotesOnlineParticipant(t *testing.T) {
+func TestServerDisconnectKeepsParticipantAndSeat(t *testing.T) {
 	t.Parallel()
 
 	aggregate := realtimeAggregate(t)
-	guest := table.Participant{
-		ID: "91eeb013-54a1-4287-92cc-715904206f65", SessionID: "482f6524-66c1-4313-886c-e6bfd07fe58f",
-		Nickname: "Replacement", Role: table.RoleParticipant, JoinedAt: time.Now().UTC(),
-	}
-	decision, domainError := table.Decide(aggregate, table.Command{Name: table.CommandJoinTable, Participant: &guest})
+	decision, domainError := table.Decide(aggregate, table.Command{Name: table.CommandTakeSeat, SessionID: realtimeSessionID, Seat: bridge.North})
 	if domainError != nil {
-		t.Fatalf("join setup error = %v", domainError)
+		t.Fatalf("take seat setup error = %v", domainError)
 	}
 	aggregate = decision.NextState
 	server, _, runtime := scriptedServer(t, aggregate, nil)
 	ownerConnection := projectedConnection(server, realtimeSessionID)
-	guestConnection := projectedConnection(server, guest.SessionID)
 	server.broker.subscribe(ownerConnection, aggregate.ID, nil, aggregate.Participants, realtimeParticipantID)
-	server.broker.subscribe(guestConnection, aggregate.ID, nil, aggregate.Participants, guest.ID)
 	server.broker.unsubscribe(ownerConnection)
-	server.broker.mutex.Lock()
-	generation := server.broker.presence[aggregate.ID][realtimeParticipantID].generation
-	server.broker.mutex.Unlock()
 
-	server.expireParticipant(t.Context(), aggregate.ID, realtimeParticipantID, generation)
 	updated, err := runtime.Snapshot(t.Context(), aggregate.ID)
 	if err != nil {
 		t.Fatalf("Snapshot() error = %v", err)
 	}
-	if updated.OwnerSessionID != guest.SessionID {
-		t.Fatalf("owner session = %s, want %s", updated.OwnerSessionID, guest.SessionID)
+	participant, exists := activeParticipantByID(updated, realtimeParticipantID)
+	if !exists {
+		t.Fatal("disconnected participant was removed")
 	}
-	owner, exists := activeParticipantByID(updated, guest.ID)
-	if !exists || owner.Role != table.RoleOwner {
-		t.Fatalf("replacement owner = %+v", owner)
+	assignment, seated := updated.Seats[bridge.North]
+	if !seated || assignment.ParticipantID != participant.ID {
+		t.Fatalf("disconnected participant seat = %+v, seated = %t", assignment, seated)
+	}
+	server.broker.mutex.Lock()
+	presence := presencePayload(server.broker.presence[aggregate.ID][realtimeParticipantID])
+	server.broker.mutex.Unlock()
+	if presence.Online || presence.OfflineSince == "" {
+		t.Fatalf("disconnected participant presence = %+v", presence)
 	}
 }
 
@@ -707,8 +704,7 @@ func scriptedServer(t *testing.T, aggregate table.Aggregate, events []table.Pers
 		Identity: identityService, Tables: runtime, Events: runtime, Random: rand.Reader, Now: time.Now,
 		ReadLimitBytes: 8 << 10, OutboundQueueCapacity: 32, OutboundQueueBytes: 128 << 10,
 		WriteTimeout: time.Second, PingInterval: time.Hour, PongTimeout: time.Second,
-		PresenceGracePeriod: time.Hour,
-		MaxConnections:      8, MaxConnectionsPerSession: 3, MessageRate: 100, MessageBurst: 100, RecoveryLimit: 16,
+		MaxConnections: 8, MaxConnectionsPerSession: 3, MessageRate: 100, MessageBurst: 100, RecoveryLimit: 16,
 	})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)

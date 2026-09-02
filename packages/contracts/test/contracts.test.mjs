@@ -31,7 +31,7 @@ test("WebSocket contract rejects unsafe envelopes", () => {
     { v: 1, kind: "command", name: "table.set_ready", request_id: "request_02", table_id: "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31", expected_revision: 0, controller_epoch: 0, payload: { ready: true } },
     { v: 1, kind: "command", name: "table.take_seat", request_id: "request_03", table_id: "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31", expected_revision: 0, payload: { seat: "N", hidden: true } },
     { v: 1, kind: "event", name: "table.updated", table_id: "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31", revision: -1, seq: 1, payload: {} },
-    { v: 1, kind: "control", name: "presence.snapshot", table_id: "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31", payload: { participants: [{ participantId: realtimeParticipantId, online: false, expiresAt: "soon" }] } },
+    { v: 1, kind: "control", name: "presence.snapshot", table_id: "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31", payload: { participants: [{ participantId: realtimeParticipantId, online: false, offlineSince: "soon" }] } },
     { v: 1, kind: "control", name: "heartbeat", payload: {}, unexpected: true }
   ];
 

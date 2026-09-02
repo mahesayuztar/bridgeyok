@@ -1,7 +1,6 @@
 package realtime
 
 import (
-	"context"
 	"encoding/json"
 	"sort"
 	"time"
@@ -11,20 +10,14 @@ import (
 
 type presenceEntry struct {
 	participantID string
-	sessionID     string
-	role          table.Role
 	connections   int
 	offlineSince  time.Time
-	expiresAt     time.Time
-	generation    uint64
-	timer         *time.Timer
 }
 
 type presenceParticipant struct {
 	ParticipantID string `json:"participantId"`
 	Online        bool   `json:"online"`
 	OfflineSince  string `json:"offlineSince,omitempty"`
-	ExpiresAt     string `json:"expiresAt,omitempty"`
 }
 
 func (broker *broker) syncParticipantsLocked(tableID string, participants []table.Participant) {
@@ -43,25 +36,15 @@ func (broker *broker) syncParticipantsLocked(tableID string, participants []tabl
 		if entry == nil {
 			entry = &presenceEntry{
 				participantID: participant.ID,
-				sessionID:     participant.SessionID,
-				role:          participant.Role,
 				offlineSince:  broker.now().UTC(),
 			}
 			entries[participant.ID] = entry
-			broker.scheduleExpiryLocked(tableID, entry)
-			continue
-		}
-		entry.sessionID = participant.SessionID
-		entry.role = participant.Role
-		if entry.connections == 0 && entry.timer == nil {
-			broker.scheduleExpiryLocked(tableID, entry)
 		}
 	}
-	for participantID, entry := range entries {
+	for participantID := range entries {
 		if _, exists := active[participantID]; exists {
 			continue
 		}
-		broker.cancelExpiryLocked(entry)
 		delete(entries, participantID)
 	}
 }
@@ -79,9 +62,7 @@ func (broker *broker) markOnlineLocked(client *connection, tableID string, parti
 	}
 	wasOnline := entry.connections > 0
 	entry.connections++
-	entry.generation++
 	entry.offlineSince = time.Time{}
-	broker.cancelExpiryLocked(entry)
 	if !wasOnline {
 		broker.publishPresenceChangedLocked(tableID, entry, client)
 	}
@@ -96,52 +77,8 @@ func (broker *broker) markOfflineLocked(client *connection, tableID string, part
 	if entry.connections > 0 {
 		return
 	}
-	entry.generation++
 	entry.offlineSince = broker.now().UTC()
-	broker.scheduleExpiryLocked(tableID, entry)
 	broker.publishPresenceChangedLocked(tableID, entry, client)
-}
-
-func (broker *broker) scheduleExpiryLocked(tableID string, entry *presenceEntry) {
-	broker.cancelExpiryLocked(entry)
-	if entry.connections > 0 || broker.expireParticipant == nil {
-		return
-	}
-	entry.expiresAt = entry.offlineSince.Add(broker.gracePeriod)
-	generation := entry.generation
-	entry.timer = time.AfterFunc(broker.gracePeriod, func() {
-		broker.mutex.Lock()
-		current := broker.presence[tableID][entry.participantID]
-		if current != entry || entry.connections > 0 || entry.generation != generation {
-			broker.mutex.Unlock()
-			return
-		}
-		entry.timer = nil
-		broker.mutex.Unlock()
-		broker.expireParticipant(context.Background(), tableID, entry.participantID, generation)
-	})
-}
-
-func (broker *broker) cancelExpiryLocked(entry *presenceEntry) {
-	if entry.timer != nil {
-		entry.timer.Stop()
-		entry.timer = nil
-	}
-	entry.expiresAt = time.Time{}
-}
-
-func (broker *broker) isOffline(tableID string, participantID string, generation uint64) bool {
-	broker.mutex.Lock()
-	defer broker.mutex.Unlock()
-	entry := broker.presence[tableID][participantID]
-	return entry != nil && entry.connections == 0 && entry.generation == generation
-}
-
-func (broker *broker) isOnline(tableID string, participantID string) bool {
-	broker.mutex.Lock()
-	defer broker.mutex.Unlock()
-	entry := broker.presence[tableID][participantID]
-	return entry != nil && entry.connections > 0
 }
 
 func (broker *broker) presenceSnapshotFrameLocked(tableID string) ([]byte, error) {
@@ -189,9 +126,6 @@ func presencePayload(entry *presenceEntry) presenceParticipant {
 	payload := presenceParticipant{ParticipantID: entry.participantID, Online: entry.connections > 0}
 	if !entry.offlineSince.IsZero() {
 		payload.OfflineSince = entry.offlineSince.Format(time.RFC3339Nano)
-	}
-	if !entry.expiresAt.IsZero() {
-		payload.ExpiresAt = entry.expiresAt.Format(time.RFC3339Nano)
 	}
 	return payload
 }

@@ -55,7 +55,6 @@ type Options struct {
 	WriteTimeout             time.Duration
 	PingInterval             time.Duration
 	PongTimeout              time.Duration
-	PresenceGracePeriod      time.Duration
 	MaxConnections           int
 	MaxConnectionsPerSession int
 	MessageRate              int
@@ -132,7 +131,7 @@ func NewServer(options Options) (*Server, error) {
 	if options.ReadLimitBytes < 1 || options.OutboundQueueCapacity < 1 || options.OutboundQueueBytes < 1 || options.MaxConnections < 1 || options.MaxConnectionsPerSession < 1 || options.MessageRate < 1 || options.MessageBurst < 1 || options.RecoveryLimit < 1 || options.RecoveryLimit > 255 {
 		return nil, fmt.Errorf("realtime resource limits must be positive and bounded")
 	}
-	if options.WriteTimeout <= 0 || options.PingInterval <= 0 || options.PongTimeout <= 0 || options.PresenceGracePeriod <= 0 {
+	if options.WriteTimeout <= 0 || options.PingInterval <= 0 || options.PongTimeout <= 0 {
 		return nil, fmt.Errorf("realtime timeouts must be positive")
 	}
 	server := &Server{
@@ -140,7 +139,7 @@ func NewServer(options Options) (*Server, error) {
 		connections:          make(map[*connection]struct{}),
 		connectionsBySession: make(map[string]int),
 	}
-	server.broker = newBroker(options.Logger, options.PresenceGracePeriod, options.Now, server.expireParticipant)
+	server.broker = newBroker(options.Logger, options.Now)
 	return server, nil
 }
 
@@ -254,56 +253,6 @@ func (server *Server) TableChanged(ctx context.Context, tableID string) {
 	}
 }
 
-func (server *Server) expireParticipant(ctx context.Context, tableID string, participantID string, generation uint64) {
-	expireCtx, cancel := context.WithTimeout(ctx, server.options.WriteTimeout)
-	defer cancel()
-	for _attempt := 0; _attempt < 3; _attempt++ {
-		if !server.broker.isOffline(tableID, participantID, generation) {
-			return
-		}
-		aggregate, err := server.options.Tables.Snapshot(expireCtx, tableID)
-		if err != nil {
-			server.options.Logger.WarnContext(expireCtx, "realtime_presence_expiry_failed", "table_id", tableID, "result_code", "SNAPSHOT_ERROR")
-			return
-		}
-		target, exists := activeParticipantByID(aggregate, participantID)
-		if !exists {
-			return
-		}
-		replacementParticipantID := ""
-		if target.Role == table.RoleOwner {
-			replacementParticipantID = server.replacementOwnerParticipantID(aggregate, participantID)
-			if replacementParticipantID == "" {
-				return
-			}
-		}
-		result, err := server.options.Tables.Submit(expireCtx, table.CommandRequest{
-			TableID: tableID, SessionID: aggregate.OwnerSessionID, RequestID: "presence_" + rand.Text(),
-			ExpectedRevision: aggregate.Revision,
-			Command: table.Command{
-				Name: table.CommandExpireParticipant, SessionID: aggregate.OwnerSessionID, ParticipantID: participantID,
-				ReplacementParticipantID: replacementParticipantID, OccurredAt: server.options.Now().UTC(),
-			},
-		})
-		if err != nil {
-			server.options.Logger.WarnContext(expireCtx, "realtime_presence_expiry_failed", "table_id", tableID, "result_code", "COMMAND_ERROR")
-			return
-		}
-		if result.Outcome.Status == table.CommandStatusRejected {
-			if result.Outcome.ErrorCode == table.ErrorStateChanged {
-				continue
-			}
-			return
-		}
-		if err := server.broker.publishResult(expireCtx, result); err != nil {
-			server.options.Logger.ErrorContext(expireCtx, "realtime_presence_expiry_publish_failed", "table_id", tableID, "result_code", "PROJECTION_ERROR")
-		}
-		server.options.Logger.InfoContext(expireCtx, "realtime_participant_expired", "table_id", tableID, "result_code", "REMOVED")
-		return
-	}
-	server.options.Logger.WarnContext(expireCtx, "realtime_presence_expiry_failed", "table_id", tableID, "result_code", "REVISION_CONFLICT")
-}
-
 // Drain rejects new handshakes, notifies live clients, and waits for close handshakes.
 func (server *Server) Drain(ctx context.Context) error {
 	server.mutex.Lock()
@@ -332,32 +281,6 @@ func (server *Server) Drain(ctx context.Context) error {
 	case <-ctx.Done():
 		return fmt.Errorf("drain realtime connections: %w", ctx.Err())
 	}
-}
-
-func (server *Server) replacementOwnerParticipantID(aggregate table.Aggregate, ownerParticipantID string) string {
-	for _, requireSeat := range []bool{true, false} {
-		for _, participant := range aggregate.Participants {
-			if participant.ID == ownerParticipantID || participant.LeftAt != nil || !server.broker.isOnline(aggregate.ID, participant.ID) {
-				continue
-			}
-			seated := false
-			for _, assignment := range aggregate.Seats {
-				if assignment.ParticipantID == participant.ID {
-					seated = true
-					break
-				}
-			}
-			if seated == requireSeat {
-				return participant.ID
-			}
-		}
-	}
-	for _, participant := range aggregate.Participants {
-		if participant.ID != ownerParticipantID && participant.LeftAt == nil {
-			return participant.ID
-		}
-	}
-	return ""
 }
 
 func (server *Server) reserve(sessionID string) (bool, string) {

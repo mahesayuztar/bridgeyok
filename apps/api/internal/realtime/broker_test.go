@@ -22,7 +22,7 @@ func TestBrokerProjectsEventsForEachRecipient(t *testing.T) {
 	server := &Server{options: Options{OutboundQueueBytes: 128 << 10}}
 	north := projectedConnection(server, sessions[bridge.North])
 	east := projectedConnection(server, sessions[bridge.East])
-	roomBroker := newBroker(slog.New(slog.NewJSONHandler(io.Discard, nil)), time.Hour, time.Now, nil)
+	roomBroker := newBroker(slog.New(slog.NewJSONHandler(io.Discard, nil)), time.Now)
 	t.Cleanup(roomBroker.drain)
 	northParticipant, _ := activeParticipantForSession(aggregate, sessions[bridge.North])
 	eastParticipant, _ := activeParticipantForSession(aggregate, sessions[bridge.East])
@@ -55,7 +55,7 @@ func TestBrokerProjectsEventsForEachRecipient(t *testing.T) {
 	}
 }
 
-func TestBrokerPresenceExpiresAfterLastConnection(t *testing.T) {
+func TestBrokerPresenceTurnsOfflineAfterLastConnection(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
@@ -70,10 +70,7 @@ func TestBrokerPresenceExpiresAfterLastConnection(t *testing.T) {
 		t.Fatalf("join setup error = %v", domainError)
 	}
 	aggregate = decision.NextState
-	expired := make(chan string, 2)
-	roomBroker := newBroker(slog.New(slog.NewJSONHandler(io.Discard, nil)), 20*time.Millisecond, time.Now, func(_ context.Context, _ string, participantID string, _ uint64) {
-		expired <- participantID
-	})
+	roomBroker := newBroker(slog.New(slog.NewJSONHandler(io.Discard, nil)), time.Now)
 	t.Cleanup(roomBroker.drain)
 	server := &Server{options: Options{OutboundQueueBytes: 128 << 10}}
 	ownerConnection := projectedConnection(server, owner.SessionID)
@@ -84,19 +81,18 @@ func TestBrokerPresenceExpiresAfterLastConnection(t *testing.T) {
 	roomBroker.subscribe(secondGuestConnection, aggregate.ID, nil, aggregate.Participants, guest.ID)
 
 	roomBroker.unsubscribe(firstGuestConnection)
-	select {
-	case participantID := <-expired:
-		t.Fatalf("participant %s expired while another connection remained", participantID)
-	case <-time.After(40 * time.Millisecond):
+	roomBroker.mutex.Lock()
+	presence := presencePayload(roomBroker.presence[aggregate.ID][guest.ID])
+	roomBroker.mutex.Unlock()
+	if !presence.Online || presence.OfflineSince != "" {
+		t.Fatalf("participant presence with one connection = %+v", presence)
 	}
 	roomBroker.unsubscribe(secondGuestConnection)
-	select {
-	case participantID := <-expired:
-		if participantID != guest.ID {
-			t.Fatalf("expired participant = %s, want %s", participantID, guest.ID)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("offline participant did not expire")
+	roomBroker.mutex.Lock()
+	presence = presencePayload(roomBroker.presence[aggregate.ID][guest.ID])
+	roomBroker.mutex.Unlock()
+	if presence.Online || presence.OfflineSince == "" {
+		t.Fatalf("participant presence without connections = %+v", presence)
 	}
 }
 

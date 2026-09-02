@@ -113,7 +113,7 @@ test("table reducer tracks presence and removes departed participants", () => {
     tableId: "table-a",
     participants: [
       { participantId: "owner", online: true },
-      { participantId: "guest", online: false, offlineSince: "2026-08-31T10:00:00Z", expiresAt: "2026-08-31T10:01:00Z" },
+      { participantId: "guest", online: false, offlineSince: "2026-08-31T10:00:00Z" },
       { participantId: "unknown", online: true }
     ]
   });

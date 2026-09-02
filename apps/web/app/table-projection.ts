@@ -330,14 +330,10 @@ export function normalizeParticipantPresence(value: unknown): ParticipantPresenc
   if (value.offlineSince !== undefined && !isDateTime(value.offlineSince)) {
     return null;
   }
-  if (value.expiresAt !== undefined && !isDateTime(value.expiresAt)) {
-    return null;
-  }
   return {
     participantId: value.participantId,
     online: value.online,
-    ...(isDateTime(value.offlineSince) ? { offlineSince: value.offlineSince } : {}),
-    ...(isDateTime(value.expiresAt) ? { expiresAt: value.expiresAt } : {})
+    ...(isDateTime(value.offlineSince) ? { offlineSince: value.offlineSince } : {})
   };
 }
 

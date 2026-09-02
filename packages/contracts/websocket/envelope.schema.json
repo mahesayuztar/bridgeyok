@@ -92,8 +92,7 @@
       "properties": {
         "participantId": { "type": "string", "format": "uuid" },
         "online": { "type": "boolean" },
-        "offlineSince": { "type": "string", "format": "date-time" },
-        "expiresAt": { "type": "string", "format": "date-time" }
+        "offlineSince": { "type": "string", "format": "date-time" }
       }
     },
     "presenceSnapshotPayload": {

@@ -37,7 +37,7 @@ func TestLoad(t *testing.T) {
 				if config.RealtimeReadLimitBytes != 8<<10 || config.RealtimeOutboundQueueCapacity != 64 || config.RealtimeOutboundQueueBytes != 256<<10 || config.RealtimeRecoveryLimit != 128 {
 					t.Fatalf("unexpected realtime bounds: %+v", config)
 				}
-				if config.RealtimeWriteTimeout != 5*time.Second || config.RealtimePingInterval != 20*time.Second || config.RealtimePongTimeout != 10*time.Second || config.RealtimePresenceGracePeriod != time.Minute {
+				if config.RealtimeWriteTimeout != 5*time.Second || config.RealtimePingInterval != 20*time.Second || config.RealtimePongTimeout != 10*time.Second {
 					t.Fatalf("unexpected realtime timeouts: %+v", config)
 				}
 			},
