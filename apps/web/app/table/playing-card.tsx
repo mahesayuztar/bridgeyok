@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import type { Card } from "../table-state";
 import { cardKey, suitLabels } from "./gameplay-presentation";
 import { useCardDrag } from "./use-card-drag";
@@ -17,6 +18,7 @@ export function PlayingCard({
   onPlay?: (card: Card) => void;
 }) {
   const drag = useCardDrag(() => onPlay?.(card));
+  const canPlay = onPlay !== undefined && playable && !disabled;
   const rank = card.rank === "T" ? "10" : card.rank;
   const content = (
     <>
@@ -29,7 +31,8 @@ export function PlayingCard({
       </span>
     </>
   );
-  const className = `physical-card suit-${card.suit.toLowerCase()} card-${variant}${drag.dragging ? " is-dragging" : ""}`;
+  const baseClassName = `physical-card suit-${card.suit.toLowerCase()} card-${variant}`;
+  const className = `${baseClassName}${drag.dragging ? " is-dragging" : ""}`;
   const label = `${rank} ${suitLabels[card.suit]}`;
 
   if (onPlay === undefined) {
@@ -40,27 +43,47 @@ export function PlayingCard({
     );
   }
   return (
-    <button
-      className={className}
-      type="button"
-      disabled={disabled || !playable}
-      onClick={() => {
-        if (!drag.shouldSuppressClick()) onPlay(card);
-      }}
-      onPointerDown={drag.handlePointerDown}
-      onPointerMove={drag.handlePointerMove}
-      onPointerUp={drag.handlePointerUp}
-      onPointerCancel={drag.handlePointerCancel}
-      onLostPointerCapture={drag.handleLostPointerCapture}
-      style={{
-        "--drag-x": `${drag.offset.x}px`,
-        "--drag-y": `${drag.offset.y}px`,
-      } as CSSProperties}
-      data-dragging={drag.dragging}
-      aria-label={`Mainkan ${label}`}
-    >
-      {content}
-    </button>
+    <>
+      <button
+        className={className}
+        type="button"
+        disabled={!canPlay}
+        onClick={() => {
+          if (!drag.shouldSuppressClick()) onPlay(card);
+        }}
+        {...(canPlay
+          ? {
+              onPointerDown: drag.handlePointerDown,
+              onPointerMove: drag.handlePointerMove,
+              onPointerUp: drag.handlePointerUp,
+              onPointerCancel: drag.handlePointerCancel,
+              onLostPointerCapture: drag.handleLostPointerCapture,
+            }
+          : {})}
+        data-dragging={drag.dragging}
+        aria-label={`Mainkan ${label}`}
+      >
+        {content}
+      </button>
+      {drag.dragging && drag.origin !== null && typeof document !== "undefined"
+        ? createPortal(
+            <span
+              className={`${baseClassName} card-drag-preview`}
+              style={{
+                top: drag.origin.top,
+                left: drag.origin.left,
+                width: drag.origin.width,
+                height: drag.origin.height,
+                transform: `translate3d(${drag.offset.x}px, ${drag.offset.y}px, 0) rotate(1deg)`,
+              }}
+              aria-hidden="true"
+            >
+              {content}
+            </span>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
 

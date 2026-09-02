@@ -7,6 +7,12 @@ const DRAG_THRESHOLD = 6;
 export function useCardDrag(onDrop: () => void) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [origin, setOrigin] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const draggingRef = useRef(false);
   const pointerRef = useRef<{
     id: number;
@@ -21,6 +27,7 @@ export function useCardDrag(onDrop: () => void) {
     draggingRef.current = false;
     setDragging(false);
     setOffset({ x: 0, y: 0 });
+    setOrigin(null);
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -31,6 +38,13 @@ export function useCardDrag(onDrop: () => void) {
       startY: event.clientY,
       completed: false,
     };
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setOrigin({
+      left: bounds.left,
+      top: bounds.top,
+      width: bounds.width,
+      height: bounds.height,
+    });
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragging(true);
   }
@@ -88,6 +102,7 @@ export function useCardDrag(onDrop: () => void) {
   return {
     dragging,
     offset,
+    origin,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
