@@ -22,9 +22,9 @@
   --card: #fffdf7;
   --card-line: #d5d0c7;
   --card-aspect-ratio: 5 / 7;
-  --card-hand-width: clamp(4.75rem, 6.4vw, 6.5rem);
-  --card-dummy-width: clamp(4.25rem, 5.3vw, 5.25rem);
-  --card-trick-width: clamp(3.75rem, 4.8vw, 4.75rem);
+  --card-hand-width: clamp(4.25rem, 5.5vw, 5.75rem);
+  --card-dummy-width: clamp(3.9rem, 5vw, 5.25rem);
+  --card-trick-width: clamp(3.75rem, 4.4vw, 4.75rem);
   --card-compact-width: 2.4rem;
   --dummy-card-exposure: 1.7rem;
   --dummy-side-exposure: 1.55rem;
@@ -639,7 +639,7 @@ h2 {
   display: grid;
   height: 100dvh;
   overflow: hidden;
-  grid-template-rows: auto minmax(0, 1fr) clamp(8.5rem, 23vh, 11.5rem);
+  grid-template-rows: auto minmax(0, 1fr) clamp(7.75rem, 18vh, 10.75rem);
   background: var(--table-felt-dark);
 }
 .active-table-client .table-status-bar {
@@ -2608,8 +2608,8 @@ button.physical-card.is-dragging {
 
 @media (max-width: 64rem) {
   :root {
-    --card-dummy-width: clamp(3.85rem, 6vw, 4.35rem);
-    --card-trick-width: clamp(3.65rem, 5.8vw, 4.15rem);
+    --card-dummy-width: clamp(3.6rem, 6vw, 4.2rem);
+    --card-trick-width: clamp(3.45rem, 5.8vw, 4rem);
   }
   .dummy-left .hand-cards,
   .dummy-right .hand-cards {
@@ -2624,14 +2624,14 @@ button.physical-card.is-dragging {
 
 @media (max-width: 48rem) {
   :root {
-    --card-hand-width: clamp(4.25rem, 18vw, 4.75rem);
-    --card-dummy-width: 3.8rem;
-    --card-trick-width: 3.35rem;
+    --card-hand-width: clamp(3.25rem, 14vw, 3.75rem);
+    --card-dummy-width: clamp(3.15rem, 14vw, 3.65rem);
+    --card-trick-width: clamp(3.1rem, 14vw, 3.55rem);
     --dummy-card-exposure: 1.55rem;
     --dummy-side-exposure: 1.45rem;
   }
   .active-table-client {
-    grid-template-rows: auto minmax(0, 1fr) clamp(8.5rem, 23vh, 10.25rem);
+    grid-template-rows: auto minmax(0, 1fr) clamp(6.25rem, 18vh, 8rem);
   }
   .physical-card {
     padding: 0.3rem;
@@ -2726,8 +2726,8 @@ button.physical-card.is-dragging {
 
 @media (max-width: 25rem) {
   :root {
-    --card-dummy-width: 3.5rem;
-    --card-trick-width: 3.25rem;
+    --card-dummy-width: 3.15rem;
+    --card-trick-width: 3.1rem;
   }
   .dummy-top .hand-cards,
   .dummy-bottom .hand-cards {
@@ -2770,98 +2770,131 @@ button.physical-card.is-dragging {
   }
 }
 
+.bridge-hand {
+  --hand-card-width: var(--card-hand-width);
+  --hand-card-height: calc(var(--hand-card-width) * 1.4);
+}
+
 .bridge-hand .hand-cards {
+  display: flex;
   width: 100%;
   max-width: 100%;
   height: 100%;
+  flex-flow: row nowrap;
+  align-items: flex-start;
   justify-content: center;
+  gap: 0;
   overflow: visible;
   padding-inline: 0;
 }
 
 .bridge-hand .hand-card-slot {
   position: relative;
-  width: var(--card-hand-width);
+  width: var(--hand-card-width);
   min-width: 0;
-  max-width: var(--card-hand-width);
-  height: calc(var(--card-hand-width) * 1.4 + 0.55rem);
+  max-width: var(--hand-card-width);
+  height: var(--hand-card-height);
   flex: 1 1 0;
 }
 
 .bridge-hand .hand-card-slot:last-child {
-  flex: 0 0 var(--card-hand-width);
+  flex: 0 0 var(--hand-card-width);
 }
 
 .bridge-hand .hand-card-slot .physical-card {
   position: absolute;
   top: 0;
   left: 0;
-  width: var(--card-hand-width);
+  width: var(--hand-card-width);
   margin: 0;
 }
 
 .own-hand {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .own-hand .hand-cards {
-  width: 100%;
-  height: 100%;
   overflow: visible;
   overscroll-behavior: auto;
   scroll-snap-type: none;
   scrollbar-width: none;
 }
 
+.own-hand .hand-card-slot {
+  height: calc(var(--hand-card-height) + 0.45rem);
+}
+
+.own-hand .hand-card-slot .physical-card {
+  top: 0.45rem;
+}
+
 .dummy-hand {
-  width: 100%;
-  max-width: 100%;
+  --hand-card-width: var(--card-dummy-width);
+  z-index: 9;
+  max-width: none;
   max-height: none;
 }
 
-.dummy-hand .hand-cards {
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0;
-}
-
-.dummy-hand .physical-card,
-.card-trick {
-  width: var(--card-hand-width);
-  flex-basis: var(--card-hand-width);
-  padding: 0.38rem;
-}
-
-.dummy-hand .card-corner,
-.card-trick .card-corner {
-  font-size: clamp(1.2rem, 1.7vw, 1.55rem);
-}
-
-.dummy-hand .card-corner span,
-.card-trick .card-corner span {
-  margin-top: 0.12rem;
-  font-size: 1.12em;
-}
-
-.dummy-hand .card-suit,
-.card-trick .card-suit {
-  right: 0.42rem;
-  bottom: 0.32rem;
-  font-size: clamp(2.15rem, 3.3vw, 3.15rem);
+.dummy-hand .physical-card {
+  width: var(--hand-card-width);
+  flex-basis: var(--hand-card-width);
+  padding: 0.32rem;
 }
 
 .dummy-top,
 .dummy-bottom {
   left: 50%;
+  width: calc(100% - 0.8rem);
+  height: var(--hand-card-height);
   transform: translateX(-50%);
+}
+
+.dummy-top {
+  top: 0.4rem;
+}
+
+.dummy-bottom {
+  bottom: 0.4rem;
 }
 
 .dummy-left,
 .dummy-right {
-  top: 0.4rem;
+  top: 50%;
+  width: var(--hand-card-width);
+  height: calc(100% - 0.8rem);
+  transform: translateY(-50%);
+}
+
+.dummy-left {
   right: auto;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0.4rem;
+}
+
+.dummy-right {
+  right: 0.4rem;
+  left: auto;
+}
+
+.dummy-left .hand-cards,
+.dummy-right .hand-cards {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.dummy-left .hand-card-slot,
+.dummy-right .hand-card-slot {
+  width: var(--hand-card-width);
+  max-width: var(--hand-card-width);
+  height: var(--dummy-card-exposure);
+  max-height: var(--dummy-card-exposure);
+  flex: 1 1 var(--dummy-card-exposure);
+}
+
+.dummy-left .hand-card-slot:last-child,
+.dummy-right .hand-card-slot:last-child {
+  height: var(--hand-card-height);
+  max-height: var(--hand-card-height);
+  flex: 0 0 var(--hand-card-height);
 }
 
 .own-hand button.physical-card:not(:disabled),
@@ -2874,46 +2907,92 @@ button.physical-card.is-dragging {
 .current-trick[data-dummy-position="right"],
 .current-trick[data-dummy-position="bottom"],
 .current-trick[data-dummy-position="left"] {
-  --trick-card-width: var(--card-hand-width);
-  --trick-side-offset: 0;
-  --trick-top-offset: 0;
+  --trick-card-height: calc(var(--card-trick-width) * 1.4);
+  --trick-gap: 0.4rem;
+  z-index: 10;
   top: 50%;
   right: auto;
   left: 50%;
-  width: 0;
-  height: 0;
+  width: calc(
+    var(--card-trick-width) + var(--card-trick-width) +
+      var(--card-trick-width) + var(--trick-gap) + var(--trick-gap)
+  );
+  height: calc(
+    var(--trick-card-height) + var(--trick-card-height) +
+      var(--trick-card-height) + var(--trick-gap) + var(--trick-gap)
+  );
   transform: translate(-50%, -50%);
+}
+
+.current-trick[data-dummy-position="top"] {
+  top: 60%;
+}
+
+.current-trick[data-dummy-position="bottom"] {
+  top: 40%;
+}
+
+.current-trick[data-dummy-position="left"] {
+  left: 60%;
+}
+
+.current-trick[data-dummy-position="right"] {
+  left: 40%;
 }
 
 .trick-top,
 .trick-top.trick-dummy {
   top: 0;
   bottom: auto;
-  left: 0;
-  transform: translate(-50%, -100%);
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .trick-bottom {
-  top: 0;
-  bottom: auto;
-  left: 0;
-  transform: translate(-50%, 0);
+  top: auto;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .trick-left,
 .trick-left.trick-dummy {
-  top: 0;
+  top: 50%;
   right: auto;
   left: 0;
-  transform: translate(-100%, -50%);
+  transform: translateY(-50%);
 }
 
 .trick-right,
 .trick-right.trick-dummy {
-  top: 0;
-  right: auto;
-  left: 0;
-  transform: translate(0, -50%);
+  top: 50%;
+  right: 0;
+  left: auto;
+  transform: translateY(-50%);
+}
+
+.card-trick {
+  width: var(--card-trick-width);
+  flex-basis: var(--card-trick-width);
+  padding: 0.32rem;
+}
+
+.dummy-hand .card-corner,
+.card-trick .card-corner {
+  font-size: clamp(1rem, 1.45vw, 1.3rem);
+}
+
+.dummy-hand .card-corner span,
+.card-trick .card-corner span {
+  margin-top: 0.12rem;
+  font-size: 1.08em;
+}
+
+.dummy-hand .card-suit,
+.card-trick .card-suit {
+  right: 0.34rem;
+  bottom: 0.26rem;
+  font-size: clamp(1.8rem, 2.8vw, 2.65rem);
 }
 
 .board-result {
@@ -2932,14 +3011,14 @@ button.physical-card.is-dragging {
 @media (max-width: 48rem) {
   .dummy-hand .card-corner,
   .card-trick .card-corner {
-    font-size: 1.12rem;
+    font-size: 1rem;
   }
 
   .dummy-hand .card-suit,
   .card-trick .card-suit {
-    right: 0.32rem;
-    bottom: 0.24rem;
-    font-size: 2.15rem;
+    right: 0.28rem;
+    bottom: 0.2rem;
+    font-size: 1.75rem;
   }
 
   .board-result dl div:nth-child(3) {
@@ -2947,11 +3026,20 @@ button.physical-card.is-dragging {
     border-left: 1px solid var(--line);
   }
 
-  .dummy-left,
-  .dummy-right {
-    right: auto;
-    left: 50%;
-    transform: translateX(-50%);
+  .current-trick[data-dummy-position="top"] {
+    top: 61%;
+  }
+
+  .current-trick[data-dummy-position="bottom"] {
+    top: 39%;
+  }
+
+  .current-trick[data-dummy-position="left"] {
+    left: 62%;
+  }
+
+  .current-trick[data-dummy-position="right"] {
+    left: 38%;
   }
 }
 
