@@ -194,7 +194,7 @@ Authorization selalu diperiksa di server untuk setiap REST mutation dan WS comma
 - Seat reservation terikat pada `guest_session_id`, bukan connection ID atau nickname.
 - Reconnect meminta short-lived WebSocket ticket, lalu mengirim `resume` dengan `table_id` dan `last_seen_seq`.
 - Jika credential masih valid, server mengembalikan missing events atau snapshot terbaru.
-- Jika browser storage hilang, invite saja **tidak** mengambil seat yang masih terisi. Setelah participant offline 60 detik dan otomatis dilepas, invite yang sama dapat dipakai identity baru untuk mengambil vacancy.
+- Jika browser storage hilang, invite saja **tidak** mengambil seat yang masih terisi. Disconnect hanya mengubah presence; pelepasan seat memerlukan leave, owner removal, atau lifecycle expiry eksplisit.
 - Guest credential dirotasi setelah recovery sensitif dan dapat dicabut.
 
 ---
@@ -673,7 +673,7 @@ Catalog ini menjadi sumber test case dan harus terus bertambah ketika bug ditemu
 | Browser menolak storage | beri warning “recovery terbatas”; session tetap dapat berjalan in-memory |
 | Guest membuka link dari device lain | dianggap identity baru; tidak otomatis mengambil seat lama |
 | Credential dicuri/replay | hash-at-rest, rotation/revoke, short session policy, controller fencing, audit signal |
-| User logout/clear data saat seated | socket ditutup; seat memasuki disconnected grace, tidak langsung diberikan orang lain |
+| User logout/clear data saat seated | socket ditutup; seat tetap durabel sampai leave, owner removal, atau lifecycle expiry eksplisit |
 | Session expired saat socket hidup | server revalidate/expiry timer; minta refresh atau close dengan code terstruktur |
 
 ### 11.2 Lobby, seat, dan start race
@@ -683,8 +683,8 @@ Catalog ini menjadi sumber test case dan harus terus bertambah ketika bug ditemu
 | Dua user mengambil seat yang sama | satu transaksi menang; yang kalah mendapat `SEAT_TAKEN` + state terbaru |
 | Satu user mengambil dua seat | constraint menolak; satu participant hanya satu seat |
 | User pindah seat saat ready | ready reset; event tunggal yang konsisten |
-| User disconnect sebelum start | presence `offline` dan countdown 60 detik; participant otomatis dilepas jika tidak reconnect |
-| Owner disconnect | grace 60 detik; ownership otomatis berpindah ke participant online/seated yang diprioritaskan sebelum owner lama dilepas |
+| User disconnect sebelum start | presence menjadi `offline`; participant dan seat tetap durabel |
+| Owner disconnect | presence menjadi `offline`; ownership dan seat tidak berubah tanpa lifecycle command eksplisit |
 | Owner kick dirinya sendiri | ownership wajib ditransfer atomik ke participant aktif lain; ditolak bila tidak ada pengganti |
 | Kick saat board berjalan | tersedia bagi owner; seat menjadi vacancy tanpa mengubah call/card game |
 | Start diklik dua kali | idempotent; hanya satu board/deal dibuat |
@@ -1393,9 +1393,9 @@ Semua decision berikut berlaku sebagai baseline implementasi. Phase 0 tidak memi
 | ID | Keputusan final | Konsekuensi/acceptance behavior |
 |---|---|---|
 | OD-01 | Satu table dapat memainkan board berikutnya berulang kali sampai owner memilih finish pada state `BETWEEN_BOARDS`; tidak ada tournament movement pada MVP. | `next_board` idempotent, hanya di safe state, board number naik satu, dan table tidak dapat dihidupkan kembali setelah finished. |
-| OD-02 | Presence memakai jumlah subscribed connection per participant. Setelah offline **60 detik**, participant otomatis dilepas melalui command durabel; invite yang sama dapat mengisi vacancy termasuk saat board aktif. | Multi-tab tidak timeout sampai koneksi terakhir lepas; replacement hanya mengambil seat kosong dan melanjutkan state seat tersebut. Lihat ADR-006. |
+| OD-02 | Presence memakai jumlah subscribed connection per participant. WebSocket disconnect hanya mengubah presence menjadi offline dan tidak melepaskan participant atau seat. | Marker browser hanya kandidat recovery; membership server menentukan `TABLE_ACTIVE` atau `TABLE_EXPIRED`. Lihat ADR-011. |
 | OD-03 | Waiting table expire setelah **2 jam** tanpa meaningful activity; active table menjadi abandoned setelah **24 jam** tanpa meaningful activity; completed result hanya untuk participant dan disimpan **90 hari**. | Heartbeat/presence tidak memperpanjang TTL; warning dikirim sebelum expiry; cleanup idempotent. |
-| OD-04 | Owner mendapat grace **60 detik** seperti participant lain. Bila ada participant aktif pengganti, transfer master dan expiry owner commit atomik; owner terakhir tidak dapat dilepas tanpa pengganti. | Auto-transfer memprioritaskan participant online+seated, lalu online, lalu participant aktif paling awal. Lihat ADR-006. |
+| OD-04 | Owner disconnect tidak memindahkan ownership. Transfer atau removal hanya terjadi melalui command lifecycle eksplisit dan owner terakhir tidak dapat dilepas tanpa pengganti. | Presence transport tidak menentukan membership atau ownership. Lihat ADR-011. |
 | OD-05 | Full deal hanya terlihat oleh participant meja setelah board berstatus completed; tidak terlihat oleh visitor, invite preview, atau public spectator. | Semua result tetap melewati projector dan `Cache-Control: private, no-store`. |
 | OD-06 | Dealer dan vulnerability mengikuti standard **16-board duplicate cycle**, kemudian mengulang untuk board 17+. | Board number, dealer, dan vulnerability dihitung server-side dan dilindungi golden tests. |
 | OD-07 | Nilai canonical adalah signed integer `score_ns`; score EW selalu `-score_ns`. UI menampilkan nilai dari perspektif partnership viewer. | Database/API tidak menyimpan dua score independen yang bisa berbeda. |
