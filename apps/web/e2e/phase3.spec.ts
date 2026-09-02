@@ -133,11 +133,19 @@ async function dragPlayableCard(
   const startY = cardBox!.y + cardBox!.height / 2;
   const endX = boardBox!.x + boardBox!.width / 2;
   const endY = boardBox!.y + boardBox!.height / 2;
+  const preview = page.locator(".card-drag-preview");
 
   if (pointer === "mouse") {
     await page.mouse.move(startX, startY);
     await page.mouse.down();
+    await expect(preview).toHaveCount(1);
     await page.mouse.move(endX, endY, { steps: 5 });
+    const previewBox = await preview.boundingBox();
+    expect(previewBox).not.toBeNull();
+    expect(previewBox!.x).toBeLessThan(endX);
+    expect(previewBox!.x + previewBox!.width).toBeGreaterThan(endX);
+    expect(previewBox!.y).toBeLessThan(endY);
+    expect(previewBox!.y + previewBox!.height).toBeGreaterThan(endY);
     await page.mouse.up();
   } else {
     const session = await page.context().newCDPSession(page);
@@ -146,6 +154,7 @@ async function dragPlayableCard(
       touchPoints: [{ x: startX, y: startY }],
     });
     await expect(page.locator('.physical-card[data-dragging="true"]')).toHaveCount(1);
+    await expect(preview).toHaveCount(1);
     const pickupX = startX < endX ? startX + 24 : startX - 24;
     await session.send("Input.dispatchTouchEvent", {
       type: "touchMove",
@@ -164,6 +173,20 @@ async function dragPlayableCard(
       await page.waitForTimeout(20);
     }
     await expect(page.locator('.physical-card[data-dragging="true"]')).toHaveCount(1);
+    const previewLayer = await preview.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const board = document.querySelector(".board-play-zone");
+      return {
+        position: style.position,
+        opacity: style.opacity,
+        zIndex: Number(style.zIndex),
+        boardZIndex:
+          board === null ? 0 : Number(getComputedStyle(board).zIndex) || 0,
+      };
+    });
+    expect(previewLayer.position).toBe("fixed");
+    expect(previewLayer.opacity).toBe("1");
+    expect(previewLayer.zIndex).toBeGreaterThan(previewLayer.boardZIndex);
     await session.send("Input.dispatchTouchEvent", {
       type: "touchEnd",
       touchPoints: [],
@@ -253,6 +276,28 @@ async function assertGameplayGeometry(page: Page) {
     ];
     const dummyCards = dummyCardElements.map(rect);
     const trickCards = [...document.querySelectorAll(".trick-slot .physical-card")].map(rect);
+    const playedCardColors = [
+      ...document.querySelectorAll<HTMLElement>(".trick-slot .physical-card"),
+    ].map((card) => {
+      const source = document.createElement("span");
+      const suitClass = [...card.classList].find((name) => name.startsWith("suit-"));
+      source.className = `physical-card card-hand ${suitClass ?? ""}`;
+      source.style.position = "fixed";
+      source.style.visibility = "hidden";
+      document.body.append(source);
+      const playedStyle = getComputedStyle(card);
+      const sourceStyle = getComputedStyle(source);
+      const comparison = {
+        playedColor: playedStyle.color,
+        sourceColor: sourceStyle.color,
+        playedBackground: playedStyle.backgroundColor,
+        sourceBackground: sourceStyle.backgroundColor,
+        opacity: playedStyle.opacity,
+        filter: playedStyle.filter,
+      };
+      source.remove();
+      return comparison;
+    });
     const dummyHand = rect(document.querySelector(".dummy-hand"));
     const currentTrick = rect(document.querySelector(".current-trick"));
     const handCard = rect(document.querySelector(".own-hand .physical-card"));
@@ -297,12 +342,15 @@ async function assertGameplayGeometry(page: Page) {
     const ownCardSlots = [
       ...document.querySelectorAll<HTMLElement>(".own-hand .hand-card-slot"),
     ];
-    const ownCardExposure = ownCardSlots
-      .slice(1)
-      .map((slot, _slotIndex) =>
-        slot.getBoundingClientRect().left -
-        ownCardSlots[_slotIndex]!.getBoundingClientRect().left,
-      );
+    const ownCardExposure = ownCardSlots.flatMap((slot, _slotIndex) => {
+      const nextSlot = ownCardSlots[_slotIndex + 1];
+      if (nextSlot === undefined) return [];
+      const slotBox = slot.getBoundingClientRect();
+      const nextBox = nextSlot.getBoundingClientRect();
+      return Math.abs(slotBox.top - nextBox.top) <= 1
+        ? [nextBox.left - slotBox.left]
+        : [];
+    });
     const wonIndicator = rect(document.querySelector(".trick-won"));
     const lostIndicator = rect(document.querySelector(".trick-lost"));
     return {
@@ -314,13 +362,22 @@ async function assertGameplayGeometry(page: Page) {
       dummyHasExtras:
         document.querySelector(".dummy-hand h3, .dummy-suit, .dummy-suit-label") !==
         null,
-      dummyCenterDelta:
+      dummyPlacement:
         dummyHand === null || playZone === null
           ? null
-          : Math.abs(
-              dummyHand.left + dummyHand.width / 2 -
-                (playZone.left + playZone.width / 2),
-            ),
+          : {
+              position: ["top", "right", "bottom", "left"].find((position) =>
+                document
+                  .querySelector(".dummy-hand")
+                  ?.classList.contains(`dummy-${position}`),
+              ),
+              leftDelta: Math.abs(dummyHand.left - playZone.left),
+              rightDelta: Math.abs(dummyHand.right - playZone.right),
+              centerDelta: Math.abs(
+                dummyHand.left + dummyHand.width / 2 -
+                  (playZone.left + playZone.width / 2),
+              ),
+            },
       trickCenterDelta:
         currentTrick === null || playZone === null
           ? null
@@ -342,6 +399,7 @@ async function assertGameplayGeometry(page: Page) {
             Math.abs(trickCard.width - handCard.width) <= 1 &&
             Math.abs(trickCard.height - handCard.height) <= 1,
         ),
+      playedCardColors,
       dummyBlockedByTrick: dummyCardElements.some((card) => {
         const box = card.getBoundingClientRect();
         const target = document.elementFromPoint(box.left + 7, box.top + 7);
@@ -397,15 +455,33 @@ async function assertGameplayGeometry(page: Page) {
       .filter((card) => card.className.includes("card-trick"))
       .every((card) => card.width >= 52),
   ).toBe(true);
-  expect(geometry.ownCardExposure.every((exposure) => exposure >= 18)).toBe(true);
+  expect(
+    geometry.ownCardExposure.every(
+      (exposure) => exposure >= (geometry.viewport.width <= 400 ? 38 : 18),
+    ),
+  ).toBe(true);
   expect(geometry.ownHandScrollable).toBe(false);
   expect(geometry.dummyHasExtras).toBe(false);
   expect(geometry.playedCardMatchesHand).toBe(true);
+  for (const card of geometry.playedCardColors) {
+    expect(card).toEqual({
+      playedColor: card.sourceColor,
+      sourceColor: card.sourceColor,
+      playedBackground: card.sourceBackground,
+      sourceBackground: card.sourceBackground,
+      opacity: "1",
+      filter: "none",
+    });
+  }
   expect(geometry.trickCenterDelta).not.toBeNull();
   expect(geometry.trickCenterDelta!.x).toBeLessThanOrEqual(1);
   expect(geometry.trickCenterDelta!.y).toBeLessThanOrEqual(1);
-  if (geometry.viewport.width <= 400) {
-    expect(geometry.dummyCenterDelta).toBeLessThanOrEqual(1);
+  if (geometry.dummyPlacement?.position === "left") {
+    expect(geometry.dummyPlacement.leftDelta).toBeLessThanOrEqual(1);
+  } else if (geometry.dummyPlacement?.position === "right") {
+    expect(geometry.dummyPlacement.rightDelta).toBeLessThanOrEqual(1);
+  } else if (geometry.dummyPlacement !== null) {
+    expect(geometry.dummyPlacement.centerDelta).toBeLessThanOrEqual(1);
   }
   expect(geometry.dummyBlockedByTrick).toBe(false);
   expect(geometry.dummyTrickOverlap).toBe(false);
@@ -638,6 +714,17 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await expect(
     east.page.locator('button[aria-label^="Mainkan "]:enabled').first(),
   ).toBeVisible();
+  const unavailableCard = south.page.locator(
+    'button[aria-label^="Mainkan "]:disabled',
+  ).first();
+  await expect(unavailableCard).toBeVisible();
+  await unavailableCard.dispatchEvent("pointerdown", {
+    pointerId: 91,
+    pointerType: "mouse",
+    isPrimary: true,
+    button: 0,
+  });
+  await expect(south.page.locator(".card-drag-preview")).toHaveCount(0);
   const eastFramesBeforeDrag = mutationFrameCount(east.sentFrames);
   const declarerCueBeforeLead = await replacementTab.evaluate(() =>
     (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
