@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 29 Agustus 2026
-- Last amended: 1 September 2026
+- Last amended: 2 September 2026
 - Decision owners: Engineering
 - Supersedes: none
 
@@ -34,7 +34,7 @@ Common fields:
 - Satu reader dan satu bounded writer loop per connection.
 - Table subscription bertindak sebagai room scope; authorization terjadi saat subscribe dan setiap mutation.
 - Satu table actor memproses command berurutan.
-- Satu principal dapat mempunyai mirror connections; satu controller epoch per seat.
+- Satu principal dapat mempunyai beberapa connection, tetapi web client terbaru otomatis meminta controller epoch baru setelah projection fresh sesuai ADR-010; hanya satu controller epoch aktif per seat.
 - Server protocol ping/pong mendeteksi dead peer.
 - Browser mengirim jittered application heartbeat selama realtime screen aktif; heartbeat tidak menyentuh DB/Redis.
 - Text JSON only, max 8 KiB, compression off.

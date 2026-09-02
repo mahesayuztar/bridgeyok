@@ -27,6 +27,7 @@ Jika dua dokumen setingkat bertentangan, dokumen dengan change record/ADR paling
 | [`adr/0007-consensus-claim-and-undo.md`](adr/0007-consensus-claim-and-undo.md) | durable consensus claim/undo baseline | Accepted |
 | [`adr/0008-simple-table-bots.md`](adr/0008-simple-table-bots.md) | owner-managed deterministic seat bots | Accepted |
 | [`adr/0009-optimistic-gameplay-client-and-presentation.md`](adr/0009-optimistic-gameplay-client-and-presentation.md) | optimistic client, sequenced presentation, canonical card, UX-G1 engine gate | Accepted |
+| [`adr/0010-automatic-controller-handoff.md`](adr/0010-automatic-controller-handoff.md) | automatic newest-device controller handoff with epoch fencing | Accepted |
 
 ## Decision traceability
 
@@ -50,6 +51,7 @@ Jika dua dokumen setingkat bertentangan, dokumen dengan change record/ADR paling
 | OD-16 team match | Product Contract Team Match section | paired-board integration |
 | OD-17 simple table bots | Product Contract sections 3, 6, 7; ADR-008 | table/actor/protocol/projection tests |
 | OD-18 gameplay UX reliability | `apps/web/PLAN.md` sections 19–23; ADR-003 amendment; ADR-009 | optimistic/realtime/component/pointer/visual browser matrix and UX-G1 |
+| OD-19 automatic controller handoff | Product Contract sections 7.5 and 15; Wireflows 14; ADR-010 | reducer and two-tab/reload E2E plus realtime fencing tests |
 
 ## Phase 0 exit report
 

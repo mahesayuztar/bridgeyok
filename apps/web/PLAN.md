@@ -21,7 +21,7 @@ Prioritas tertinggi refactor ini adalah:
 - `/lobby` tidak memiliki hero marketing: hanya navbar ringkas dan application content;
 - heading terbesar dan pertama di `/lobby` adalah sapaan personal, misalnya `Halo, Mahesa`;
 - setiap kegagalan join/session/network mempunyai pesan, penyebab, dan tindakan lanjut yang spesifik;
-- **Ambil alih kendali** benar-benar memulihkan controller yang stale dan memberikan konfirmasi yang terlihat;
+- device/tab terbaru untuk guest yang sama otomatis mendapat kendali tanpa konfirmasi setelah projection fresh;
 - AUCTION, PLAY, dan SCORE memakai satu table shell persisten yang secara struktur, information hierarchy, spatial layout, dan interaction model sekitar 90% familiar bagi pemain Bridge Base Online (BBO);
 - 10% diferensiasi produk dipakai untuk warna, tipografi, responsivitas, aksesibilitas, feedback koneksi, dan kualitas interaksi—bukan untuk mengganti struktur meja BBO.
 
@@ -89,7 +89,7 @@ Jika jawabannya tidak, layout belum dapat diterima meskipun terlihat bersih atau
 | --- | --- | --- |
 | `app/page.tsx` | Refactor | Landing dan guest entry saja; hilangkan mounted lobby/table dari landing. |
 | `useTableSession` credential storage/refresh | Pertahankan lalu rapikan | Pertahankan long-lived device identity, tab access token, ticket, generation fence, resume, dan no mutation retry. Pisahkan route navigation dan typed issue presentation dari transport. |
-| `table-state.ts` stale-room/sequence reducer | Pertahankan dan perluas | Pertahankan private-state clearing dan monotonic sequence; tambah typed issue dan explicit resync/takeover state. |
+| `table-state.ts` stale-room/sequence reducer | Pertahankan dan perluas | Pertahankan private-state clearing dan monotonic sequence; tambah typed issue dan automatic resync/takeover state. |
 | `BridgeTable` monolith | Refactor bertahap | Jadikan orchestrator tipis di dedicated table route; ekstrak hanya unit visual/behavioral yang bermakna. |
 | `SeatPosition` | Refactor | Menjadi player position yang melekat pada geometri shell dan dapat memakai viewer-relative orientation. |
 | `Hand` | Replace | Ganti dengan `BridgeHand` + reusable `PlayingCard`. |
@@ -142,7 +142,7 @@ type ClientIssue = {
   title: string;
   detail: string;
   retryable: boolean;
-  action?: "retry" | "editInvite" | "backToLobby" | "signInAgain" | "resync" | "takeover";
+  action?: "retry" | "editInvite" | "backToLobby" | "signInAgain" | "resync";
   source: "rest" | "websocket" | "browser";
 };
 ```
@@ -164,7 +164,7 @@ Nama final boleh menyesuaikan existing convention. Jangan menggunakan HTTP statu
 | `SERVICE_UNAVAILABLE`/5xx | **Layanan meja sedang bermasalah** | Gunakan `retryable` dari Problem Details bila ada. | Retry manual. |
 | session inactive/invalid | **Sesi tamu sudah berakhir** | Private table state dibersihkan. | Masuk kembali. |
 | `STATE_CHANGED` | **Meja sudah berubah** | Projection terbaru harus dimuat sebelum command berikutnya. | Resync. |
-| `STALE_CONTROLLER` | **Kendali ada di perangkat lain** | Jelaskan bahwa state perlu diselaraskan sebelum takeover. | Resync lalu Ambil alih. |
+| `STALE_CONTROLLER` | **Kendali berpindah perangkat** | Jelaskan bahwa state diselaraskan sebelum kendali otomatis berpindah. | Resync otomatis; retry manual hanya bila sync gagal. |
 | illegal call/card/turn | Pesan aksi spesifik | Pertahankan meja dan state committed; jangan ubah revision lokal. | Koreksi pilihan. |
 
 Presentation rules:
@@ -182,34 +182,24 @@ Catatan contract: audit join endpoint harus membuktikan `TABLE_FULL`/`TABLE_LOCK
 
 ### Masalah saat ini
 
-`sendCommand("table.takeover")` memakai `expected_revision` dan `controller_epoch` dari projection lokal. Saat server mengembalikan `STALE_CONTROLLER` atau `STATE_CHANGED`, client hanya menghapus pending request dan memasang message. Projection/revision/epoch tidak diperbarui, sehingga klik berikutnya dapat mengulang stale command yang sama. Selain itu tidak ada visual success state setelah `CONTROLLER_REPLACED`.
+`sendCommand("table.takeover")` memakai `expected_revision` dan `controller_epoch` dari projection lokal. Flow lama meminta user menekan konfirmasi setelah `STALE_CONTROLLER`, walaupun device/tab baru sudah terautentikasi sebagai guest yang sama dan membuka meja yang sama.
 
 ### Flow yang wajib
 
-1. Deteksi `STALE_CONTROLLER` atau `STATE_CHANGED` dari WS error.
-2. Bekukan game mutations dari tab tersebut dan tandai controller state `stale`.
-3. Minta resume/snapshot untuk active table menggunakan sequence committed terakhir; jangan retry mutation yang ditolak.
-4. Setelah projection fresh diterima, tampilkan action **Ambil alih kendali** dengan penjelasan singkat.
-5. Kirim satu `table.takeover` memakai revision dan controller epoch dari projection fresh.
-6. Pertahankan pending state sampai event projection yang memuat `CONTROLLER_REPLACED`/epoch baru diterima.
-7. Tampilkan success feedback `Kendali sudah berpindah ke perangkat ini`, kembalikan controller state ke `current`, dan aktifkan legal mutations.
-8. Error/reconnect di tengah takeover kembali ke langkah resync; tidak ada automatic takeover retry.
-
-Button rules:
-
-- jangan tampil permanen tanpa konteks pada semua seated player;
-- tampilkan ketika conflict terdeteksi atau melalui compact secondary device-control menu;
-- disabled selama `syncing`, `offline`, atau takeover pending;
-- click berulang tidak membuat request paralel;
-- keyboard focus tetap pada feedback/action yang relevan;
-- current controller dan stale controller harus mempunyai status yang dapat dipahami tanpa melihat log.
+1. Saat connection baru dibuka, bekukan game mutations sampai projection recipient terbaru diterima.
+2. Jika guest sudah duduk, kirim tepat satu `table.takeover` untuk revision/controller epoch projection tersebut tanpa tombol konfirmasi.
+3. Pertahankan pending state sampai event projection yang memuat `CONTROLLER_REPLACED`/epoch baru diterima.
+4. Setelah event authoritative, kembalikan controller state ke `current` tanpa success toast dan aktifkan legal mutations.
+5. Device lama yang melihat viewer controller epoch berubah tanpa pending takeover miliknya langsung menjadi mirror/read-only; server tetap menjadi final fence.
+6. Jika device lama baru mengetahui pergantian melalui `STALE_CONTROLLER`, minta resume/snapshot lalu jalankan flow yang sama; mutation user yang ditolak tidak di-retry otomatis.
+7. Error/reconnect di tengah takeover kembali ke resync dan tidak membuat loop request pada revision yang sama.
 
 Tests minimum:
 
-- reducer: stale error → resyncing → fresh snapshot → takeover pending → replaced event → current;
+- reducer: connection/stale error → resyncing → fresh projection → automatic takeover pending → replaced event → current;
 - stale revision tidak dikirim ulang;
 - two-tab scenario untuk session/seat yang sama membuktikan controller epoch bertambah dan tab peminta dapat kembali melakukan command;
-- failure di setiap tahap menghasilkan action recovery yang benar;
+- failure di setiap tahap menghasilkan action resync yang benar tanpa konfirmasi takeover;
 - tidak ada stale pending/controller/private state setelah pindah table.
 
 Jika test membuktikan contract server tidak memungkinkan takeover setelah fresh projection, lakukan diagnosis contract terarah. Perubahan backend hanya boleh berupa koreksi bug kompatibel; jangan mendesain ulang controller fencing atau protocol.
@@ -430,7 +420,7 @@ Presentation helpers yang layak diuji:
 | `app/lobby/page.tsx` | New guest lobby route dengan navbar ringkas dan greeting `<h1>` terbesar. |
 | `app/table/[tableId]/page.tsx` | New dedicated table route dan route boundary. |
 | `app/bridge-table.tsx` | Diperkecil atau dipindah menjadi shell orchestrator; phase panels lama dihapus. |
-| `app/use-table-session.ts` | Typed issue, explicit resync/takeover lifecycle, route-safe enter/clear, dan no-retry preservation. |
+| `app/use-table-session.ts` | Typed issue, automatic resync/takeover lifecycle, route-safe enter/clear, dan no-retry preservation. |
 | `app/table-state.ts` | Controller/resync state, typed issue, orientation/phase presentation boundary bila tepat. |
 | `app/globals.css` | Hapus dashboard selectors; tambah route shell, BBO geometry, physical card, bidding box, spatial trick, responsive/safe-area rules. |
 | `app/layout.tsx` | Pertahankan metadata/global document; jangan membuat seluruh app Client Component. |
@@ -461,7 +451,7 @@ Screenshot sudah tersedia di /docs/*.png
 
 - [x] Implement stable error classifier dan contextual recovery UI.
 - [x] Bedakan not found, unavailable, full, locked, offline, network, timeout, session, conflict, dan server failure.
-- [x] Implement stale-controller resync → fresh projection → explicit takeover → success event flow.
+- [x] Implement stale-controller/new-connection resync → fresh projection → automatic takeover → authoritative event flow.
 - [x] Tambah reducer tests dan pertahankan no automatic mutation retry.
 
 ### Work 3 — persistent shell and presentation model
@@ -525,11 +515,11 @@ Screenshot sudah tersedia di /docs/*.png
 
 ### Takeover
 
-- Tombol takeover tidak mengirim revision/controller epoch stale berulang kali.
-- `STALE_CONTROLLER` menyebabkan resync projection sebelum takeover baru boleh dikirim.
-- Satu click setelah fresh projection menghasilkan tepat satu takeover request.
-- Event authoritative mengubah UI menjadi `Kendali sudah berpindah ke perangkat ini`.
-- Tab peminta dapat kembali melakukan call/play yang legal.
+- UI tidak menampilkan tombol atau success toast takeover.
+- `STALE_CONTROLLER` dan connection baru menyebabkan resync projection sebelum takeover otomatis dikirim.
+- Satu fresh projection menghasilkan paling banyak satu takeover request pada revision tersebut.
+- Event authoritative mengaktifkan call/play legal di device terbaru.
+- Event yang sama langsung membuat device lama mirror/read-only sebelum aksi otomatis atau user berikutnya terkirim.
 - Pending controller state bersih setelah reconnect, table switch, leave, atau finish.
 
 ### General table

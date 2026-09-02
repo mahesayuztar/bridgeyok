@@ -88,7 +88,7 @@ MVP dinyatakan **done**, bukan sekadar “fitur tampak jalan”, hanya jika selu
 - [ ] Tidak ada client yang menerima hand lawan sebelum informasi itu menjadi publik menurut aturan.
 - [ ] Duplicate command, double-click, pesan out-of-order, dan retry tidak menggandakan aksi.
 - [ ] Reload, pindah jaringan, laptop sleep, WebSocket putus, dan backend restart dapat dipulihkan dari revision terakhir yang sudah commit.
-- [ ] Satu seat tidak dapat dimainkan dua controller sekaligus; takeover menggunakan fencing epoch.
+- [ ] Satu seat tidak dapat dimainkan dua controller sekaligus; device terbaru mendapat takeover otomatis dengan fencing epoch.
 - [ ] Aksi tidak sah menghasilkan error terstruktur tanpa mengubah revision/state.
 - [ ] Origin allowlist, auth per message, schema validation, size limit, rate limit, redacted logs, dan graceful shutdown aktif.
 - [ ] `go test -race ./...`, unit/integration test, contract test, serta E2E four-player critical path lulus di CI.
@@ -461,11 +461,11 @@ Per connection:
 
 ### 7.6 Multi-tab dan fencing
 
-- Satu identity boleh membuka beberapa read-only connection.
+- Satu identity boleh membuka beberapa connection.
 - Hanya satu `controller_epoch` aktif per seat.
-- Tab baru meminta takeover eksplisit atau menjadi mirror.
+- Tab/device baru untuk guest yang sudah duduk otomatis mengirim satu takeover setelah projection fresh.
 - Setelah takeover, command dari epoch lama ditolak `STALE_CONTROLLER`, meskipun socket lama belum mati.
-- Pergantian controller ditampilkan ke user dan dicatat tanpa membocorkan token.
+- Pergantian controller tidak memerlukan tombol atau toast konfirmasi dan tetap dicatat tanpa membocorkan token.
 
 ---
 
@@ -725,7 +725,7 @@ Catalog ini menjadi sumber test case dan harus terus bertambah ketika bug ditemu
 | Deploy/SIGTERM | server draining event, stop command, commit selesai, close/reconnect |
 | DB sementara unavailable | reject/retryable; RAM tidak maju mendahului DB |
 | Client sangat lambat | bounded queue; close `SLOW_CONSUMER`; resume via snapshot |
-| Tab lama dan tab baru aktif | explicit takeover; epoch lama read-only/rejected |
+| Tab lama dan tab baru aktif | tab terbaru otomatis takeover; epoch lama read-only/rejected |
 | Browser offline mengantre click | UI hanya satu pending domain command; stale command tidak dikirim massal saat online |
 | System clock user salah | tidak memengaruhi ordering/rules; server time authoritative |
 
@@ -936,7 +936,7 @@ Aturan tambahan:
 - reload salah satu pemain pada auction dan play;
 - network offline setelah commit sebelum ack;
 - owner/start race;
-- multi-tab takeover;
+- multi-tab automatic takeover;
 - mobile viewport + keyboard-only critical path;
 - privacy assertion: response/socket North tidak mengandung card East/West/South yang tersembunyi.
 - satu Team Match happy path dengan eight isolated clients sebagai release smoke.
@@ -1410,8 +1410,9 @@ Semua decision berikut berlaku sebagai baseline implementasi. Phase 0 tidak memi
 | OD-16 | Setiap board mempunyai deal-source provenance. | Mendukung secure random, deterministic test, prepared, dan configurable constraint source tanpa ontology/problem classification. |
 | OD-17 | Owner dapat mengelola bot kursi sederhana. | Bot bukan guest identity; add/remove/replace bersifat durabel, bot memilih legal call/card pertama melalui actor, dan claim/undo dinonaktifkan saat bot duduk. Lihat ADR-008. |
 | OD-18 | Gameplay UX reliability memakai server-authoritative optimistic client, logical/presentation separation, one canonical card primitive, one play-command path, dan UX-G1 engine gate. | Local legal call/play terlihat segera lalu reconcile/rollback dengan revision/request identity; known-illegal action dicegah; motion terurut dapat di-skip hanya lewat board; ENG-01/02/03 blocked sampai UX-01–14 PASS. Lihat ADR-009 dan `apps/web/PLAN.md`. |
+| OD-19 | Connection web terbaru untuk guest yang sudah duduk otomatis mengambil controller setelah projection fresh. | Tidak ada konfirmasi takeover; fencing epoch tetap tunggal, device lama ditolak `STALE_CONTROLLER`, dan mutation user yang ditolak tidak diulang otomatis. Lihat ADR-010. |
 
-Status OD-01 sampai OD-12: **CLOSED — accepted 29 Agustus 2026**. OD-13 sampai OD-16 mencatat refactor scope 30 Agustus 2026. OD-17 diterima 31 Agustus 2026 sebagai perubahan produk eksplisit dan menjadi baseline Phase 3–5. OD-18 diterima 1 September 2026 sebagai architecture/sequence baseline Objective GUX; implementation sedang berjalan dengan UX-01–UX-13 PASS, sedangkan UX-14 belum dimulai.
+Status OD-01 sampai OD-12: **CLOSED — accepted 29 Agustus 2026**. OD-13 sampai OD-16 mencatat refactor scope 30 Agustus 2026. OD-17 diterima 31 Agustus 2026 sebagai perubahan produk eksplisit dan menjadi baseline Phase 3–5. OD-18 diterima 1 September 2026 sebagai architecture/sequence baseline Objective GUX; implementation sedang berjalan dengan UX-01–UX-13 PASS, sedangkan UX-14 belum dimulai. OD-19 diterima 2 September 2026 dan menggantikan konfirmasi takeover manual dengan handoff otomatis pada connection terbaru.
 
 ---
 
