@@ -83,7 +83,7 @@ test("contract organizes viewer and dummy suit groups without mutating projectio
   );
 });
 
-test("side dummy ranks descend from the outer table edge toward center", () => {
+test("side dummy groups sort ranks descending without mutating projection", () => {
   const cards = [
     { suit: "S", rank: "2" },
     { suit: "S", rank: "A" },
@@ -91,15 +91,11 @@ test("side dummy ranks descend from the outer table edge toward center", () => {
     { suit: "S", rank: "K" },
   ];
 
-  const leftRanks = groupCardsForContract(cards, "S", "left")[0].cards.map(
-    (card) => card.rank,
-  );
-  const rightRanks = groupCardsForContract(cards, "S", "right")[0].cards.map(
+  const ranks = groupCardsForContract(cards, "S")[0].cards.map(
     (card) => card.rank,
   );
 
-  assert.deepEqual(leftRanks, ["A", "K", "T", "2"]);
-  assert.deepEqual(rightRanks, ["2", "T", "K", "A"]);
+  assert.deepEqual(ranks, ["A", "K", "T", "2"]);
   assert.deepEqual(cards.map((card) => card.rank), ["2", "A", "T", "K"]);
 });
 

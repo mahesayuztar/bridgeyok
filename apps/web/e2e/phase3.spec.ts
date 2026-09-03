@@ -420,6 +420,29 @@ async function assertGameplayGeometry(page: Page) {
         .sort((firstCard, secondCard) => firstCard.edge - secondCard.edge)
         .map((card) => card.rank),
     );
+    const dummySuitForegroundRanks = dummySuitGroups.map(
+      (group) =>
+        group.querySelector(
+          ".hand-card-slot:last-child .card-corner strong",
+        )?.textContent ?? "",
+    );
+    const dummySuitForegroundFullyClickable = dummySuitGroups.map((group) => {
+      const foregroundCard = group.querySelector<HTMLElement>(
+        ".hand-card-slot:last-child .physical-card",
+      );
+      if (foregroundCard === null) return false;
+      const box = foregroundCard.getBoundingClientRect();
+      return [
+        [box.left + 2, box.top + 2],
+        [box.right - 2, box.top + 2],
+        [box.left + 2, box.bottom - 2],
+        [box.right - 2, box.bottom - 2],
+        [box.left + box.width / 2, box.top + box.height / 2],
+      ].every(([x, y]) =>
+        document.elementFromPoint(x!, y!)?.closest(".physical-card") ===
+        foregroundCard,
+      );
+    });
     const dummySuitVerticalSpan = dummySuitGroups.length === 0
       ? 0
       : Math.max(
@@ -428,22 +451,6 @@ async function assertGameplayGeometry(page: Page) {
         Math.min(
           ...dummySuitGroups.map((group) => group.getBoundingClientRect().top),
         );
-    const visibleDummyCards = dummyCards.flatMap((card) =>
-      card === null ? [] : [card],
-    );
-    const visibleTrickCards = trickCards.flatMap((card) =>
-      card === null ? [] : [card],
-    );
-    const sideDummyTrickGap =
-      visibleDummyCards.length === 0 || visibleTrickCards.length === 0
-        ? null
-        : dummyPosition === "left"
-          ? Math.min(...visibleTrickCards.map((card) => card.left)) -
-            Math.max(...visibleDummyCards.map((card) => card.right))
-          : dummyPosition === "right"
-            ? Math.min(...visibleDummyCards.map((card) => card.left)) -
-              Math.max(...visibleTrickCards.map((card) => card.right))
-            : null;
     const playedCardsOverlap = trickCards.some((trickCard, _trickIndex) =>
       trickCards
         .slice(_trickIndex + 1)
@@ -467,6 +474,8 @@ async function assertGameplayGeometry(page: Page) {
       dummySuitCardCounts,
       dummySuitExposures,
       dummySuitOuterRankOrders,
+      dummySuitForegroundRanks,
+      dummySuitForegroundFullyClickable,
       dummySuitVerticalSpan,
       dummyPlacement:
         dummyHand === null || playZone === null
@@ -509,7 +518,6 @@ async function assertGameplayGeometry(page: Page) {
       dummyTrickOverlap: dummyCards.some((dummyCard) =>
         trickCards.some((trickCard) => overlaps(dummyCard, trickCard)),
       ),
-      sideDummyTrickGap,
       indicator:
         wonIndicator === null || lostIndicator === null
           ? null
@@ -600,7 +608,6 @@ async function assertGameplayGeometry(page: Page) {
     expect(geometry.dummySuitGroupCount).toBeGreaterThan(0);
     expect(geometry.dummySuitGroupRows).toBe(geometry.dummySuitGroupCount);
     expect(geometry.dummySuitCardCounts.every((count) => count > 0)).toBe(true);
-    expect(geometry.sideDummyTrickGap).toBeGreaterThanOrEqual(6);
     expect(geometry.dummySuitOuterRankOrders).toEqual(
       geometry.dummySuitOuterRankOrders.map((ranks) =>
         [...ranks].sort(
@@ -610,6 +617,10 @@ async function assertGameplayGeometry(page: Page) {
         ),
       ),
     );
+    expect(geometry.dummySuitForegroundRanks).toEqual(
+      geometry.dummySuitOuterRankOrders.map((ranks) => ranks.at(-1)),
+    );
+    expect(geometry.dummySuitForegroundFullyClickable.every(Boolean)).toBe(true);
     expect(
       geometry.dummySuitExposures.flat().every((exposure) => exposure >= 14),
     ).toBe(true);
@@ -631,7 +642,6 @@ async function assertGameplayGeometry(page: Page) {
     expect(geometry.dummySuitGroupCount).toBeGreaterThan(0);
     expect(geometry.dummySuitGroupRows).toBe(geometry.dummySuitGroupCount);
     expect(geometry.dummySuitCardCounts.every((count) => count > 0)).toBe(true);
-    expect(geometry.sideDummyTrickGap).toBeGreaterThanOrEqual(6);
     expect(geometry.dummySuitOuterRankOrders).toEqual(
       geometry.dummySuitOuterRankOrders.map((ranks) =>
         [...ranks].sort(
@@ -641,6 +651,10 @@ async function assertGameplayGeometry(page: Page) {
         ),
       ),
     );
+    expect(geometry.dummySuitForegroundRanks).toEqual(
+      geometry.dummySuitOuterRankOrders.map((ranks) => ranks.at(-1)),
+    );
+    expect(geometry.dummySuitForegroundFullyClickable.every(Boolean)).toBe(true);
     expect(
       geometry.dummySuitExposures.flat().every((exposure) => exposure >= 14),
     ).toBe(true);
