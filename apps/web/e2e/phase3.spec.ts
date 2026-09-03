@@ -1,5 +1,21 @@
 import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
 
+const DESCENDING_CARD_RANKS = [
+  "A",
+  "K",
+  "Q",
+  "J",
+  "10",
+  "9",
+  "8",
+  "7",
+  "6",
+  "5",
+  "4",
+  "3",
+  "2",
+];
+
 function delayAuthoritativeGameplay(route: WebSocketRoute) {
   const server = route.connectToServer();
   server.onMessage((message) => {
@@ -344,6 +360,9 @@ async function assertGameplayGeometry(page: Page) {
     const dummySuitGroups = [
       ...document.querySelectorAll<HTMLElement>(".dummy-hand .dummy-suit-group"),
     ];
+    const dummyPosition = ["top", "right", "bottom", "left"].find((position) =>
+      document.querySelector(".dummy-hand")?.classList.contains(`dummy-${position}`),
+    );
     const ownCardExposure = ownCardSlots.flatMap((slot, _slotIndex) => {
       const nextSlot = ownCardSlots[_slotIndex + 1];
       if (nextSlot === undefined) return [];
@@ -381,9 +400,34 @@ async function assertGameplayGeometry(page: Page) {
     const dummySuitCardCounts = dummySuitGroups.map(
       (group) => group.querySelectorAll(".physical-card").length,
     );
-    const dummyPosition = ["top", "right", "bottom", "left"].find((position) =>
-      document.querySelector(".dummy-hand")?.classList.contains(`dummy-${position}`),
+    const dummySuitExposures = dummySuitGroups.map((group) => {
+      const groupCards = [
+        ...group.querySelectorAll<HTMLElement>(".physical-card"),
+      ].map((card) => card.getBoundingClientRect());
+      return groupCards.slice(0, -1).map((card, _cardIndex) =>
+        Math.abs(groupCards[_cardIndex + 1]!.left - card.left),
+      );
+    });
+    const dummySuitOuterRankOrders = dummySuitGroups.map((group) =>
+      [...group.querySelectorAll<HTMLElement>(".physical-card")]
+        .map((card) => {
+          const box = card.getBoundingClientRect();
+          return {
+            edge: dummyPosition === "right" ? -box.right : box.left,
+            rank: card.querySelector(".card-corner strong")?.textContent ?? "",
+          };
+        })
+        .sort((firstCard, secondCard) => firstCard.edge - secondCard.edge)
+        .map((card) => card.rank),
     );
+    const dummySuitVerticalSpan = dummySuitGroups.length === 0
+      ? 0
+      : Math.max(
+          ...dummySuitGroups.map((group) => group.getBoundingClientRect().bottom),
+        ) -
+        Math.min(
+          ...dummySuitGroups.map((group) => group.getBoundingClientRect().top),
+        );
     const visibleDummyCards = dummyCards.flatMap((card) =>
       card === null ? [] : [card],
     );
@@ -421,6 +465,9 @@ async function assertGameplayGeometry(page: Page) {
       dummySuitGroupRows,
       dummySuitSpreads,
       dummySuitCardCounts,
+      dummySuitExposures,
+      dummySuitOuterRankOrders,
+      dummySuitVerticalSpan,
       dummyPlacement:
         dummyHand === null || playZone === null
           ? null
@@ -548,19 +595,63 @@ async function assertGameplayGeometry(page: Page) {
   expect(geometry.trickInsidePlayZone).toBe(true);
   if (geometry.dummyPlacement?.position === "left") {
     expect(geometry.dummyPlacement.leftDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.topDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.bottomDelta).toBeLessThanOrEqual(8);
     expect(geometry.dummySuitGroupCount).toBeGreaterThan(0);
     expect(geometry.dummySuitGroupRows).toBe(geometry.dummySuitGroupCount);
     expect(geometry.dummySuitCardCounts.every((count) => count > 0)).toBe(true);
     expect(geometry.sideDummyTrickGap).toBeGreaterThanOrEqual(6);
+    expect(geometry.dummySuitOuterRankOrders).toEqual(
+      geometry.dummySuitOuterRankOrders.map((ranks) =>
+        [...ranks].sort(
+          (firstRank, secondRank) =>
+            DESCENDING_CARD_RANKS.indexOf(firstRank) -
+            DESCENDING_CARD_RANKS.indexOf(secondRank),
+        ),
+      ),
+    );
+    expect(
+      geometry.dummySuitExposures.flat().every((exposure) => exposure >= 14),
+    ).toBe(true);
+    expect(
+      geometry.dummySuitExposures.flat().every((exposure) => exposure <= 25),
+    ).toBe(true);
+    if (geometry.dummySuitGroupCount > 1) {
+      expect(geometry.dummySuitVerticalSpan).toBeGreaterThan(
+        geometry.dummyPlacement.height * 0.3,
+      );
+    }
     expect(Math.max(...geometry.dummySuitSpreads)).toBeGreaterThan(
       geometry.cards.find((card) => card.className.includes("card-dummy"))!.width,
     );
   } else if (geometry.dummyPlacement?.position === "right") {
     expect(geometry.dummyPlacement.rightDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.topDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.bottomDelta).toBeLessThanOrEqual(8);
     expect(geometry.dummySuitGroupCount).toBeGreaterThan(0);
     expect(geometry.dummySuitGroupRows).toBe(geometry.dummySuitGroupCount);
     expect(geometry.dummySuitCardCounts.every((count) => count > 0)).toBe(true);
     expect(geometry.sideDummyTrickGap).toBeGreaterThanOrEqual(6);
+    expect(geometry.dummySuitOuterRankOrders).toEqual(
+      geometry.dummySuitOuterRankOrders.map((ranks) =>
+        [...ranks].sort(
+          (firstRank, secondRank) =>
+            DESCENDING_CARD_RANKS.indexOf(firstRank) -
+            DESCENDING_CARD_RANKS.indexOf(secondRank),
+        ),
+      ),
+    );
+    expect(
+      geometry.dummySuitExposures.flat().every((exposure) => exposure >= 14),
+    ).toBe(true);
+    expect(
+      geometry.dummySuitExposures.flat().every((exposure) => exposure <= 25),
+    ).toBe(true);
+    if (geometry.dummySuitGroupCount > 1) {
+      expect(geometry.dummySuitVerticalSpan).toBeGreaterThan(
+        geometry.dummyPlacement.height * 0.3,
+      );
+    }
     expect(Math.max(...geometry.dummySuitSpreads)).toBeGreaterThan(
       geometry.cards.find((card) => card.className.includes("card-dummy"))!.width,
     );
