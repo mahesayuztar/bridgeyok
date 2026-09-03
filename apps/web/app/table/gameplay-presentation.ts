@@ -3,7 +3,6 @@ import type {
   Card,
   LiveTableProjection,
   Suit,
-  VisualPosition,
 } from "../table-state";
 
 export const suitLabels: Record<Suit, string> = {
@@ -60,7 +59,6 @@ export function organizeCardsForContract(
 export function groupCardsForContract(
   cards: Card[],
   strain?: NonNullable<Call["strain"]>,
-  position?: Extract<VisualPosition, "left" | "right">,
 ) {
   const organizedCards = organizeCardsForContract(cards, strain);
   return suitOrderForContract(strain)
@@ -75,7 +73,7 @@ export function groupCardsForContract(
         key: suit,
         suit,
         suitIndex: _suitIndex,
-        cards: position === "right" ? suitCards.reverse() : suitCards,
+        cards: suitCards,
       };
     })
     .filter((cardGroup) => cardGroup.cards.length > 0);

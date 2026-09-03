@@ -118,7 +118,7 @@ export function BridgeHand({
   const sideDummy =
     variant === "dummy" && (position === "left" || position === "right");
   const cardGroups = sideDummy
-    ? groupCardsForContract(cards, contractStrain, position)
+    ? groupCardsForContract(cards, contractStrain)
     : [{ key: "hand", suit: undefined, suitIndex: 0, cards: organizedCards }];
   const style = { "--card-count": Math.max(cards.length, 1) } as CSSProperties;
   return (
@@ -137,7 +137,10 @@ export function BridgeHand({
             style={
               sideDummy
                 ? ({
-                    "--side-dummy-suit-row": cardGroup.suitIndex + 1,
+                    "--side-dummy-suit-row":
+                      cardGroup.suitIndex < 2
+                        ? cardGroup.suitIndex + 1
+                        : cardGroup.suitIndex + 2,
                   } as CSSProperties)
                 : undefined
             }
