@@ -282,6 +282,27 @@ func TestCommandRepositoryPersistsOwnerTransfer(t *testing.T) {
 	}
 }
 
+func TestCommandRepositoryExpiresTableSessionsAtomically(t *testing.T) {
+	environment := newCommandTestEnvironment(t, 2)
+	aggregate, err := environment.postgres.FindTable(environment.ctx, environment.tableID)
+	if err != nil {
+		t.Fatalf("FindTable() error = %v", err)
+	}
+	result := environment.process(t, table.CommandRequest{
+		TableID: environment.tableID, SessionID: aggregate.OwnerSessionID, RequestID: "expire_table_sessions_01",
+		ExpectedRevision: aggregate.Revision,
+		Command:          table.Command{Name: table.CommandExpireTable, OccurredAt: time.Now().UTC()},
+	})
+	if result.Outcome.Status != table.CommandStatusAccepted || result.Aggregate.State != table.StateFinished {
+		t.Fatalf("expiry result = %+v", result)
+	}
+	for _, session := range environment.sessions {
+		if _, err := environment.postgres.FindActiveSession(environment.ctx, session.ID, time.Now().UTC()); !errors.Is(err, identity.ErrSessionInactive) {
+			t.Fatalf("FindActiveSession(%s) error = %v, want %v", session.ID, err, identity.ErrSessionInactive)
+		}
+	}
+}
+
 func TestCommandRepositoryConcurrentRevisionFence(t *testing.T) {
 	environment := newCommandTestEnvironment(t, 2)
 	aggregate, err := environment.postgres.FindTable(environment.ctx, environment.tableID)

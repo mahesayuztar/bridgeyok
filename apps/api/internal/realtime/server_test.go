@@ -238,6 +238,61 @@ func TestServerLogsDoNotExposeTicketOrGuestIdentity(t *testing.T) {
 	}
 }
 
+func TestServerTableExpiryInvalidatesEveryParticipantConnection(t *testing.T) {
+	t.Parallel()
+
+	aggregate := realtimeAggregate(t)
+	decision, domainError := table.Decide(aggregate, table.Command{
+		Name: table.CommandExpireTable, SessionID: aggregate.OwnerSessionID, OccurredAt: time.Now().UTC(),
+	})
+	if domainError != nil {
+		t.Fatalf("expiry setup error = %v", domainError)
+	}
+	expired := decision.NextState
+	expired.Revision = aggregate.Revision + 1
+	expired.LastSeq = aggregate.LastSeq + 1
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	server := &Server{
+		options:     Options{Logger: logger, OutboundQueueBytes: 128 << 10},
+		connections: map[*connection]struct{}{},
+	}
+	server.broker = newBroker(logger, time.Now)
+	t.Cleanup(server.broker.drain)
+	subscribed := projectedConnection(server, realtimeSessionID)
+	idle := projectedConnection(server, realtimeSessionID)
+	server.connections[subscribed] = struct{}{}
+	server.connections[idle] = struct{}{}
+	server.broker.subscribe(subscribed, aggregate.ID, nil, aggregate.Participants, realtimeParticipantID)
+	presenceFrame := <-subscribed.outbound
+	subscribed.releaseQueuedBytes(len(presenceFrame.message))
+
+	server.TableExpired(t.Context(), table.CommandResult{
+		Aggregate: expired,
+		Outcome: table.CommandOutcome{
+			Status: table.CommandStatusAccepted, Revision: expired.Revision, LastSeq: expired.LastSeq,
+		},
+		Events: []table.PersistedEvent{{
+			TableID: aggregate.ID, Seq: expired.LastSeq, Revision: expired.Revision,
+			Type: "TABLE_EXPIRED", Payload: map[string]any{}, OccurredAt: time.Now().UTC(),
+		}},
+	})
+
+	eventFrame := <-subscribed.outbound
+	subscribed.releaseQueuedBytes(len(eventFrame.message))
+	var event wireEnvelope
+	if err := json.Unmarshal(eventFrame.message, &event); err != nil || event.Kind != "event" || event.Name != "table.expired" {
+		t.Fatalf("expiry event = %+v, error = %v", event, err)
+	}
+	for connectionName, connection := range map[string]*connection{"subscribed": subscribed, "idle": idle} {
+		frame := <-connection.outbound
+		connection.releaseQueuedBytes(len(frame.message))
+		var envelope wireEnvelope
+		if err := json.Unmarshal(frame.message, &envelope); err != nil || envelope.Kind != "error" || envelope.Code != "SESSION_INACTIVE" || frame.closeStatus != websocket.StatusPolicyViolation {
+			t.Fatalf("%s expiry frame = %+v/%+v, error = %v", connectionName, envelope, frame, err)
+		}
+	}
+}
+
 func TestServerSubscribesAndBroadcastsAckBeforeProjectedEvent(t *testing.T) {
 	t.Parallel()
 

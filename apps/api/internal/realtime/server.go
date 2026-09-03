@@ -223,7 +223,6 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		client.cancel()
 		<-client.done
 		server.broker.unsubscribe(client)
-		server.release(client, session.ID)
 		if err := socket.CloseNow(); err != nil && !errors.Is(err, net.ErrClosed) {
 			server.options.Logger.Warn("realtime_connection_cleanup_failed", "connection_id", client.id, "result_code", "CLOSE_ERROR")
 		}
@@ -232,6 +231,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 			"result_code", "DISCONNECTED",
 			"latency_ms", server.options.Now().UTC().Sub(startedAt).Milliseconds(),
 		)
+		server.release(client, session.ID)
 	}()
 
 	go client.writeLoop()
@@ -250,6 +250,35 @@ func (server *Server) TableChanged(ctx context.Context, tableID string) {
 	}
 	if err := server.broker.publishSnapshot(ctx, aggregate); err != nil {
 		server.options.Logger.ErrorContext(ctx, "realtime_lifecycle_publish_failed", "table_id", tableID, "result_code", "PROJECTION_ERROR")
+	}
+}
+
+// TableOfflineSince reports whether a table has had no subscribed clients for the returned duration anchor.
+func (server *Server) TableOfflineSince(tableID string) (time.Time, bool) {
+	return server.broker.tableOfflineSince(tableID)
+}
+
+// TableExpired publishes the terminal event and closes every connection backed by an invalidated participant session.
+func (server *Server) TableExpired(ctx context.Context, result table.CommandResult) {
+	if err := server.broker.publishResult(ctx, result); err != nil {
+		server.options.Logger.ErrorContext(ctx, "realtime_lifecycle_publish_failed", "table_id", result.Aggregate.ID, "result_code", "PROJECTION_ERROR")
+	}
+	sessionIDs := make(map[string]struct{}, len(result.Aggregate.Participants))
+	for _, participant := range result.Aggregate.Participants {
+		if participant.LeftAt == nil {
+			sessionIDs[participant.SessionID] = struct{}{}
+		}
+	}
+	server.mutex.Lock()
+	connections := make([]*connection, 0)
+	for connection := range server.connections {
+		if _, expires := sessionIDs[connection.session.ID]; expires {
+			connections = append(connections, connection)
+		}
+	}
+	server.mutex.Unlock()
+	for _, connection := range connections {
+		connection.sendErrorAndClose(ClientEnvelope{}, "SESSION_INACTIVE", false, websocket.StatusPolicyViolation, "session inactive")
 	}
 }
 

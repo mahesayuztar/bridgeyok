@@ -34,6 +34,9 @@ func TestLoad(t *testing.T) {
 				if config.TableActorQueueCapacity != 64 || config.TableActorIdleTimeout != 10*time.Minute {
 					t.Fatalf("actor defaults = %d and %s, want 64 and 10m", config.TableActorQueueCapacity, config.TableActorIdleTimeout)
 				}
+				if config.TableInactivityTimeout != 5*time.Minute || config.TableLifecycleSweepInterval != 15*time.Second {
+					t.Fatalf("table lifecycle defaults = %s and %s, want 5m and 15s", config.TableInactivityTimeout, config.TableLifecycleSweepInterval)
+				}
 				if config.RealtimeReadLimitBytes != 8<<10 || config.RealtimeOutboundQueueCapacity != 64 || config.RealtimeOutboundQueueBytes != 256<<10 || config.RealtimeRecoveryLimit != 128 {
 					t.Fatalf("unexpected realtime bounds: %+v", config)
 				}
@@ -136,6 +139,14 @@ func TestLoad(t *testing.T) {
 				"TABLE_ACTOR_IDLE_TIMEOUT": "never",
 			},
 			wantErr: "TABLE_ACTOR_IDLE_TIMEOUT must be a positive duration",
+		},
+		{
+			name: "invalid table inactivity timeout",
+			values: map[string]string{
+				"DATABASE_URL":             "postgresql://bridgeyok:secret@localhost:5432/bridgeyok",
+				"TABLE_INACTIVITY_TIMEOUT": "never",
+			},
+			wantErr: "TABLE_INACTIVITY_TIMEOUT must be a positive duration",
 		},
 		{
 			name: "invalid realtime frame limit",

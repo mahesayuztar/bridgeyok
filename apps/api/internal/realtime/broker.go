@@ -13,17 +13,20 @@ import (
 )
 
 type broker struct {
-	logger   *slog.Logger
-	now      func() time.Time
-	mutex    sync.Mutex
-	rooms    map[string]map[*connection]struct{}
-	presence map[string]map[string]*presenceEntry
+	logger       *slog.Logger
+	now          func() time.Time
+	startedAt    time.Time
+	mutex        sync.Mutex
+	rooms        map[string]map[*connection]struct{}
+	presence     map[string]map[string]*presenceEntry
+	offlineSince map[string]time.Time
 }
 
 func newBroker(logger *slog.Logger, now func() time.Time) *broker {
 	return &broker{
-		logger: logger, now: now,
+		logger: logger, now: now, startedAt: now().UTC(),
 		rooms: make(map[string]map[*connection]struct{}), presence: make(map[string]map[string]*presenceEntry),
+		offlineSince: make(map[string]time.Time),
 	}
 }
 
@@ -46,6 +49,7 @@ func (broker *broker) subscribe(client *connection, tableID string, initialFrame
 		broker.rooms[tableID] = room
 	}
 	room[client] = struct{}{}
+	delete(broker.offlineSince, tableID)
 	client.setSubscription(tableID, participantID)
 	broker.markOnlineLocked(client, tableID, participantID)
 	if frame, err := broker.presenceSnapshotFrameLocked(tableID); err == nil {
@@ -159,11 +163,24 @@ func (broker *broker) connections(tableID string) []*connection {
 	return connections
 }
 
+func (broker *broker) tableOfflineSince(tableID string) (time.Time, bool) {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	if len(broker.rooms[tableID]) > 0 {
+		return time.Time{}, false
+	}
+	if offlineSince, exists := broker.offlineSince[tableID]; exists {
+		return offlineSince, true
+	}
+	return broker.startedAt, true
+}
+
 func (broker *broker) removeLocked(client *connection, tableID string) {
 	room := broker.rooms[tableID]
 	delete(room, client)
 	if len(room) == 0 {
 		delete(broker.rooms, tableID)
+		broker.offlineSince[tableID] = broker.now().UTC()
 	}
 	_, participantID := client.subscriptionInfo()
 	broker.markOfflineLocked(client, tableID, participantID)
@@ -174,6 +191,7 @@ func (broker *broker) drain() {
 	defer broker.mutex.Unlock()
 	broker.rooms = make(map[string]map[*connection]struct{})
 	broker.presence = make(map[string]map[string]*presenceEntry)
+	broker.offlineSince = make(map[string]time.Time)
 }
 
 func eventFrames(events []table.PersistedEvent, projection table.Projection) ([][]byte, error) {

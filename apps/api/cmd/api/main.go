@@ -84,6 +84,16 @@ func main() {
 		logger.Error("realtime initialization failed", "error", err)
 		os.Exit(1)
 	}
+	tableLifecycle, err := table.NewLifecycle(postgres, actorRegistry, realtimeServer, table.LifecycleOptions{
+		InactivityTimeout: appConfig.TableInactivityTimeout,
+		SweepInterval:     appConfig.TableLifecycleSweepInterval,
+		Logger:            logger,
+		Now:               time.Now,
+	})
+	if err != nil {
+		logger.Error("table lifecycle initialization failed", "error", err)
+		os.Exit(1)
+	}
 
 	handler := httpapi.NewRouter(httpapi.Options{
 		Logger:         logger,
@@ -95,6 +105,7 @@ func main() {
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go tableLifecycle.Run(ctx)
 	serverErr := httpserver.Run(ctx, appConfig, handler, logger, realtimeServer.Drain)
 	drainCtx, cancelDrain := context.WithTimeout(context.Background(), appConfig.ShutdownTimeout)
 	drainErr := actorRegistry.Drain(drainCtx)

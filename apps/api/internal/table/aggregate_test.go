@@ -144,8 +144,10 @@ func TestDecideSeatRaceAndOwnerControls(t *testing.T) {
 		t.Fatal("removed participant remained active")
 	}
 
-	_, domainError = Decide(aggregate, Command{Name: CommandLeaveTable, SessionID: "session-owner", OccurredAt: removedAt})
-	assertDomainError(t, domainError, ErrorOwnerCannotLeave)
+	decision := acceptedDecision(t, aggregate, Command{Name: CommandLeaveTable, SessionID: "session-owner", OccurredAt: removedAt})
+	if decision.NextState.OwnerSessionID != second.SessionID || decision.NextState.Participants[2].Role != RoleOwner {
+		t.Fatalf("owner leave replacement = %+v", decision.NextState.Participants)
+	}
 }
 
 func TestDecideWaitingSeatAndFinishCommands(t *testing.T) {
@@ -506,6 +508,57 @@ func TestDecideOfflineParticipantTimeout(t *testing.T) {
 	})
 	if decision.Events[0].Type != "PARTICIPANT_TIMED_OUT" {
 		t.Fatalf("timeout event = %s", decision.Events[0].Type)
+	}
+}
+
+func TestDecideSoleOwnerLeaveClosesTable(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testAggregate(t)
+	owner := aggregate.Participants[0]
+	decision := acceptedDecision(t, aggregate, Command{
+		Name: CommandLeaveTable, SessionID: owner.SessionID, OccurredAt: testJoinedAt.Add(time.Minute),
+	})
+	if decision.NextState.State != StateFinished || decision.Events[0].Type != "TABLE_CLOSED" {
+		t.Fatalf("owner leave decision = %+v", decision)
+	}
+	if _, active := decision.NextState.activeParticipant(owner.SessionID); active {
+		t.Fatal("sole owner remained active after leaving")
+	}
+}
+
+func TestDecideParticipantCanLeaveActiveTable(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testReadyAggregate(t)
+	deal := testDeal(t)
+	aggregate = acceptedDecision(t, aggregate, Command{
+		Name: CommandStartGame, SessionID: aggregate.OwnerSessionID, Deal: &deal, BoardID: "board-one",
+	}).NextState
+	guest := aggregate.Participants[1]
+	decision := acceptedDecision(t, aggregate, Command{
+		Name: CommandLeaveTable, SessionID: guest.SessionID, OccurredAt: testJoinedAt.Add(time.Minute),
+	})
+	if decision.NextState.State != StateActive {
+		t.Fatalf("state after active leave = %s, want %s", decision.NextState.State, StateActive)
+	}
+	if _, seated := decision.NextState.seatForParticipant(guest.ID); seated {
+		t.Fatal("active participant retained seat after leaving")
+	}
+}
+
+func TestDecideTableExpiryClosesWithoutRemovingParticipants(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testAggregateWithGuests(t, 1)
+	decision := acceptedDecision(t, aggregate, Command{
+		Name: CommandExpireTable, SessionID: aggregate.OwnerSessionID, OccurredAt: testJoinedAt.Add(5 * time.Minute),
+	})
+	if decision.NextState.State != StateFinished || decision.Events[0].Type != "TABLE_EXPIRED" {
+		t.Fatalf("expiry decision = %+v", decision)
+	}
+	if decision.NextState.activeParticipantCount() != 2 {
+		t.Fatalf("expiry active participants = %d, want historical membership preserved", decision.NextState.activeParticipantCount())
 	}
 }
 

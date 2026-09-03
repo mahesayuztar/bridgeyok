@@ -78,6 +78,16 @@ SELECT id,
 FROM bridgeyok.tables
 WHERE id = sqlc.arg(id);
 
+-- name: ListInactiveTables :many
+SELECT id,
+       owner_session_id,
+       revision
+FROM bridgeyok.tables
+WHERE state IN ('WAITING', 'ACTIVE', 'BETWEEN_BOARDS', 'PAUSED')
+  AND meaningful_at <= sqlc.arg(inactive_before)
+ORDER BY meaningful_at, id
+LIMIT sqlc.arg(table_limit);
+
 -- name: ListActiveTableParticipants :many
 SELECT table_participants.id,
        table_participants.session_id,

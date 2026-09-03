@@ -172,6 +172,48 @@ func (q *Queries) ListActiveTableParticipants(ctx context.Context, tableID strin
 	return items, nil
 }
 
+const listInactiveTables = `-- name: ListInactiveTables :many
+SELECT id,
+       owner_session_id,
+       revision
+FROM bridgeyok.tables
+WHERE state IN ('WAITING', 'ACTIVE', 'BETWEEN_BOARDS', 'PAUSED')
+  AND meaningful_at <= $1
+ORDER BY meaningful_at, id
+LIMIT $2
+`
+
+type ListInactiveTablesParams struct {
+	InactiveBefore pgtype.Timestamptz `json:"inactive_before"`
+	TableLimit     int32              `json:"table_limit"`
+}
+
+type ListInactiveTablesRow struct {
+	ID             string `json:"id"`
+	OwnerSessionID string `json:"owner_session_id"`
+	Revision       int64  `json:"revision"`
+}
+
+func (q *Queries) ListInactiveTables(ctx context.Context, arg ListInactiveTablesParams) ([]ListInactiveTablesRow, error) {
+	rows, err := q.db.Query(ctx, listInactiveTables, arg.InactiveBefore, arg.TableLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListInactiveTablesRow{}
+	for rows.Next() {
+		var i ListInactiveTablesRow
+		if err := rows.Scan(&i.ID, &i.OwnerSessionID, &i.Revision); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTableSeats = `-- name: ListTableSeats :many
 SELECT seat,
        participant_id,

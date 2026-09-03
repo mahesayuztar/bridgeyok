@@ -96,6 +96,31 @@ func TestBrokerPresenceTurnsOfflineAfterLastConnection(t *testing.T) {
 	}
 }
 
+func TestBrokerTracksAllOfflineDurationFromLastConnection(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.September, 4, 9, 0, 0, 0, time.UTC)
+	roomBroker := newBroker(slog.New(slog.NewJSONHandler(io.Discard, nil)), func() time.Time { return now })
+	t.Cleanup(roomBroker.drain)
+	unknownSince, allOffline := roomBroker.tableOfflineSince(realtimeTableID)
+	if !allOffline || unknownSince != now {
+		t.Fatalf("unknown table offline state = %s/%v, want process start", unknownSince, allOffline)
+	}
+	aggregate := realtimeAggregate(t)
+	server := &Server{options: Options{OutboundQueueBytes: 128 << 10}}
+	connection := projectedConnection(server, realtimeSessionID)
+	roomBroker.subscribe(connection, aggregate.ID, nil, aggregate.Participants, realtimeParticipantID)
+	if _, allOffline := roomBroker.tableOfflineSince(aggregate.ID); allOffline {
+		t.Fatal("subscribed table reported all participants offline")
+	}
+	now = now.Add(2 * time.Minute)
+	roomBroker.unsubscribe(connection)
+	offlineSince, allOffline := roomBroker.tableOfflineSince(aggregate.ID)
+	if !allOffline || offlineSince != now {
+		t.Fatalf("offline state = %s/%v, want %s/true", offlineSince, allOffline, now)
+	}
+}
+
 func TestTokenBucketUsesBoundedBurstAndRefill(t *testing.T) {
 	t.Parallel()
 

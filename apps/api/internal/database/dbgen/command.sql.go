@@ -21,6 +21,29 @@ func (q *Queries) DeleteTableSeatsForSync(ctx context.Context, tableID string) e
 	return err
 }
 
+const expireTableGuestSessions = `-- name: ExpireTableGuestSessions :exec
+UPDATE bridgeyok.guest_sessions
+SET status = 'EXPIRED',
+    last_seen_at = $1
+WHERE status = 'ACTIVE'
+  AND id IN (
+      SELECT session_id
+      FROM bridgeyok.table_participants
+      WHERE table_id = $2
+        AND left_at IS NULL
+  )
+`
+
+type ExpireTableGuestSessionsParams struct {
+	ExpiredAt pgtype.Timestamptz `json:"expired_at"`
+	TableID   string             `json:"table_id"`
+}
+
+func (q *Queries) ExpireTableGuestSessions(ctx context.Context, arg ExpireTableGuestSessionsParams) error {
+	_, err := q.db.Exec(ctx, expireTableGuestSessions, arg.ExpiredAt, arg.TableID)
+	return err
+}
+
 const findProcessedCommand = `-- name: FindProcessedCommand :one
 SELECT outcome
 FROM bridgeyok.processed_commands

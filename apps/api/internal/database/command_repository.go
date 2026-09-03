@@ -134,6 +134,13 @@ func persistAcceptedDecision(
 	if err := syncRelationalAggregate(ctx, queries, next, occurredAt); err != nil {
 		return table.CommandResult{}, err
 	}
+	if request.Command.Name == table.CommandExpireTable {
+		if err := queries.ExpireTableGuestSessions(ctx, dbgen.ExpireTableGuestSessionsParams{
+			ExpiredAt: timestamptz(occurredAt), TableID: next.ID,
+		}); err != nil {
+			return table.CommandResult{}, fmt.Errorf("expire table guest sessions: %w", err)
+		}
+	}
 
 	events := make([]table.PersistedEvent, 0, len(decision.Events))
 	for _index, event := range decision.Events {

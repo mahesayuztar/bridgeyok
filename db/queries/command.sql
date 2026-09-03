@@ -147,6 +147,18 @@ SET role = sqlc.arg(role)
 WHERE table_id = sqlc.arg(table_id)
   AND id = sqlc.arg(participant_id);
 
+-- name: ExpireTableGuestSessions :exec
+UPDATE bridgeyok.guest_sessions
+SET status = 'EXPIRED',
+    last_seen_at = sqlc.arg(expired_at)
+WHERE status = 'ACTIVE'
+  AND id IN (
+      SELECT session_id
+      FROM bridgeyok.table_participants
+      WHERE table_id = sqlc.arg(table_id)
+        AND left_at IS NULL
+  );
+
 -- name: UpsertBoard :exec
 INSERT INTO bridgeyok.boards (
     id,

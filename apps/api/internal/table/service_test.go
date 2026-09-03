@@ -112,6 +112,12 @@ func TestServiceTableLifecycle(t *testing.T) {
 	if _, err := service.Get(context.Background(), joined.TableID, guest); !errors.Is(err, ErrTableNotFound) {
 		t.Fatalf("Get() after leave error = %v, want %v", err, ErrTableNotFound)
 	}
+	if err := service.Leave(context.Background(), joined.TableID, owner); err != nil {
+		t.Fatalf("owner Leave() error = %v", err)
+	}
+	if repository.aggregate.State != StateFinished {
+		t.Fatalf("state after sole owner leave = %s, want %s", repository.aggregate.State, StateFinished)
+	}
 }
 
 func TestNewServiceRejectsInvalidDependencies(t *testing.T) {

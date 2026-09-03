@@ -180,7 +180,7 @@ func (service *Service) Get(ctx context.Context, tableID string, session identit
 	return projection, nil
 }
 
-// Leave removes a non-owner participant from a waiting table and releases its seat.
+// Leave removes the authenticated participant, transferring ownership or closing the table when required.
 func (service *Service) Leave(ctx context.Context, tableID string, session identity.Session) error {
 	if _, err := uuid.Parse(tableID); err != nil {
 		return ErrTableNotFound

@@ -127,9 +127,10 @@ func TestTableRepositoryLifecycleAndJoinCapacity(t *testing.T) {
 		t.Fatalf("participant count after leave = %d, want 3", preview.ParticipantCount)
 	}
 
-	ownerLeaveError := tableService.Leave(ctx, created.Projection.TableID, sessions[0])
-	var domainError *table.DomainError
-	if !errors.As(ownerLeaveError, &domainError) || domainError.Code != table.ErrorOwnerCannotLeave {
-		t.Fatalf("owner Leave() error = %v, want %s", ownerLeaveError, table.ErrorOwnerCannotLeave)
+	if err := tableService.Leave(ctx, created.Projection.TableID, sessions[0]); err != nil {
+		t.Fatalf("owner Leave() error = %v", err)
+	}
+	if _, err := tableService.Get(ctx, created.Projection.TableID, sessions[0]); !errors.Is(err, table.ErrTableNotFound) {
+		t.Fatalf("owner Get() after leave error = %v, want %v", err, table.ErrTableNotFound)
 	}
 }

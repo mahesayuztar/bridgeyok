@@ -19,6 +19,8 @@ type Config struct {
 	DatabaseMaxConns                 int32
 	TableActorQueueCapacity          int
 	TableActorIdleTimeout            time.Duration
+	TableInactivityTimeout           time.Duration
+	TableLifecycleSweepInterval      time.Duration
 	RealtimeReadLimitBytes           int64
 	RealtimeOutboundQueueCapacity    int
 	RealtimeOutboundQueueBytes       int
@@ -77,6 +79,14 @@ func load(lookup lookupFunc) (Config, error) {
 		return Config{}, err
 	}
 	tableActorIdleTimeout, err := durationValue(lookup, "TABLE_ACTOR_IDLE_TIMEOUT", 10*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	tableInactivityTimeout, err := durationValue(lookup, "TABLE_INACTIVITY_TIMEOUT", 5*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	tableLifecycleSweepInterval, err := durationValue(lookup, "TABLE_LIFECYCLE_SWEEP_INTERVAL", 15*time.Second)
 	if err != nil {
 		return Config{}, err
 	}
@@ -165,6 +175,8 @@ func load(lookup lookupFunc) (Config, error) {
 		DatabaseMaxConns:                 int32(databaseMaxConns),
 		TableActorQueueCapacity:          tableActorQueueCapacity,
 		TableActorIdleTimeout:            tableActorIdleTimeout,
+		TableInactivityTimeout:           tableInactivityTimeout,
+		TableLifecycleSweepInterval:      tableLifecycleSweepInterval,
 		RealtimeReadLimitBytes:           int64(realtimeReadLimitBytes),
 		RealtimeOutboundQueueCapacity:    realtimeOutboundQueueCapacity,
 		RealtimeOutboundQueueBytes:       realtimeOutboundQueueBytes,

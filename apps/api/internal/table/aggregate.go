@@ -51,6 +51,7 @@ const (
 	CommandRespondUndo       CommandName = "RESPOND_UNDO"
 	CommandRequestNextBoard  CommandName = "REQUEST_NEXT_BOARD"
 	CommandFinishTable       CommandName = "FINISH_TABLE"
+	CommandExpireTable       CommandName = "EXPIRE_TABLE"
 	CommandTakeoverControl   CommandName = "TAKEOVER_CONTROL"
 )
 
@@ -226,14 +227,22 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 	var events []Event
 	switch command.Name {
 	case CommandLeaveTable:
-		if next.State != StateWaiting {
-			return Decision{}, reject(ErrorInvalidState, "leaving the table requires a waiting table")
-		}
-		if participant.Role == RoleOwner {
-			return Decision{}, reject(ErrorOwnerCannotLeave, "owner must finish the table instead")
+		if next.State == StateFinished {
+			return Decision{}, reject(ErrorInvalidState, "finished table cannot be left")
 		}
 		if command.OccurredAt.IsZero() {
 			return Decision{}, reject(ErrorInvalidCommand, "leave time is required")
+		}
+		replacementParticipantID := ""
+		if participant.Role == RoleOwner {
+			replacementIndex := next.replacementOwnerIndex(participant.ID, "")
+			if replacementIndex >= 0 {
+				next.Participants[replacementIndex].Role = RoleOwner
+				next.OwnerSessionID = next.Participants[replacementIndex].SessionID
+				replacementParticipantID = next.Participants[replacementIndex].ID
+			} else {
+				next.State = StateFinished
+			}
 		}
 		for _index := range next.Participants {
 			if next.Participants[_index].ID == participant.ID {
@@ -245,7 +254,17 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		if seat, seated := next.seatForParticipant(participant.ID); seated {
 			delete(next.Seats, seat)
 		}
-		events = []Event{{Type: "PARTICIPANT_LEFT", Payload: map[string]any{"participantId": participant.ID}}}
+		next.ActionRequest = nil
+		next.UndoableAction = nil
+		payload := map[string]any{"participantId": participant.ID}
+		if replacementParticipantID != "" {
+			payload["ownerParticipantId"] = replacementParticipantID
+		}
+		eventType := "PARTICIPANT_LEFT"
+		if next.State == StateFinished {
+			eventType = "TABLE_CLOSED"
+		}
+		events = []Event{{Type: eventType, Payload: payload}}
 	case CommandTakeSeat:
 		if next.State != StateWaiting && next.State != StateActive && next.State != StateBetweenBoards {
 			return Decision{}, reject(ErrorInvalidState, "seat changes require an open table")
@@ -581,6 +600,20 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		next.ActionRequest = nil
 		next.UndoableAction = nil
 		events = []Event{{Type: "TABLE_FINISHED", Payload: map[string]any{}}}
+	case CommandExpireTable:
+		if participant.Role != RoleOwner {
+			return Decision{}, reject(ErrorOwnerRequired, "only the owner can expire the table")
+		}
+		if next.State == StateFinished {
+			return Decision{}, reject(ErrorInvalidState, "finished table cannot expire")
+		}
+		if command.OccurredAt.IsZero() {
+			return Decision{}, reject(ErrorInvalidCommand, "expiry time is required")
+		}
+		next.State = StateFinished
+		next.ActionRequest = nil
+		next.UndoableAction = nil
+		events = []Event{{Type: "TABLE_EXPIRED", Payload: map[string]any{}}}
 	case CommandTakeoverControl:
 		if next.State == StateFinished {
 			return Decision{}, reject(ErrorInvalidState, "finished table controller cannot be replaced")
@@ -672,7 +705,7 @@ func (aggregate Aggregate) Validate() error {
 			ownerCount++
 		}
 	}
-	if ownerCount != 1 {
+	if ownerCount != 1 && !(aggregate.State == StateFinished && ownerCount == 0 && len(activeParticipantIDs) == 0) {
 		return fmt.Errorf("table must have exactly one active owner")
 	}
 	seatedParticipants := make(map[string]struct{}, len(aggregate.Seats))

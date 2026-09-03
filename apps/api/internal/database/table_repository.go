@@ -149,7 +149,22 @@ func (postgres *Postgres) FindTable(ctx context.Context, tableID string) (table.
 	})
 }
 
-// LeaveTable serializes a waiting-table leave and releases any occupied seat.
+// ListInactiveTables returns a bounded oldest-first set of open tables with no recent durable action.
+func (postgres *Postgres) ListInactiveTables(ctx context.Context, inactiveBefore time.Time, limit int) ([]table.InactiveTable, error) {
+	rows, err := postgres.queries.ListInactiveTables(ctx, dbgen.ListInactiveTablesParams{
+		InactiveBefore: timestamptz(inactiveBefore), TableLimit: int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list inactive tables: %w", err)
+	}
+	tables := make([]table.InactiveTable, 0, len(rows))
+	for _, row := range rows {
+		tables = append(tables, table.InactiveTable{ID: row.ID, OwnerSessionID: row.OwnerSessionID, Revision: row.Revision})
+	}
+	return tables, nil
+}
+
+// LeaveTable serializes an explicit participant leave and releases any occupied seat.
 func (postgres *Postgres) LeaveTable(ctx context.Context, tableID string, sessionID string, occurredAt time.Time) error {
 	return pgx.BeginFunc(ctx, postgres.pool, func(tx pgx.Tx) error {
 		queries := postgres.queries.WithTx(tx)
