@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
 import { ConsensusControls } from "./consensus-controls";
@@ -22,22 +21,23 @@ const connectionLabels = {
 
 export function WaitingTableStatusBar({
   connectionState,
+  onLeaveTable,
 }: {
   connectionState: TableSession["connectionState"];
+  onLeaveTable: () => void;
 }) {
   return (
     <header className="table-status-bar">
-      <Link
-        className="table-wordmark"
-        href="/lobby"
-        aria-label="Kembali ke lobby"
-      >
-        BridgeYok
-      </Link>
+      <span className="table-wordmark">BridgeYok</span>
       <span>Meja tunggu</span>
-      <div className="connection-status" data-state={connectionState}>
-        <span className="status-mark" />
-        {connectionLabels[connectionState]}
+      <div className="status-actions">
+        <div className="connection-status" data-state={connectionState}>
+          <span className="status-mark" />
+          {connectionLabels[connectionState]}
+        </div>
+        <button className="quiet-button" type="button" onClick={onLeaveTable}>
+          Keluar
+        </button>
       </div>
     </header>
   );
@@ -51,6 +51,7 @@ export function ActiveTableStatusBar({
   onCommand,
   soundMuted,
   onSoundMutedChange,
+  onLeaveTable,
 }: {
   table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
@@ -59,18 +60,13 @@ export function ActiveTableStatusBar({
   onCommand: TableSession["sendCommand"];
   soundMuted: boolean;
   onSoundMutedChange: (muted: boolean) => void;
+  onLeaveTable: () => void;
 }) {
   const game = table.game;
   const contract = game?.auction.contract;
   return (
     <header className="table-status-bar">
-      <Link
-        className="table-wordmark"
-        href="/lobby"
-        aria-label="Kembali ke lobby"
-      >
-        BY
-      </Link>
+      <span className="table-wordmark">BY</span>
       <dl className="table-facts">
         <div>
           <dt>Board</dt>
@@ -116,7 +112,9 @@ export function ActiveTableStatusBar({
         <details className="table-menu">
           <summary aria-label="Buka menu meja">•••</summary>
           <div>
-            <Link href="/lobby">Lobby</Link>
+            <button type="button" onClick={onLeaveTable}>
+              Keluar dari meja
+            </button>
             {inviteCode === null ? null : (
               <span className="table-menu-invite">
                 <small>Kode undangan</small>

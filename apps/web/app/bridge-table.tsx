@@ -104,8 +104,9 @@ export default function BridgeTable({
   }, [canSendCommand, game, sendCommand, viewerTurn]);
 
   async function returnToLobby() {
-    await session.leaveTable();
-    router.replace("/lobby");
+    if (await session.leaveTable()) {
+      router.replace("/lobby");
+    }
   }
 
   if (
@@ -139,7 +140,10 @@ export default function BridgeTable({
   if (table.state === "WAITING") {
     return (
       <main className="table-client waiting-client">
-        <WaitingTableStatusBar connectionState={session.connectionState} />
+        <WaitingTableStatusBar
+          connectionState={session.connectionState}
+          onLeaveTable={() => void returnToLobby()}
+        />
         {session.tableState.issue === null ? null : (
           <IssueNotice
             compact
@@ -184,6 +188,7 @@ export default function BridgeTable({
         onCommand={session.sendCommand}
         soundMuted={turnAudio.muted}
         onSoundMutedChange={turnAudio.setMuted}
+        onLeaveTable={() => void returnToLobby()}
       />
 
       <div className="table-feedback" aria-live="polite">
@@ -195,7 +200,7 @@ export default function BridgeTable({
             onAction={(action) => {
               if (action === "resync") session.resync();
               else if (action === "retry") session.reconnect();
-              else if (action === "backToLobby") router.push("/lobby");
+              else if (action === "backToLobby") void returnToLobby();
               else if (action === "signInAgain")
                 void session.logout().then(() => router.replace("/"));
             }}

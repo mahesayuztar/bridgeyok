@@ -100,6 +100,6 @@ export function canSendTableCommand(
     case "table.finish":
       return isOwner && (table.state === "WAITING" || table.state === "BETWEEN_BOARDS") && table.actionRequest === undefined;
     case "table.leave":
-      return table.state === "WAITING" || table.state === "FINISHED";
+      return table.state !== "FINISHED";
   }
 }

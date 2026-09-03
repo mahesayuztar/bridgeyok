@@ -80,6 +80,9 @@ test("table lifecycle commands follow owner, readiness, and phase", () => {
   assert.equal(canSendTableCommand(context(table), "table.start_game"), true);
   assert.equal(canSendTableCommand(context(table), "table.finish"), true);
   assert.equal(canSendTableCommand(context(activeTable()), "table.finish"), false);
+  assert.equal(canSendTableCommand(context(table), "table.leave"), true);
+  assert.equal(canSendTableCommand(context(activeTable()), "table.leave"), true);
+  assert.equal(canSendTableCommand(context({ ...table, state: "FINISHED" }), "table.leave"), false);
 });
 
 test("consensus capabilities expose only the projected responder", () => {

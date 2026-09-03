@@ -135,6 +135,15 @@ function issueForError(error: unknown): ClientIssue {
   return error instanceof ApiError ? error.issue : issueFromFailure(error, "rest");
 }
 
+function isSessionFailure(error: unknown) {
+  return error instanceof ApiError && [
+    "SESSION_INVALID",
+    "SESSION_INACTIVE",
+    "INVALID_CREDENTIAL",
+    "INVALID_ACCESS_TOKEN"
+  ].includes(error.code ?? "");
+}
+
 export type TableSession = {
   initializing: boolean;
   recoveryState: TableRecoveryState;
@@ -149,7 +158,7 @@ export type TableSession = {
   createTable: () => Promise<string | null>;
   joinTable: (inviteCode: string) => Promise<string | null>;
   openTable: (tableId: string) => Promise<boolean>;
-  leaveTable: () => Promise<void>;
+  leaveTable: () => Promise<boolean>;
   reconnect: () => void;
   resync: () => void;
   dismissIssue: () => void;
@@ -268,6 +277,17 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     setRecoveryState(nextRecoveryState);
     dispatch({ type: "clear" });
   }, [stopConnection]);
+
+  const clearIdentity = useCallback((issue: ClientIssue | null = null) => {
+    clearTable("NO_SESSION");
+    credentialsRef.current = null;
+    removeStoredValue(browserStorage("local"), IDENTITY_KEY);
+    removeStoredValue(browserStorage("session"), ACCESS_KEY);
+    setNickname(null);
+    if (issue !== null) {
+      dispatch({ type: "issue", issue });
+    }
+  }, [clearTable]);
 
   const requestResync = useCallback((tableId: string) => {
     const socket = socketRef.current;
@@ -392,7 +412,9 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
               source: "websocket",
               ...(code === undefined ? {} : { code })
             });
-            if (code === "STALE_CONTROLLER" || code === "STATE_CHANGED" || code === "REVISION_CONFLICT") {
+            if (code === "SESSION_INACTIVE" || code === "SESSION_INVALID") {
+              clearIdentity(issue);
+            } else if (code === "STALE_CONTROLLER" || code === "STATE_CHANGED" || code === "REVISION_CONFLICT") {
               dispatch({ type: "conflict", issue });
               requestResync(tableId);
             } else if (typeof envelope.request_id === "string") {
@@ -447,13 +469,17 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
         if (connectionGenerationRef.current !== generation) {
           return;
         }
+        if (isSessionFailure(error)) {
+          clearIdentity(issueForError(error));
+          return;
+        }
         setConnectionState(navigator.onLine ? "degraded" : "offline");
         dispatch({ type: "connectionLost", issue: issueForError(error) });
         const delay = Math.min(10_000, 500 * 2 ** attempt) + Math.floor(Math.random() * 300);
         reconnectTimerRef.current = setTimeout(() => void connect(tableId, generation, attempt + 1), delay);
       }
     },
-    [authenticatedRequest, clearTable, requestResync]
+    [authenticatedRequest, clearIdentity, clearTable, requestResync]
   );
 
   const beginConnection = useCallback(
@@ -509,11 +535,8 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
           setRecoveryState("SESSION_ONLY");
         }
       } catch (error) {
-        if (error instanceof ApiError && (error.code === "SESSION_INVALID" || error.code === "SESSION_INACTIVE")) {
-          removeStoredValue(local, IDENTITY_KEY);
-          removeStoredValue(session, ACCESS_KEY);
-          setNickname(null);
-          setRecoveryState("NO_SESSION");
+        if (isSessionFailure(error)) {
+          clearIdentity(issueForError(error));
         } else if (error instanceof ApiError && error.code === "TABLE_NOT_FOUND") {
           removeStoredValue(local, TABLE_KEY);
           setRecoveryState("TABLE_EXPIRED");
@@ -531,7 +554,22 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
       active = false;
       stopConnection();
     };
-  }, [authenticatedRequest, beginConnection, connectOnRestore, refreshCredentials, stopConnection]);
+  }, [authenticatedRequest, beginConnection, clearIdentity, connectOnRestore, refreshCredentials, stopConnection]);
+
+  useEffect(() => {
+    function handleStorage(event: StorageEvent) {
+      if (event.storageArea !== browserStorage("local") || event.newValue !== null) {
+        return;
+      }
+      if (event.key === TABLE_KEY) {
+        clearTable("TABLE_EXPIRED");
+      } else if (event.key === IDENTITY_KEY) {
+        clearIdentity();
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [clearIdentity, clearTable]);
 
   useEffect(() => {
     function handleOnline() {
@@ -586,13 +624,10 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
       }
     } catch {
     } finally {
-      credentialsRef.current = null;
-      removeStoredValue(browserStorage("local"), IDENTITY_KEY);
-      removeStoredValue(browserStorage("session"), ACCESS_KEY);
-      setNickname(null);
+      clearIdentity();
       setBusy(false);
     }
-  }, [authenticatedRequest, clearTable]);
+  }, [authenticatedRequest, clearIdentity, clearTable]);
 
   const createTable = useCallback(async () => {
     setBusy(true);
@@ -688,20 +723,21 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
   const leaveTable = useCallback(async () => {
     const table = tableStateRef.current.table;
     if (table === null) {
-      return;
+      clearTable();
+      return true;
     }
     setBusy(true);
     try {
       if (table.state === "FINISHED") {
         clearTable();
-      } else if (table.state === "WAITING") {
+      } else {
         await authenticatedRequest<void>(`/v1/tables/${encodeURIComponent(table.tableId)}/leave`, { method: "POST" });
         clearTable();
-      } else {
-        dispatch({ type: "issue", issue: issueFromServer({ source: "rest" }) });
       }
+      return true;
     } catch (error) {
       dispatch({ type: "issue", issue: issueForError(error) });
+      return false;
     } finally {
       setBusy(false);
     }
