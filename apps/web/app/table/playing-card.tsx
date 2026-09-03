@@ -118,8 +118,8 @@ export function BridgeHand({
   const sideDummy =
     variant === "dummy" && (position === "left" || position === "right");
   const cardGroups = sideDummy
-    ? groupCardsForContract(cards, contractStrain)
-    : [{ key: "hand", suit: undefined, cards: organizedCards }];
+    ? groupCardsForContract(cards, contractStrain, position)
+    : [{ key: "hand", suit: undefined, suitIndex: 0, cards: organizedCards }];
   const style = { "--card-count": Math.max(cards.length, 1) } as CSSProperties;
   return (
     <section
@@ -134,10 +134,19 @@ export function BridgeHand({
           <div
             className={`hand-card-group${cardGroup.suit === undefined ? "" : " dummy-suit-group"}`}
             key={cardGroup.key}
+            style={
+              sideDummy
+                ? ({
+                    "--side-dummy-suit-row": cardGroup.suitIndex + 1,
+                  } as CSSProperties)
+                : undefined
+            }
             {...(cardGroup.suit === undefined
               ? {}
               : {
                   "data-suit": cardGroup.suit,
+                  "data-density":
+                    cardGroup.cards.length >= 10 ? "tight" : "normal",
                   "aria-label": `${suitLabels[cardGroup.suit]} ${cardGroup.cards.length} kartu`,
                 })}
           >

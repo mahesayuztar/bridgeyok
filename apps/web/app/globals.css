@@ -3324,7 +3324,7 @@ button.physical-card.is-dragging {
   --hand-card-width: var(--card-dummy-width);
   --side-dummy-card-width: var(--hand-card-height);
   --side-dummy-card-height: var(--hand-card-width);
-  --dummy-suit-step: clamp(2rem, 4.5vh, 2.5rem);
+  --side-dummy-card-exposure: clamp(1.35rem, 2vw, 1.5rem);
   z-index: 9;
   max-width: none;
   max-height: none;
@@ -3354,10 +3354,12 @@ button.physical-card.is-dragging {
 
 .dummy-left,
 .dummy-right {
-  top: 50%;
-  width: min(42%, 20rem);
+  top: 0.4rem;
+  bottom: 0.4rem;
+  width: max-content;
+  max-width: calc(100% - 0.8rem);
   height: auto;
-  transform: translateY(-50%);
+  transform: none;
 }
 
 .dummy-left {
@@ -3372,45 +3374,63 @@ button.physical-card.is-dragging {
 
 .dummy-left .hand-cards,
 .dummy-right .hand-cards {
-  height: auto;
-  flex-direction: column;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(4, var(--side-dummy-card-height));
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  align-content: space-between;
 }
 
 .dummy-left .hand-card-group,
 .dummy-right .hand-card-group {
   position: relative;
   display: flex;
+  grid-row: var(--side-dummy-suit-row);
   width: 100%;
-  height: var(--dummy-suit-step);
-  min-height: var(--dummy-suit-step);
-  flex: 0 0 var(--dummy-suit-step);
+  max-width: max-content;
+  height: var(--side-dummy-card-height);
+  min-height: var(--side-dummy-card-height);
   flex-flow: row nowrap;
   align-items: flex-start;
 }
 
-.dummy-left .hand-card-group:last-child,
-.dummy-right .hand-card-group:last-child {
-  height: var(--side-dummy-card-height);
-  min-height: var(--side-dummy-card-height);
-  flex: 0 0 var(--side-dummy-card-height);
+.dummy-left .hand-card-group {
+  justify-self: start;
 }
 
 .dummy-right .hand-card-group {
+  justify-self: end;
   justify-content: flex-end;
 }
 
 .dummy-left .hand-card-slot,
 .dummy-right .hand-card-slot {
-  width: var(--side-dummy-card-width);
-  min-width: clamp(0.9rem, 2.5vw, 1.2rem);
-  max-width: var(--side-dummy-card-width);
+  width: var(--side-dummy-card-exposure);
+  min-width: 0;
+  max-width: var(--side-dummy-card-exposure);
   height: var(--side-dummy-card-height);
+  flex: 1 1 var(--side-dummy-card-exposure);
 }
 
 .dummy-left .hand-card-slot:last-child,
 .dummy-right .hand-card-slot:last-child {
+  width: var(--side-dummy-card-width);
+  max-width: var(--side-dummy-card-width);
+  height: var(--side-dummy-card-height);
   flex: 0 0 var(--side-dummy-card-width);
+}
+
+.dummy-left .hand-card-group[data-density="tight"] .physical-card,
+.dummy-right .hand-card-group[data-density="tight"] .physical-card {
+  padding-inline: 0.03rem;
+}
+
+.dummy-left .hand-card-group[data-density="tight"] .card-corner,
+.dummy-right .hand-card-group[data-density="tight"] .card-corner {
+  transform: scaleX(0.84);
+  transform-origin: top left;
 }
 
 .dummy-left .hand-card-slot .physical-card,
@@ -3532,9 +3552,19 @@ button.physical-card.is-dragging {
 }
 
 @media (max-width: 48rem) {
+  .dummy-hand {
+    --side-dummy-card-width: clamp(3.85rem, 18vw, 4.5rem);
+    --side-dummy-card-height: calc(var(--side-dummy-card-width) / 1.4);
+  }
+
   .dummy-hand .card-corner,
   .card-trick .card-corner {
     font-size: 1rem;
+  }
+
+  .dummy-left .hand-card-group[data-density="tight"] .card-corner,
+  .dummy-right .hand-card-group[data-density="tight"] .card-corner {
+    font-size: 0.875rem;
   }
 
   .dummy-hand .card-suit,

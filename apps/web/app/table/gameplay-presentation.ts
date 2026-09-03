@@ -1,4 +1,10 @@
-import type { Call, Card, LiveTableProjection, Suit } from "../table-state";
+import type {
+  Call,
+  Card,
+  LiveTableProjection,
+  Suit,
+  VisualPosition,
+} from "../table-state";
 
 export const suitLabels: Record<Suit, string> = {
   S: "♠",
@@ -16,6 +22,22 @@ const CONTRACT_SUIT_ORDER: Record<
   H: ["H", "S", "C", "D"],
   D: ["D", "S", "H", "C"],
   C: ["C", "H", "S", "D"],
+};
+
+const RANK_ORDER: Record<Card["rank"], number> = {
+  "2": 2,
+  "3": 3,
+  "4": 4,
+  "5": 5,
+  "6": 6,
+  "7": 7,
+  "8": 8,
+  "9": 9,
+  T: 10,
+  J: 11,
+  Q: 12,
+  K: 13,
+  A: 14,
 };
 
 export function suitOrderForContract(
@@ -38,14 +60,24 @@ export function organizeCardsForContract(
 export function groupCardsForContract(
   cards: Card[],
   strain?: NonNullable<Call["strain"]>,
+  position?: Extract<VisualPosition, "left" | "right">,
 ) {
   const organizedCards = organizeCardsForContract(cards, strain);
   return suitOrderForContract(strain)
-    .map((suit) => ({
-      key: suit,
-      suit,
-      cards: organizedCards.filter((card) => card.suit === suit),
-    }))
+    .map((suit, _suitIndex) => {
+      const suitCards = organizedCards
+        .filter((card) => card.suit === suit)
+        .sort(
+          (firstCard, secondCard) =>
+            RANK_ORDER[secondCard.rank] - RANK_ORDER[firstCard.rank],
+        );
+      return {
+        key: suit,
+        suit,
+        suitIndex: _suitIndex,
+        cards: position === "right" ? suitCards.reverse() : suitCards,
+      };
+    })
     .filter((cardGroup) => cardGroup.cards.length > 0);
 }
 
