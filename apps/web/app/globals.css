@@ -3645,3 +3645,193 @@ button.physical-card.is-dragging {
     touch-action: none;
   }
 }
+
+.active-table-client {
+  --board-player-block: 1.25rem;
+  --board-player-inline: 1.25rem;
+}
+
+.active-table-client[data-board-complete="true"] {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.active-table-client .player-trigger,
+.active-table-client .empty-seat-trigger {
+  gap: 0.18rem;
+  padding: 0.05rem 0.25rem;
+}
+
+.active-table-client .player-seat {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-basis: 0.9rem;
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.active-table-client .player-copy strong {
+  gap: 0.2rem;
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.active-table-client .owner-crown,
+.active-table-client .bot-icon {
+  width: 0.72rem;
+  height: 0.72rem;
+}
+
+.active-table-client .player-left .player-trigger,
+.active-table-client .player-right .player-trigger,
+.active-table-client .player-left .empty-seat-trigger,
+.active-table-client .player-right .empty-seat-trigger {
+  gap: 0.12rem;
+  padding: 0.08rem 0;
+}
+
+.completed-deal {
+  position: absolute;
+  z-index: 9;
+  inset: 0;
+  pointer-events: none;
+}
+
+.completed-deal-hand {
+  --hand-card-width: clamp(2.7rem, 4vw, 3.6rem);
+  --hand-card-height: calc(var(--hand-card-width) * 1.4);
+  --side-dummy-card-width: var(--hand-card-height);
+  --side-dummy-card-height: var(--hand-card-width);
+  --side-dummy-card-exposure: clamp(0.65rem, 1.1vw, 0.95rem);
+  --side-dummy-suit-gap: clamp(0.3rem, 0.8vh, 0.55rem);
+}
+
+.completed-deal-top,
+.completed-deal-bottom {
+  width: min(72%, 48rem);
+}
+
+.completed-deal-left,
+.completed-deal-right {
+  top: 50%;
+  bottom: auto;
+  width: min(30%, 22rem);
+  max-width: min(30%, 22rem);
+  height: calc(
+    var(--side-dummy-card-height) * 4 + var(--side-dummy-suit-gap) * 3
+  );
+  max-height: calc(100% - var(--hand-card-height) * 2 - 2rem);
+  transform: translateY(-50%);
+}
+
+.completed-deal-left .hand-cards,
+.completed-deal-right .hand-cards {
+  grid-template-rows: repeat(4, var(--side-dummy-card-height));
+  row-gap: var(--side-dummy-suit-gap);
+}
+
+.completed-deal-hand .physical-card {
+  padding: 0.22rem;
+}
+
+.completed-deal-hand .card-corner {
+  font-size: clamp(0.72rem, 1vw, 0.95rem);
+}
+
+.completed-deal-hand .card-suit {
+  right: 0.2rem;
+  bottom: 0.16rem;
+  font-size: clamp(1.15rem, 1.8vw, 1.7rem);
+}
+
+.completed-deal-hand.dummy-right .card-suit {
+  right: auto;
+  left: 0.2rem;
+}
+
+.board-result {
+  width: min(18rem, calc(100% - 4rem));
+  padding: 0.28rem;
+}
+
+.board-result dl {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--line);
+}
+
+.board-result dl div {
+  min-width: 0;
+  padding: 0.42rem 0.35rem;
+}
+
+.board-result dt {
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+}
+
+.board-result dd {
+  overflow: hidden;
+  margin-top: 0.1rem;
+  font-size: 0.9rem;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 48rem) {
+  .completed-deal-hand {
+    --hand-card-width: clamp(2.15rem, 10.5vw, 2.65rem);
+    --side-dummy-card-exposure: clamp(0.34rem, 1.75vw, 0.6rem);
+    --side-dummy-suit-gap: 0.28rem;
+  }
+
+  .completed-deal-top,
+  .completed-deal-bottom {
+    width: calc(100% - 0.5rem);
+  }
+
+  .completed-deal-left,
+  .completed-deal-right {
+    width: calc(50% - 3.25rem);
+    max-width: calc(50% - 3.25rem);
+  }
+
+  .completed-deal-hand .card-corner,
+  .completed-deal-left .hand-card-group[data-density="tight"] .card-corner,
+  .completed-deal-right .hand-card-group[data-density="tight"] .card-corner {
+    font-size: 0.66rem;
+  }
+
+  .completed-deal-hand .card-suit {
+    right: 0.16rem;
+    bottom: 0.12rem;
+    font-size: 1rem;
+  }
+
+  .completed-deal-hand.dummy-right .card-suit {
+    right: auto;
+    left: 0.16rem;
+  }
+
+  .board-result {
+    width: 5.5rem;
+    padding: 0.2rem;
+  }
+
+  .board-result dl {
+    grid-template-columns: 1fr;
+  }
+
+  .board-result dl div {
+    padding: 0.35rem 0.25rem;
+  }
+
+  .board-result dl div + div,
+  .board-result dl div:nth-child(3) {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .board-result dd {
+    font-size: 0.76rem;
+  }
+}

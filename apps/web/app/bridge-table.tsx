@@ -13,6 +13,7 @@ import {
 } from "./table-state";
 import { AuctionTable, BiddingBox } from "./table/auction-controls";
 import { BoardResult } from "./table/board-result";
+import { CompletedDeal } from "./table/completed-deal";
 import { CurrentTrick } from "./table/current-trick";
 import { callKey } from "./table/gameplay-presentation";
 import { BridgeHand } from "./table/playing-card";
@@ -178,8 +179,12 @@ export default function BridgeTable({
       : visualPositionForSeat(orientation, dummySeat);
   const viewerIsDummy =
     dummySeat !== undefined && table.viewerSeat === dummySeat;
+  const boardComplete = game?.phase === "BOARD_SCORED";
   return (
-    <main className="table-client active-table-client">
+    <main
+      className="table-client active-table-client"
+      data-board-complete={boardComplete}
+    >
       <ActiveTableStatusBar
         table={table}
         connectionState={session.connectionState}
@@ -228,6 +233,9 @@ export default function BridgeTable({
         onCommand={session.sendCommand}
         onBoardClick={motion.skipCurrent}
       >
+        {game === undefined || !boardComplete ? null : (
+          <CompletedDeal game={game} orientation={orientation} />
+        )}
         {game?.phase === "AUCTION" ? (
           <div className="auction-workspace">
             <AuctionTable game={game} />
@@ -298,7 +306,7 @@ export default function BridgeTable({
         )}
       </TableSurface>
 
-      {game === undefined ? null : (
+      {game === undefined || boardComplete ? null : (
         <BridgeHand
           className="own-hand"
           title="Kartu Anda"

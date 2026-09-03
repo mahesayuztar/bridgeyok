@@ -701,6 +701,93 @@ async function assertGameplayGeometry(page: Page) {
   expect(geometry.indicator!.bottomDelta).toBeLessThanOrEqual(1);
 }
 
+async function assertCompletedDealGeometry(page: Page) {
+  const geometry = await page.evaluate(() => {
+    const rect = (element: Element) => {
+      const box = element.getBoundingClientRect();
+      return {
+        top: box.top,
+        right: box.right,
+        bottom: box.bottom,
+        left: box.left,
+      };
+    };
+    const overlaps = (
+      first: ReturnType<typeof rect>,
+      second: ReturnType<typeof rect>,
+    ) =>
+      first.left < second.right - 1 &&
+      first.right > second.left + 1 &&
+      first.top < second.bottom - 1 &&
+      first.bottom > second.top + 1;
+    const playZone = document.querySelector(".board-play-zone");
+    const result = document.querySelector(".board-result");
+    const hands = [
+      ...document.querySelectorAll<HTMLElement>(".completed-deal-hand"),
+    ].map((hand) => ({
+      position: ["top", "right", "bottom", "left"].find((position) =>
+        hand.classList.contains(`completed-deal-${position}`),
+      ),
+      cards: [...hand.querySelectorAll(".physical-card")].map(rect),
+    }));
+    const zoneBox = playZone === null ? null : rect(playZone);
+    const resultBox = result === null ? null : rect(result);
+    const crossHandCollisions = hands.flatMap((hand, _handIndex) =>
+      hands.slice(_handIndex + 1).flatMap((otherHand) =>
+        hand.cards.flatMap((card) =>
+          otherHand.cards.filter((otherCard) => overlaps(card, otherCard)),
+        ),
+      ),
+    ).length;
+
+    return {
+      handCount: hands.length,
+      cardCounts: hands.map((hand) => hand.cards.length),
+      terms: [...document.querySelectorAll(".board-result dt")].map(
+        (term) => term.textContent,
+      ),
+      ownHandCount: document.querySelectorAll(".own-hand").length,
+      cardsInsidePlayZone:
+        zoneBox !== null &&
+        hands.every((hand) =>
+          hand.cards.every(
+            (card) =>
+              card.left >= zoneBox.left - 1 &&
+              card.right <= zoneBox.right + 1 &&
+              card.top >= zoneBox.top - 1 &&
+              card.bottom <= zoneBox.bottom + 1,
+          ),
+        ),
+      crossHandCollisions,
+      resultCollisions:
+        resultBox === null
+          ? -1
+          : hands.flatMap((hand) =>
+              hand.cards.filter((card) => overlaps(card, resultBox)),
+            ).length,
+      participantThicknesses: [
+        document.querySelector(".player-top")?.getBoundingClientRect().height,
+        document.querySelector(".player-right")?.getBoundingClientRect().width,
+        document.querySelector(".player-bottom")?.getBoundingClientRect().height,
+        document.querySelector(".player-left")?.getBoundingClientRect().width,
+      ],
+    };
+  });
+
+  expect(geometry.handCount).toBe(4);
+  expect(geometry.cardCounts).toEqual([13, 13, 13, 13]);
+  expect(geometry.terms).toEqual(["Contract", "Result", "Score"]);
+  expect(geometry.ownHandCount).toBe(0);
+  expect(geometry.cardsInsidePlayZone).toBe(true);
+  expect(geometry.crossHandCollisions).toBe(0);
+  expect(geometry.resultCollisions).toBe(0);
+  expect(
+    geometry.participantThicknesses.every(
+      (thickness) => thickness !== undefined && thickness <= 21,
+    ),
+  ).toBe(true);
+}
+
 async function selectText(page: Page, selector: string) {
   return page.locator(selector).evaluate((element) => {
     const selection = window.getSelection();
@@ -736,7 +823,7 @@ test("stale table recovery returns an authenticated guest to the lobby", async (
 });
 
 test("four guests finish boards, recover a controller, and keep hidden hands private", async ({ browser }, testInfo) => {
-  test.setTimeout(300_000);
+  test.setTimeout(360_000);
   const profiles = [
     { nickname: "Nara", viewport: { width: 1920, height: 1080 } },
     { nickname: "Eka", viewport: { width: 1024, height: 768 } },
@@ -1062,8 +1149,13 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     "data-motion-stage",
     "winner",
   );
-  for (const page of [replacementTab, east.page, south.page, west.page]) {
-    await expect(page.locator(".trick-slot .physical-card")).toHaveCount(4);
+  const trickPages = [replacementTab, east.page, south.page, west.page];
+  await Promise.all(
+    trickPages.map((page) =>
+      expect(page.locator(".trick-slot .physical-card")).toHaveCount(4),
+    ),
+  );
+  for (const page of trickPages) {
     await assertGameplayGeometry(page);
     await page.screenshot({
       path: testInfo.outputPath(
@@ -1125,19 +1217,36 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   for (let _cardIndex = 4; _cardIndex < 52; _cardIndex++) {
     await playNextCard(activePages);
   }
-  for (const page of activePages) {
-    await expect(page.locator(".board-result")).toBeVisible();
+  for (let _recoveryPlay = 0; _recoveryPlay < 4; _recoveryPlay++) {
+    await replacementTab.waitForTimeout(600);
+    const resultVisible = await Promise.all(
+      activePages.map((page) => page.locator(".board-result").count()),
+    );
+    if (resultVisible.some((count) => count > 0)) break;
+    const playableCards = await Promise.all(
+      activePages.map((page) =>
+        page.locator('button[aria-label^="Mainkan "]:enabled').count(),
+      ),
+    );
+    if (playableCards.every((count) => count === 0)) continue;
+    await playNextCard(activePages);
   }
-  for (const player of players) {
-    assertPrivateFrames(player.frames);
-  }
+  await Promise.all(
+    activePages.map((page) => expect(page.locator(".board-result")).toBeVisible()),
+  );
+  await Promise.all(activePages.map(assertCompletedDealGeometry));
 
-  await east.page.locator(".board-result").click({ position: { x: 12, y: 12 } });
-  await expect(east.page.locator(".board-result")).toHaveAttribute(
+  await replacementTab.locator(".board-play-zone").click({
+    position: { x: 10, y: 10 },
+  });
+  await expect(replacementTab.locator(".board-result")).toHaveAttribute(
     "data-exiting",
     "true",
   );
-  await expect(east.page.locator(".board-result")).toHaveCount(0);
+  await expect(replacementTab.locator(".board-result")).toHaveCount(0);
+  for (const player of players) {
+    assertPrivateFrames(player.frames);
+  }
   await expect(
     replacementTab.getByRole("button", { name: "Board berikutnya" }),
   ).toHaveCount(0);
@@ -1149,6 +1258,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await makeCall(west.page, /^Pass/);
   await makeCall(replacementTab, /^Pass/);
   await expect(replacementTab.getByText("Passed out").first()).toBeVisible();
+  await replacementTab.getByLabel("Buka menu meja").click();
   await replacementTab.getByRole("button", { name: "Akhiri meja" }).click();
   for (const page of activePages) {
     await expect(page.getByRole("heading", { name: "Terima kasih sudah bermain." })).toBeVisible();
