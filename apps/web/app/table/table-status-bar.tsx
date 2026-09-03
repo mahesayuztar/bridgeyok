@@ -115,6 +115,19 @@ export function ActiveTableStatusBar({
             <button type="button" onClick={onLeaveTable}>
               Keluar dari meja
             </button>
+            {table.viewerRole === "OWNER" &&
+            table.state === "BETWEEN_BOARDS" ? (
+              <button
+                type="button"
+                disabled={!canSendCommand("table.finish")}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onCommand("table.finish");
+                }}
+              >
+                Akhiri meja
+              </button>
+            ) : null}
             {inviteCode === null ? null : (
               <span className="table-menu-invite">
                 <small>Kode undangan</small>

@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { boardResultLabel, type LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
-import { contractSummaryLabel } from "./gameplay-presentation";
+import {
+  compactContractLabel,
+  contractScoreLabel,
+} from "./gameplay-presentation";
 
 const RESULT_VISIBLE_DURATION = 5_000;
 const RESULT_FADE_DURATION = 180;
@@ -20,21 +23,32 @@ export function BoardResult({
   const result = table.game?.result;
   const [exiting, setExiting] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const advanceBoard = useEffectEvent(() => {
+    if (canSendCommand("table.next_board")) {
+      onCommand("table.next_board");
+    }
+  });
+  const resultKey = result === undefined ? null : table.boardId;
 
   useEffect(() => {
-    if (result === undefined || hidden) return;
+    if (resultKey === null) return;
     let fadeTimer: ReturnType<typeof setTimeout> | null = null;
     let dismissalStarted = false;
 
     function dismissResult(event?: MouseEvent) {
-      if (event?.defaultPrevented || dismissalStarted) return;
+      if (
+        event?.defaultPrevented ||
+        (event?.target instanceof Element &&
+          event.target.closest("button, a, input, select, textarea, summary, [role='dialog']") !==
+            null) ||
+        dismissalStarted
+      )
+        return;
       dismissalStarted = true;
       setExiting(true);
       fadeTimer = setTimeout(() => {
         setHidden(true);
-        if (canSendCommand("table.next_board")) {
-          onCommand("table.next_board");
-        }
+        advanceBoard();
       }, RESULT_FADE_DURATION);
     }
 
@@ -45,57 +59,30 @@ export function BoardResult({
       if (fadeTimer !== null) clearTimeout(fadeTimer);
       document.removeEventListener("click", dismissResult);
     };
-  }, [canSendCommand, hidden, onCommand, result, table.game?.board.number]);
+  }, [resultKey]);
 
   if (result === undefined) return null;
   if (hidden) return null;
   return (
     <section
       className="board-result"
-      aria-labelledby="result-title"
+      aria-label={`Hasil board ${table.game?.board.number}`}
       data-exiting={exiting}
     >
-      <p>Board {table.game?.board.number} selesai</p>
-      <h2 id="result-title">
-        {result.passedOut
-          ? "Passed out"
-          : contractSummaryLabel(result.contract)}
-      </h2>
-      <strong className="result-outcome">{boardResultLabel(result)}</strong>
       <dl>
         <div>
-          <dt>Trick</dt>
-          <dd>{result.tricksDeclarer}</dd>
+          <dt>Contract</dt>
+          <dd>{compactContractLabel(result.contract)}</dd>
         </div>
         <div>
-          <dt>NS</dt>
-          <dd>
-            {result.scoreNS > 0 ? "+" : ""}
-            {result.scoreNS}
-          </dd>
+          <dt>Result</dt>
+          <dd>{boardResultLabel(result)}</dd>
         </div>
         <div>
-          <dt>EW</dt>
-          <dd>
-            {result.scoreNS < 0 ? "+" : ""}
-            {-result.scoreNS}
-          </dd>
+          <dt>Score</dt>
+          <dd>{contractScoreLabel(result)}</dd>
         </div>
       </dl>
-      {table.viewerRole === "OWNER" && table.state === "BETWEEN_BOARDS" ? (
-        <div className="result-actions">
-          <button
-            type="button"
-            disabled={!canSendCommand("table.finish")}
-            onClick={(event) => {
-              event.preventDefault();
-              onCommand("table.finish");
-            }}
-          >
-            Akhiri meja
-          </button>
-        </div>
-      ) : null}
     </section>
   );
 }

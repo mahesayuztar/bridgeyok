@@ -269,7 +269,7 @@ test("board result label describes exact, overtrick, and undertrick", () => {
     vulnerability: "NONE",
     scoreNS: 420
   };
-  assert.equal(boardResultLabel(base), "Tepat kontrak");
+  assert.equal(boardResultLabel(base), "=");
   assert.equal(boardResultLabel({ ...base, tricksDeclarer: 11 }), "+1");
   assert.equal(boardResultLabel({ ...base, tricksDeclarer: 8 }), "-2");
 });

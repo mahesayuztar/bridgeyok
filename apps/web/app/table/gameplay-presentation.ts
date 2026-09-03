@@ -1,7 +1,9 @@
 import type {
   Call,
   Card,
+  GameProjection,
   LiveTableProjection,
+  Seat,
   Suit,
 } from "../table-state";
 
@@ -51,8 +53,13 @@ export function organizeCardsForContract(
 ) {
   const suitOrder = suitOrderForContract(strain);
   return [...cards].sort(
-    (firstCard, secondCard) =>
-      suitOrder.indexOf(firstCard.suit) - suitOrder.indexOf(secondCard.suit),
+    (firstCard, secondCard) => {
+      const suitDifference =
+        suitOrder.indexOf(firstCard.suit) - suitOrder.indexOf(secondCard.suit);
+      return suitDifference === 0
+        ? RANK_ORDER[secondCard.rank] - RANK_ORDER[firstCard.rank]
+        : suitDifference;
+    },
   );
 }
 
@@ -110,6 +117,54 @@ export function contractSummaryLabel(
 ) {
   if (contract === undefined) return "Belum ada kontrak";
   return `${contractLabel(contract)} ${contract.declarer}`;
+}
+
+export function compactContractLabel(
+  contract: NonNullable<LiveTableProjection["game"]>["auction"]["contract"],
+) {
+  if (contract === undefined) return "Passed out";
+  const doubling =
+    contract.doubling === "DOUBLED"
+      ? "x"
+      : contract.doubling === "REDOUBLED"
+        ? "xx"
+        : "";
+  const strain = contract.strain === "NT" ? "NT" : suitLabels[contract.strain];
+  return `${contract.level}${strain}${doubling}${contract.declarer}`;
+}
+
+export function contractScoreLabel(
+  result: NonNullable<NonNullable<LiveTableProjection["game"]>["result"]>,
+) {
+  if (result.contract === undefined) return "0";
+  const declarerIsNS =
+    result.contract.declarer === "N" || result.contract.declarer === "S";
+  const partnership = declarerIsNS ? "NS" : "EW";
+  const score = declarerIsNS ? result.scoreNS : -result.scoreNS;
+  return `${score > 0 ? "+" : ""}${score} ${partnership}`;
+}
+
+export function completedDealHands(game: GameProjection) {
+  if (game.phase !== "BOARD_SCORED" || game.fullDeal === undefined) return null;
+
+  const hands: Record<Seat, Card[]> = {
+    N: [...game.fullDeal.north],
+    E: [...game.fullDeal.east],
+    S: [...game.fullDeal.south],
+    W: [...game.fullDeal.west],
+  };
+  const playedCards = [
+    ...game.completedTricks.flatMap((trick) => trick.plays),
+    ...game.currentTrick.plays,
+  ];
+
+  playedCards.forEach((play) => {
+    if (!hands[play.seat].some((card) => cardKey(card) === cardKey(play.card))) {
+      hands[play.seat].push(play.card);
+    }
+  });
+
+  return hands;
 }
 
 export function viewerTrickCounts(table: LiveTableProjection) {

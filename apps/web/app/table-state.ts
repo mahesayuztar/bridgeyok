@@ -368,7 +368,7 @@ export function boardResultLabel(result: BoardResult): string {
   }
   const difference = result.tricksDeclarer - (6 + result.contract.level);
   if (difference === 0) {
-    return "Tepat kontrak";
+    return "=";
   }
   return difference > 0 ? `+${difference}` : String(difference);
 }

@@ -4,7 +4,10 @@ import {
   callKey,
   callLabel,
   cardKey,
+  compactContractLabel,
+  completedDealHands,
   contractLabel,
+  contractScoreLabel,
   contractSummaryLabel,
   groupCardsForContract,
   organizeCardsForContract,
@@ -37,6 +40,86 @@ test("contract presentation keeps only contract, doubling, and declarer seat", (
     contractSummaryLabel({ ...contract, strain: "NT", doubling: "REDOUBLED" }),
     "4NT XX N",
   );
+  assert.equal(compactContractLabel(contract), "4♥xN");
+  assert.equal(
+    compactContractLabel({ ...contract, strain: "NT", doubling: "REDOUBLED" }),
+    "4NTxxN",
+  );
+  assert.equal(compactContractLabel(undefined), "Passed out");
+});
+
+test("contract score is signed for the declaring partnership", () => {
+  const result = {
+    passedOut: false,
+    contract: {
+      level: 3,
+      strain: "NT",
+      doubling: "UNDOUBLED",
+      declarer: "E",
+    },
+    tricksDeclarer: 10,
+    tricksNS: 3,
+    tricksEW: 10,
+    vulnerability: "NONE",
+    scoreNS: -430,
+  };
+
+  assert.equal(contractScoreLabel(result), "+430 EW");
+  assert.equal(
+    contractScoreLabel({
+      ...result,
+      contract: { ...result.contract, declarer: "S" },
+      scoreNS: -50,
+    }),
+    "-50 NS",
+  );
+  assert.equal(
+    contractScoreLabel({ ...result, contract: undefined, scoreNS: 0 }),
+    "0",
+  );
+});
+
+test("completed deal reconstructs every hand from remaining and played cards", () => {
+  const longSpadeHand = [
+    "A",
+    "K",
+    "Q",
+    "J",
+    "T",
+    "9",
+    "8",
+    "7",
+    "6",
+    "5",
+    "4",
+    "3",
+  ].map((rank) => ({ suit: "S", rank }));
+  const game = {
+    phase: "BOARD_SCORED",
+    fullDeal: {
+      north: [{ suit: "H", rank: "A" }],
+      east: [],
+      south: [],
+      west: [],
+    },
+    completedTricks: longSpadeHand.map((card) => ({
+      plays: [{ seat: "N", card }],
+    })),
+    currentTrick: { plays: [] },
+  };
+
+  const hands = completedDealHands(game);
+
+  assert.equal(hands.N.length, 13);
+  assert.deepEqual(
+    hands.N.reduce((counts, card) => {
+      counts[card.suit] = (counts[card.suit] ?? 0) + 1;
+      return counts;
+    }, {}),
+    { H: 1, S: 12 },
+  );
+  assert.equal(hands.E.length, 0);
+  assert.equal(completedDealHands({ ...game, phase: "PLAY" }), null);
 });
 
 test("contract organizes viewer and dummy suit groups without mutating projection", () => {
@@ -51,6 +134,10 @@ test("contract organizes viewer and dummy suit groups without mutating projectio
   assert.deepEqual(
     organizeCardsForContract(cards).map((card) => card.suit),
     ["S", "S", "H", "D", "C"],
+  );
+  assert.deepEqual(
+    organizeCardsForContract(cards).map((card) => card.rank),
+    ["A", "Q", "K", "2", "3"],
   );
   assert.deepEqual(
     organizeCardsForContract(cards, "S").map((card) => card.suit),
