@@ -11,6 +11,7 @@ import type {
   Suit,
   Trick
 } from "./table-state";
+import { oppositeSeat } from "./table-state.ts";
 
 const SEATS: Seat[] = ["N", "E", "S", "W"];
 const SUITS: Suit[] = ["C", "D", "H", "S"];
@@ -162,6 +163,9 @@ function normalizeGame(value: unknown): GameProjection | null {
     typeof auction.complete !== "boolean" ||
     typeof auction.passedOut !== "boolean" ||
     typeof value.dummyRevealed !== "boolean" ||
+    !Number.isInteger(value.completedTrickCount) ||
+    Number(value.completedTrickCount) < 0 ||
+    Number(value.completedTrickCount) > 13 ||
     !isFiniteNumber(value.tricksNS) ||
     !isFiniteNumber(value.tricksEW)
   ) {
@@ -175,7 +179,14 @@ function normalizeGame(value: unknown): GameProjection | null {
     : normalizeTrick(value.currentTrick);
   const completedTricks = normalizeArray(value.completedTricks, normalizeTrick);
   const ownHand = normalizeArray(value.ownHand, normalizeCard);
-  if (calls === null || legalCalls === null || currentTrick === null || completedTricks === null || ownHand === null) {
+  if (
+    calls === null ||
+    legalCalls === null ||
+    currentTrick === null ||
+    completedTricks === null ||
+    completedTricks.length > Number(value.completedTrickCount) ||
+    ownHand === null
+  ) {
     return null;
   }
 
@@ -221,6 +232,7 @@ function normalizeGame(value: unknown): GameProjection | null {
     ...(isSeat(value.turn) ? { turn: value.turn } : {}),
     dummyRevealed: value.dummyRevealed,
     currentTrick,
+    completedTrickCount: value.completedTrickCount as number,
     completedTricks,
     tricksNS: value.tricksNS,
     tricksEW: value.tricksEW,
@@ -284,6 +296,21 @@ export function normalizeLiveTableProjection(value: unknown): LiveTableProjectio
   const game = value.game === null || value.game === undefined ? undefined : normalizeGame(value.game);
   if (game === null) {
     return null;
+  }
+  if (game !== undefined) {
+    const viewerIsDummy =
+      isSeat(value.viewerSeat) &&
+      game.auction.contract !== undefined &&
+      value.viewerSeat === oppositeSeat(game.auction.contract.declarer);
+    const expectedHistoryLength =
+      game.completedTrickCount === 0
+        ? 0
+        : viewerIsDummy
+          ? game.completedTrickCount
+          : 1;
+    if (game.completedTricks.length !== expectedHistoryLength) {
+      return null;
+    }
   }
 
   let actionRequest: LiveTableProjection["actionRequest"];

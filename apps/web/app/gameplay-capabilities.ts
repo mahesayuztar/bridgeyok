@@ -68,7 +68,7 @@ export function canSendTableCommand(
     }
     case "game.request_claim": {
       const dummy = game?.auction.contract === undefined ? undefined : oppositeSeat(game.auction.contract.declarer);
-      const remainingTricks = game === undefined ? 0 : 13 - game.completedTricks.length;
+      const remainingTricks = game === undefined ? 0 : 13 - game.completedTrickCount;
       return !hasBot && table.actionRequest === undefined && game?.phase === "PLAY" && game.currentTrick.plays.length === 0 && table.viewerSeat !== undefined && table.viewerSeat !== dummy && Number.isInteger(payload.tricks) && Number(payload.tricks) >= 0 && Number(payload.tricks) <= remainingTricks;
     }
     case "game.request_undo":

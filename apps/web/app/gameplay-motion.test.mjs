@@ -17,11 +17,13 @@ function game({
   phase = "PLAY",
   currentTrick = { plays: [] },
   completedTricks = [],
+  completedTrickCount = completedTricks.length,
 } = {}) {
   return {
     board: { number: boardNumber, dealer: "N", vulnerability: "NONE" },
     phase,
     currentTrick,
+    completedTrickCount,
     completedTricks,
   };
 }
@@ -56,6 +58,29 @@ test("gameplay motion preserves the winner pause before collection", () => {
   ]);
   assert.equal(events[1].trick.winner, "N");
   assert.equal(GAMEPLAY_MOTION_DURATION.winnerPause, 3_200);
+});
+
+test("gameplay motion recognizes a replaced latest-only completed trick", () => {
+  const firstTrick = { leader: "N", plays, winner: "N" };
+  const secondPlays = plays.map((play) => ({
+    ...play,
+    card: { ...play.card, rank: play.card.rank === "A" ? "K" : "4" },
+  }));
+  const secondTrick = { leader: "N", plays: secondPlays, winner: "N" };
+  const events = gameplayMotionEvents(
+    game({ completedTricks: [firstTrick], completedTrickCount: 1 }),
+    game({ completedTricks: [secondTrick], completedTrickCount: 2 }),
+  );
+
+  assert.deepEqual(events.map((event) => event.kind), [
+    "play",
+    "play",
+    "play",
+    "play",
+    "winner",
+    "collect",
+  ]);
+  assert.equal(events.at(-1).trick, secondTrick);
 });
 
 test("a lead in the next trick skips the completed trick pause", () => {

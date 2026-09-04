@@ -105,6 +105,7 @@ test("completed deal reconstructs every hand from remaining and played cards", (
     completedTricks: longSpadeHand.map((card) => ({
       plays: [{ seat: "N", card }],
     })),
+    completedTrickCount: 13,
     currentTrick: { plays: [] },
   };
 

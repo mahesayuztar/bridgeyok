@@ -72,6 +72,7 @@ export type GameProjection = {
   turn?: Seat;
   dummyRevealed: boolean;
   currentTrick: Trick;
+  completedTrickCount: number;
   completedTricks: Trick[];
   tricksNS: number;
   tricksEW: number;

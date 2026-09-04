@@ -18,7 +18,7 @@ export function ConsensusControls({
       : oppositeSeat(game.auction.contract.declarer);
   const hasBot = table.participants.some((participant) => participant.isBot);
   const remainingTricks =
-    game === undefined ? 0 : 13 - game.completedTricks.length;
+    game === undefined ? 0 : 13 - game.completedTrickCount;
   const claimAvailable =
     !hasBot &&
     request === undefined &&

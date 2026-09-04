@@ -39,6 +39,7 @@ function auctionTable() {
       turn: "N",
       dummyRevealed: false,
       currentTrick: { plays: [] },
+      completedTrickCount: 0,
       completedTricks: [],
       tricksNS: 0,
       tricksEW: 0,

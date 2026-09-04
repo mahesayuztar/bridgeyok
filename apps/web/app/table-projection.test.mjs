@@ -26,6 +26,7 @@ function activeProjection() {
       turn: "N",
       dummyRevealed: false,
       currentTrick: { leader: "", plays: null },
+      completedTrickCount: 0,
       completedTricks: null,
       tricksNS: 0,
       tricksEW: 0,
@@ -49,6 +50,32 @@ test("rejects malformed nested projection items instead of exposing them to rend
   projection.game.auction.calls = [null];
 
   assert.equal(normalizeLiveTableProjection(projection), null);
+});
+
+test("rejects completed trick history broader than recipient entitlement", () => {
+  const projection = activeProjection();
+  projection.game.phase = "PLAY";
+  projection.game.auction.contract = {
+    level: 1,
+    strain: "C",
+    doubling: "UNDOUBLED",
+    declarer: "N",
+  };
+  projection.game.completedTrickCount = 2;
+  projection.game.completedTricks = [
+    {
+      plays: [{ seat: "N", card: { suit: "C", rank: "A" } }],
+      winner: "N",
+    },
+    {
+      plays: [{ seat: "E", card: { suit: "D", rank: "A" } }],
+      winner: "E",
+    },
+  ];
+
+  assert.equal(normalizeLiveTableProjection(projection), null);
+  projection.viewerSeat = "S";
+  assert.notEqual(normalizeLiveTableProjection(projection), null);
 });
 
 test("normalizes claim and undo consensus state", () => {
