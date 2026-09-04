@@ -233,10 +233,99 @@ func TestDecideStartPassedOutAndFinish(t *testing.T) {
 	if aggregate.State != StateBetweenBoards || aggregate.Game.Result == nil || !aggregate.Game.Result.PassedOut {
 		t.Fatalf("passed-out aggregate = %+v", aggregate)
 	}
+	if len(aggregate.ScoreSheet) != 1 || aggregate.ScoreSheet[0].BoardID != "board-one" || aggregate.ScoreSheet[0].Result.ScoreNS != 0 {
+		t.Fatalf("passed-out score sheet = %+v", aggregate.ScoreSheet)
+	}
 
 	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandFinishTable, SessionID: "session-owner"}).NextState
 	if aggregate.State != StateFinished {
 		t.Fatalf("state = %s, want %s", aggregate.State, StateFinished)
+	}
+}
+
+func TestScoreSheetTotalsPreservePairIdentityAcrossOrientation(t *testing.T) {
+	t.Parallel()
+
+	pairA := ScorePair{
+		ID: "participant-a:participant-b",
+		Members: [2]ScoreParticipant{
+			{ID: "participant-a", Nickname: "A"},
+			{ID: "participant-b", Nickname: "B"},
+		},
+	}
+	pairB := ScorePair{
+		ID: "participant-c:participant-d",
+		Members: [2]ScoreParticipant{
+			{ID: "participant-c", Nickname: "C"},
+			{ID: "participant-d", Nickname: "D"},
+		},
+	}
+	passedOut, err := bridge.PassedOutResult(bridge.VulnerabilityNone)
+	if err != nil {
+		t.Fatalf("PassedOutResult() error = %v", err)
+	}
+	firstResult, err := bridge.ScoreContract(bridge.Contract{Level: 4, Strain: bridge.StrainHearts, Doubling: bridge.Undoubled, Declarer: bridge.North}, bridge.VulnerabilityNone, 10)
+	if err != nil {
+		t.Fatalf("ScoreContract(first) error = %v", err)
+	}
+	secondResult, err := bridge.ScoreContract(bridge.Contract{Level: 2, Strain: bridge.StrainSpades, Doubling: bridge.Undoubled, Declarer: bridge.East}, bridge.VulnerabilityNone, 8)
+	if err != nil {
+		t.Fatalf("ScoreContract(second) error = %v", err)
+	}
+	entries := []ScoreSheetEntry{
+		{BoardID: "board-one", BoardNumber: 1, Result: firstResult, Lineup: scoreTestLineup(pairA, pairB)},
+		{BoardID: "board-two", BoardNumber: 2, Result: secondResult, Lineup: scoreTestLineup(pairB, pairA)},
+		{BoardID: "board-three", BoardNumber: 3, Result: passedOut, Lineup: scoreTestLineup(pairA, pairB)},
+	}
+
+	totals := calculatePairScoreTotals(entries)
+	if len(totals) != 2 || totals[0].Pair.ID != pairA.ID || totals[0].Score != 530 || totals[1].Pair.ID != pairB.ID || totals[1].Score != -530 {
+		t.Fatalf("pair totals = %+v", totals)
+	}
+	if err := validateScoreSheet(entries, 3); err != nil {
+		t.Fatalf("validateScoreSheet() error = %v", err)
+	}
+}
+
+func scoreTestLineup(northSouth ScorePair, eastWest ScorePair) BoardLineup {
+	return BoardLineup{
+		Seats: map[bridge.Seat]ScoreParticipant{
+			bridge.North: northSouth.Members[0],
+			bridge.South: northSouth.Members[1],
+			bridge.East:  eastWest.Members[0],
+			bridge.West:  eastWest.Members[1],
+		},
+		NorthSouth: northSouth,
+		EastWest:   eastWest,
+	}
+}
+
+func TestScoreSheetUndoRemovesAndRescoreRestoresBoard(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	for aggregate.State == StateActive {
+		call := bridge.Pass()
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call}).NextState
+	}
+	if len(aggregate.ScoreSheet) != 1 {
+		t.Fatalf("score sheet entries = %d, want 1", len(aggregate.ScoreSheet))
+	}
+	actor := aggregate.UndoableAction.ActorSeat
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRequestUndo, SessionID: sessionForSeat(t, aggregate, actor)}).NextState
+	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+		if seat == actor {
+			continue
+		}
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRespondUndo, SessionID: sessionForSeat(t, aggregate, seat), Accepted: true}).NextState
+	}
+	if aggregate.State != StateActive || len(aggregate.ScoreSheet) != 0 {
+		t.Fatalf("score sheet after undo = %+v", aggregate.ScoreSheet)
+	}
+	call := bridge.Pass()
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call}).NextState
+	if aggregate.State != StateBetweenBoards || len(aggregate.ScoreSheet) != 1 {
+		t.Fatalf("score sheet after rescore = %+v", aggregate.ScoreSheet)
 	}
 }
 

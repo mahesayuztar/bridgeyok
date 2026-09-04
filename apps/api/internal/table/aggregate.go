@@ -135,20 +135,22 @@ type SeatAssignment struct {
 
 // Aggregate is the authoritative private state of one table.
 type Aggregate struct {
-	SchemaVersion  int                            `json:"schemaVersion"`
-	ID             string                         `json:"id"`
-	OwnerSessionID string                         `json:"ownerSessionId"`
-	State          State                          `json:"state"`
-	Locked         bool                           `json:"locked"`
-	Revision       int64                          `json:"revision"`
-	LastSeq        int64                          `json:"lastSeq"`
-	BoardID        string                         `json:"boardId,omitempty"`
-	BoardNumber    int                            `json:"boardNumber"`
-	Participants   []Participant                  `json:"participants"`
-	Seats          map[bridge.Seat]SeatAssignment `json:"seats"`
-	Game           *bridge.State                  `json:"game,omitempty"`
-	ActionRequest  *ActionRequest                 `json:"actionRequest,omitempty"`
-	UndoableAction *undoableAction                `json:"undoableAction,omitempty"`
+	SchemaVersion      int                            `json:"schemaVersion"`
+	ID                 string                         `json:"id"`
+	OwnerSessionID     string                         `json:"ownerSessionId"`
+	State              State                          `json:"state"`
+	Locked             bool                           `json:"locked"`
+	Revision           int64                          `json:"revision"`
+	LastSeq            int64                          `json:"lastSeq"`
+	BoardID            string                         `json:"boardId,omitempty"`
+	BoardNumber        int                            `json:"boardNumber"`
+	CurrentBoardLineup *BoardLineup                   `json:"currentBoardLineup,omitempty"`
+	ScoreSheet         []ScoreSheetEntry              `json:"scoreSheet"`
+	Participants       []Participant                  `json:"participants"`
+	Seats              map[bridge.Seat]SeatAssignment `json:"seats"`
+	Game               *bridge.State                  `json:"game,omitempty"`
+	ActionRequest      *ActionRequest                 `json:"actionRequest,omitempty"`
+	UndoableAction     *undoableAction                `json:"undoableAction,omitempty"`
 }
 
 // Command contains one authenticated table mutation.
@@ -197,6 +199,7 @@ func NewAggregate(tableID string, owner Participant) (Aggregate, error) {
 		State:          StateWaiting,
 		Participants:   []Participant{owner},
 		Seats:          map[bridge.Seat]SeatAssignment{},
+		ScoreSheet:     []ScoreSheetEntry{},
 	}
 	if err := aggregate.Validate(); err != nil {
 		return Aggregate{}, err
@@ -443,6 +446,11 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		next.BoardNumber = 1
 		next.BoardID = command.BoardID
 		next.Game = &game
+		lineup, err := next.captureBoardLineup()
+		if err != nil {
+			return Decision{}, reject(ErrorNotReady, err.Error())
+		}
+		next.CurrentBoardLineup = &lineup
 		next.ActionRequest = nil
 		next.UndoableAction = nil
 		events = []Event{{Type: "BOARD_STARTED", Payload: map[string]any{"boardId": command.BoardID, "boardNumber": 1}}}
@@ -484,6 +492,9 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		}
 		if gameDecision.NextState.Phase == bridge.PhaseBoardScored {
 			next.State = StateBetweenBoards
+			if err := next.appendCurrentBoardScore(); err != nil {
+				return Decision{}, reject(ErrorInvalidState, err.Error())
+			}
 		}
 	case CommandRequestClaim:
 		if next.State != StateActive || next.Game == nil {
@@ -530,6 +541,9 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		next.State = StateBetweenBoards
 		next.ActionRequest = nil
 		next.UndoableAction = nil
+		if err := next.appendCurrentBoardScore(); err != nil {
+			return Decision{}, reject(ErrorInvalidState, err.Error())
+		}
 		events = []Event{{Type: "CLAIM_ACCEPTED", Payload: gameDecision.Events[0]}}
 	case CommandRequestUndo:
 		if (next.State != StateActive && next.State != StateBetweenBoards) || next.Game == nil {
@@ -568,6 +582,7 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		restoredGame := next.UndoableAction.Game.Clone()
 		next.Game = &restoredGame
 		next.State = StateActive
+		next.removeCurrentBoardScore()
 		next.ActionRequest = nil
 		next.UndoableAction = nil
 		events = []Event{{Type: "UNDO_ACCEPTED", Payload: map[string]any{}}}
@@ -586,6 +601,11 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		next.BoardNumber++
 		next.BoardID = command.BoardID
 		next.Game = &game
+		lineup, err := next.captureBoardLineup()
+		if err != nil {
+			return Decision{}, reject(ErrorNotReady, err.Error())
+		}
+		next.CurrentBoardLineup = &lineup
 		next.ActionRequest = nil
 		next.UndoableAction = nil
 		events = []Event{{Type: "BOARD_STARTED", Payload: map[string]any{"boardId": command.BoardID, "boardNumber": next.BoardNumber}}}
@@ -741,6 +761,14 @@ func (aggregate Aggregate) Validate() error {
 			return fmt.Errorf("game invariant: %w", err)
 		}
 	}
+	if aggregate.CurrentBoardLineup != nil {
+		if err := validateBoardLineup(*aggregate.CurrentBoardLineup); err != nil {
+			return fmt.Errorf("current board lineup: %w", err)
+		}
+	}
+	if err := validateScoreSheet(aggregate.ScoreSheet, aggregate.BoardNumber); err != nil {
+		return err
+	}
 	if aggregate.ActionRequest != nil {
 		request := aggregate.ActionRequest
 		if aggregate.Game == nil || aggregate.State != StateActive && aggregate.State != StateBetweenBoards || !request.RequesterSeat.Valid() || request.Kind != ActionRequestClaim && request.Kind != ActionRequestUndo {
@@ -872,6 +900,26 @@ func (aggregate Aggregate) clone() Aggregate {
 	clone.Seats = make(map[bridge.Seat]SeatAssignment, len(aggregate.Seats))
 	for seat, assignment := range aggregate.Seats {
 		clone.Seats[seat] = assignment
+	}
+	if aggregate.CurrentBoardLineup != nil {
+		lineup := *aggregate.CurrentBoardLineup
+		lineup.Seats = make(map[bridge.Seat]ScoreParticipant, len(aggregate.CurrentBoardLineup.Seats))
+		for seat, member := range aggregate.CurrentBoardLineup.Seats {
+			lineup.Seats[seat] = member
+		}
+		clone.CurrentBoardLineup = &lineup
+	}
+	clone.ScoreSheet = make([]ScoreSheetEntry, len(aggregate.ScoreSheet))
+	for _index, entry := range aggregate.ScoreSheet {
+		clone.ScoreSheet[_index] = entry
+		clone.ScoreSheet[_index].Lineup.Seats = make(map[bridge.Seat]ScoreParticipant, len(entry.Lineup.Seats))
+		for seat, member := range entry.Lineup.Seats {
+			clone.ScoreSheet[_index].Lineup.Seats[seat] = member
+		}
+		if entry.Result.Contract != nil {
+			contract := *entry.Result.Contract
+			clone.ScoreSheet[_index].Result.Contract = &contract
+		}
 	}
 	if aggregate.Game != nil {
 		game := aggregate.Game.Clone()
