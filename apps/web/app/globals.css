@@ -3441,7 +3441,7 @@ button.physical-card.is-dragging {
   --hand-card-width: var(--card-dummy-width);
   --side-dummy-card-width: clamp(2.35rem, 3.8vw, 2.75rem);
   --side-dummy-card-height: calc(var(--side-dummy-card-width) * 1.4);
-  --side-dummy-card-exposure: clamp(1rem, 1.7vw, 1.32rem);
+  --side-dummy-card-exposure: clamp(1.25rem, 1.8vw, 1.45rem);
   --side-dummy-suit-gap: clamp(0.08rem, 0.3vh, 0.16rem);
   z-index: 9;
   max-width: none;
@@ -3687,7 +3687,7 @@ button.physical-card.is-dragging {
 .dummy-hand.dummy-left .card-corner,
 .dummy-hand.dummy-right .card-corner {
   font-size: 0.875rem;
-  transform: scaleX(0.84);
+  transform: scaleX(0.78);
 }
 
 .dummy-hand.dummy-left .card-corner {
@@ -3722,7 +3722,7 @@ button.physical-card.is-dragging {
   .dummy-hand {
     --side-dummy-card-width: clamp(2.35rem, 10vw, 2.55rem);
     --side-dummy-card-height: calc(var(--side-dummy-card-width) * 1.4);
-    --side-dummy-card-exposure: clamp(1rem, 4.4vw, 1.16rem);
+    --side-dummy-card-exposure: clamp(1.2rem, 5vw, 1.35rem);
     --side-dummy-suit-gap: 0.1rem;
   }
 
