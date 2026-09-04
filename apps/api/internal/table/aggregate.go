@@ -705,7 +705,7 @@ func (aggregate Aggregate) Validate() error {
 			ownerCount++
 		}
 	}
-	if ownerCount != 1 && !(aggregate.State == StateFinished && ownerCount == 0 && len(activeParticipantIDs) == 0) {
+	if ownerCount > 1 || ownerCount == 0 && (aggregate.State != StateFinished || len(activeParticipantIDs) != 0) {
 		return fmt.Errorf("table must have exactly one active owner")
 	}
 	seatedParticipants := make(map[string]struct{}, len(aggregate.Seats))
