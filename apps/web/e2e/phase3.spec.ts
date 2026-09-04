@@ -1289,6 +1289,10 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await east.page.keyboard.press("Escape");
   await expect(latestHistory).toBeHidden();
   await expect(latestHistoryTrigger).toBeFocused();
+  await latestHistoryTrigger.click();
+  await expect(latestHistory).toBeVisible();
+  await east.page.mouse.click(1020, 764);
+  await expect(latestHistory).toBeHidden();
 
   const fullHistoryTrigger = south.page.getByRole("button", {
     name: /Buka riwayat trick/,
@@ -1354,13 +1358,14 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await expect(fullHistory.locator(".trick-history-item").first()).toContainText(
     "Trick 1",
   );
-  await expect(fullHistory.locator(".trick-history-item").last()).toContainText(
-    "Trick 13",
-  );
+  const finalHistoryItem = fullHistory.locator(".trick-history-item").last();
+  await expect(finalHistoryItem).toContainText("Trick 13");
   await south.page.screenshot({
     path: testInfo.outputPath("trick-history-full-768x1024.png"),
     fullPage: false,
   });
+  await finalHistoryItem.scrollIntoViewIfNeeded();
+  await expect(finalHistoryItem).toBeVisible();
   await south.page.getByRole("button", { name: "Tutup riwayat trick" }).click();
 
   const compactHistoryTrigger = replacementTab.getByRole("button", {
