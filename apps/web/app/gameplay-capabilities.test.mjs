@@ -10,6 +10,8 @@ function activeTable() {
     revision: 4,
     lastSeq: 4,
     boardNumber: 1,
+    scoreSheet: [],
+    pairScoreTotals: [],
     viewerParticipantId: "owner",
     viewerRole: "OWNER",
     viewerSeat: "N",

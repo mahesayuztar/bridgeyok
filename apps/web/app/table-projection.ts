@@ -1,4 +1,11 @@
 import type {
+  BoardLineup,
+  PairScoreTotal,
+  ScorePair,
+  ScoreParticipant,
+  ScoreSheetEntry,
+} from "@bridgeyok/contracts/realtime";
+import type {
   BoardResult,
   Call,
   CallRecord,
@@ -147,6 +154,73 @@ function normalizeResult(value: unknown): BoardResult | null {
   };
 }
 
+function normalizeScoreParticipant(value: unknown): ScoreParticipant | null {
+  if (!isRecord(value) || typeof value.id !== "string" || typeof value.nickname !== "string" || typeof value.isBot !== "boolean") {
+    return null;
+  }
+  return { id: value.id, nickname: value.nickname, isBot: value.isBot };
+}
+
+function normalizeScorePair(value: unknown): ScorePair | null {
+  if (!isRecord(value) || typeof value.id !== "string") {
+    return null;
+  }
+  const members = normalizeArray(value.members, normalizeScoreParticipant);
+  if (members === null || members.length !== 2 || members[0]!.id > members[1]!.id || value.id !== `${members[0]!.id}:${members[1]!.id}`) {
+    return null;
+  }
+  return { id: value.id, members: [members[0]!, members[1]!] };
+}
+
+function normalizeBoardLineup(value: unknown): BoardLineup | null {
+  if (!isRecord(value) || !isRecord(value.seats)) {
+    return null;
+  }
+  const northSouth = normalizeScorePair(value.northSouth);
+  const eastWest = normalizeScorePair(value.eastWest);
+  const north = normalizeScoreParticipant(value.seats.N);
+  const east = normalizeScoreParticipant(value.seats.E);
+  const south = normalizeScoreParticipant(value.seats.S);
+  const west = normalizeScoreParticipant(value.seats.W);
+  if (northSouth === null || eastWest === null || north === null || east === null || south === null || west === null) {
+    return null;
+  }
+  if (
+    !northSouth.members.some((member) => member.id === north.id) ||
+    !northSouth.members.some((member) => member.id === south.id) ||
+    !eastWest.members.some((member) => member.id === east.id) ||
+    !eastWest.members.some((member) => member.id === west.id)
+  ) {
+    return null;
+  }
+  return { seats: { N: north, E: east, S: south, W: west }, northSouth, eastWest };
+}
+
+function normalizeScoreSheetEntry(value: unknown): ScoreSheetEntry | null {
+  if (!isRecord(value) || typeof value.boardId !== "string" || !Number.isInteger(value.boardNumber) || !isRecord(value.result) || typeof value.result.rulesetVersion !== "string") {
+    return null;
+  }
+  const result = normalizeResult(value.result);
+  const lineup = normalizeBoardLineup(value.lineup);
+  if (result === null || lineup === null || Number(value.boardNumber) < 1) {
+    return null;
+  }
+  return {
+    boardId: value.boardId,
+    boardNumber: value.boardNumber as number,
+    result: { rulesetVersion: value.result.rulesetVersion, ...result },
+    lineup,
+  };
+}
+
+function normalizePairScoreTotal(value: unknown): PairScoreTotal | null {
+  if (!isRecord(value) || !Number.isInteger(value.score)) {
+    return null;
+  }
+  const pair = normalizeScorePair(value.pair);
+  return pair === null ? null : { pair, score: value.score as number };
+}
+
 function normalizeGame(value: unknown): GameProjection | null {
   if (!isRecord(value) || !isRecord(value.board) || !isRecord(value.auction)) {
     return null;
@@ -271,8 +345,16 @@ export function normalizeLiveTableProjection(value: unknown): LiveTableProjectio
       isBot: participant.isBot
     };
   });
-  if (participants === null || (value.seats !== null && value.seats !== undefined && !isRecord(value.seats))) {
+  const scoreSheet = normalizeArray(value.scoreSheet, normalizeScoreSheetEntry);
+  const pairScoreTotals = normalizeArray(value.pairScoreTotals, normalizePairScoreTotal);
+  if (participants === null || scoreSheet === null || pairScoreTotals === null || (value.seats !== null && value.seats !== undefined && !isRecord(value.seats))) {
     return null;
+  }
+
+  for (let _index = 0; _index < scoreSheet.length; _index++) {
+    if (_index > 0 && scoreSheet[_index - 1]!.boardNumber >= scoreSheet[_index]!.boardNumber) {
+      return null;
+    }
   }
 
   const rawSeats = isRecord(value.seats) ? value.seats : {};
@@ -339,6 +421,8 @@ export function normalizeLiveTableProjection(value: unknown): LiveTableProjectio
     lastSeq: value.lastSeq,
     ...(typeof value.boardId === "string" ? { boardId: value.boardId } : {}),
     boardNumber: value.boardNumber,
+    scoreSheet,
+    pairScoreTotals,
     viewerParticipantId: value.viewerParticipantId,
     viewerRole: value.viewerRole as LiveTableProjection["viewerRole"],
     ...(isSeat(value.viewerSeat) ? { viewerSeat: value.viewerSeat } : {}),

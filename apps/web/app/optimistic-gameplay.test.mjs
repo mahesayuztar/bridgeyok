@@ -15,6 +15,8 @@ function auctionTable() {
     revision: 4,
     lastSeq: 4,
     boardNumber: 1,
+    scoreSheet: [],
+    pairScoreTotals: [],
     viewerParticipantId: "viewer",
     viewerRole: "OWNER",
     viewerSeat: "N",

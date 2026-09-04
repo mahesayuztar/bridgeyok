@@ -10,6 +10,8 @@ function tableProjection(tableId, lastSeq = 0) {
     revision: lastSeq,
     lastSeq,
     boardNumber: 0,
+    scoreSheet: [],
+    pairScoreTotals: [],
     viewerParticipantId: "viewer",
     viewerRole: "PARTICIPANT",
     participants: [],

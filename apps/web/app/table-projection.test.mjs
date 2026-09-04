@@ -11,6 +11,8 @@ function activeProjection() {
     lastSeq: 1,
     boardId: "board-a",
     boardNumber: 1,
+    scoreSheet: [],
+    pairScoreTotals: [],
     viewerParticipantId: "participant-a",
     viewerRole: "OWNER",
     viewerSeat: "N",
@@ -43,6 +45,41 @@ test("normalizes nullable Go collections before table state reaches the UI", () 
   assert.deepEqual(table.game.currentTrick.plays, []);
   assert.deepEqual(table.game.completedTricks, []);
   assert.deepEqual(table.game.ownHand, []);
+});
+
+test("normalizes durable score rows and rejects non-canonical pair identities", () => {
+  const projection = activeProjection();
+  const north = { id: "participant-a", nickname: "North", isBot: false };
+  const south = { id: "participant-c", nickname: "South", isBot: false };
+  const east = { id: "participant-b", nickname: "East", isBot: false };
+  const west = { id: "participant-d", nickname: "West", isBot: false };
+  const northSouth = { id: "participant-a:participant-c", members: [north, south] };
+  const eastWest = { id: "participant-b:participant-d", members: [east, west] };
+  projection.scoreSheet = [{
+    boardId: "board-a",
+    boardNumber: 1,
+    result: {
+      rulesetVersion: "bridgeyok_duplicate_v1",
+      passedOut: true,
+      tricksDeclarer: 0,
+      tricksNS: 0,
+      tricksEW: 0,
+      vulnerability: "NONE",
+      scoreNS: 0,
+    },
+    lineup: { seats: { N: north, E: east, S: south, W: west }, northSouth, eastWest },
+  }];
+  projection.pairScoreTotals = [
+    { pair: northSouth, score: 0 },
+    { pair: eastWest, score: 0 },
+  ];
+
+  const table = normalizeLiveTableProjection(projection);
+
+  assert.notEqual(table, null);
+  assert.equal(table.scoreSheet[0].boardId, "board-a");
+  projection.scoreSheet[0].lineup.northSouth.id = "seat-dependent";
+  assert.equal(normalizeLiveTableProjection(projection), null);
 });
 
 test("rejects malformed nested projection items instead of exposing them to renderers", () => {
