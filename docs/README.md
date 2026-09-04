@@ -28,6 +28,7 @@ Jika dua dokumen setingkat bertentangan, dokumen dengan change record/ADR paling
 | [`adr/0008-simple-table-bots.md`](adr/0008-simple-table-bots.md) | owner-managed deterministic seat bots | Accepted |
 | [`adr/0009-optimistic-gameplay-client-and-presentation.md`](adr/0009-optimistic-gameplay-client-and-presentation.md) | optimistic client, sequenced presentation, canonical card, UX-G1 engine gate | Accepted |
 | [`adr/0010-automatic-controller-handoff.md`](adr/0010-automatic-controller-handoff.md) | automatic newest-device controller handoff with epoch fencing | Accepted |
+| [`adr/0013-recipient-scoped-play-history.md`](adr/0013-recipient-scoped-play-history.md) | least-privilege completed-trick projection and public progress count | Accepted |
 
 ## Decision traceability
 
@@ -52,6 +53,7 @@ Jika dua dokumen setingkat bertentangan, dokumen dengan change record/ADR paling
 | OD-17 simple table bots | Product Contract sections 3, 6, 7; ADR-008 | table/actor/protocol/projection tests |
 | OD-18 gameplay UX reliability | `apps/web/PLAN.md` sections 19–23; ADR-003 amendment; ADR-009 | optimistic/realtime/component/pointer/visual browser matrix and UX-G1 |
 | OD-19 automatic controller handoff | Product Contract sections 7.5 and 15; Wireflows 14; ADR-010 | reducer and two-tab/reload E2E plus realtime fencing tests |
+| OD-20 recipient-scoped play history | ADR-013; `apps/web/PLAN.md` sections 22–23 | projector recipient matrix, snapshot round-trip, raw-frame and browser/mobile history tests |
 
 ## Phase 0 exit report
 
@@ -73,7 +75,7 @@ Current roadmap after Phase 2 is intentionally narrow: Phase 3 stabilizes realti
 
 ## Current agent context — Gameplay UX reliability
 
-Objective GUX is planned/not started. Use `apps/web/PLAN.md` sections 19–23 as the detailed objective tracker and root `PLAN.md` as the cross-component gate. Future implementation agents must preserve these reasons and boundaries:
+Objective GUX dan ENG-01 telah selesai. Use `apps/web/PLAN.md` sections 19–23 as the detailed objective tracker and root `PLAN.md` as the cross-component gate. Future implementation agents must preserve these reasons and boundaries:
 
 - UX correctness, immediate feedback, predictable bridge-table convention, and spatial clarity outrank decorative novelty.
 - Extract meaningful gameplay domains from the current large table component without atomizing wrappers. Own, dummy, and played cards use one canonical card primitive with context variants.
@@ -81,9 +83,9 @@ Objective GUX is planned/not started. Use `apps/web/PLAN.md` sections 19–23 as
 - Click/tap/drag share one command path. Known-illegal triggers are disabled; rule-invalidity toast is not the normal enforcement path.
 - Card movement/trick pacing is functional feedback in one sequenced queue. Only a board click skips the current normal gameplay animation.
 - Dummy, trick, participant, own-hand, and navbar zones must not overlap from 320 px mobile through desktop. Persistent gameplay actions use navbar space before floating panels; active copy stays concise.
-- ENG-01 history, ENG-02 score sheet, and ENG-03 bot consensus are blocked until every UX-01–UX-14 item passes UX-G1. This exists to prevent engine scope from destabilizing the frontend contract.
+- ENG-01 history is complete under ADR-013/OD-20. ENG-02 score sheet remains blocked on semantics, and ENG-03 bot consensus remains a separate deliberate supersession of ADR-008.
 
-Repository risks to re-check before implementation: accepted ACKs are currently ignored by the web client; projected events do not carry origin request ID; arbitrary events clear all pending work; `CompletedTricks` is broadly projected; single-table IMP semantics are unresolved; ADR-008 currently disables consensus with any bot.
+Repository risks to re-check before implementation: single-table IMP semantics are unresolved; ADR-008 currently disables consensus with any bot. ACK/rebase handling and recipient-scoped `CompletedTricks` are implemented and covered by delayed realtime/raw-frame tests.
 
 Rules were source-reviewed against the current WBF 2017 Laws page, including the revisions effective 1 Januari 2024 and Law 77 scoring table. An independent experienced-player review remains an additional Phase 2 golden-test sign-off; it is evidence validation, not an open product decision.
 

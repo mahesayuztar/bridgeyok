@@ -1,7 +1,7 @@
 # BridgeYok Web Roadmap
 
-> Status: **GUX COMPLETE — UX-01–UX-14 PASS; UX-G1 PASS**
-> Last updated: 4 September 2026
+> Status: **GUX COMPLETE — UX-01–UX-14, UX-G1, dan ENG-01 PASS**
+> Last updated: 5 September 2026
 > Scope: guest entry, lobby navigation, actionable errors, controller takeover, table UX/layout, dan objective GUX frontend-first yang regression-sensitive.
 > Implementation must not begin until the visual-reference and projection audits in Work 0 are complete.
 
@@ -889,6 +889,8 @@ Gate hanya PASS bila seluruh fourteen objectives memiliki acceptance, browser/mo
 
 ### ENG-01 — Play history
 
+**Status:** PASS — recipient-scoped projection, durable snapshot history, accessible popover, dan raw-frame browser evidence completed 5 September 2026.
+
 - **Problem:** completed-trick review has no governed UI entry point or explicit viewer information policy.
 - **Scope:** activate UX-11 indicator; Dummy viewer may see trick 1 through latest available trick, non-Dummy sees only last trick allowed by approved policy; persist/hydrate history in authoritative state and project only entitled records; sheet/popover UI.
 - **Non-goals:** no hidden-hand leak, full replay/editor, public spectator history, or scoring change.
@@ -944,7 +946,7 @@ UX-07–13 component/browser evidence: UX-07–09 commits 9275dce, 262b3be; UX-1
 UX-10 turn audio: commits a432824, 0419430; false→true/same-snapshot/scored-board unit proof plus Web Audio enabled/muted and localStorage persistence in four-browser flow PASS
 UX-14 matrix report: commits 5b4b7e4, bfb989d; unit 44/44, typecheck, lint, production build, Playwright 3/3 (3.6m); 1920×1080, 1024×768, 768×1024, 390×844, and 320×700 screenshots plus bounding-box, touch/mouse, delayed realtime, reconnect, reduced-motion/audio, and raw hidden-frame assertions PASS
 UX-G1 review/date: PASS — 4 September 2026; no severity-high gameplay UX or accessibility regression found in automated matrix and screenshot review
-ENG-01 privacy review: _____________________
+ENG-01 privacy review: PASS — ADR-013/OD-20; commits 6516cab, 2f076aa, eb3273d, 4bdc3f5, d1199a7, 954f644, cd84008, e0156e1; projector matrix declarer/Dummy/defenders × trick 0/1/2/13 and defensive-copy PASS; private snapshot JSON round-trip PASS; web unit 46/46, typecheck, lint PASS; Playwright full 3/3 (4.6m) plus final scoped-history flow 1/1 (4.0m) across 1920×1080, 1024×768, 768×1024, 390×844, and 320×700; Dummy 13-trick/52-card scroll, non-Dummy latest-only, Escape/focus/close, full-deal independence, reconnect, and raw snapshot/event entitlement assertions PASS
 ENG-02 score semantics decision: ___________
 ENG-03 consensus transition report: ________
 ```
@@ -954,7 +956,7 @@ Known risks discovered in the current repository:
 1. ACK revision/sequence plus request ID proved sufficient without a protocol change: ACK marks a request accepted, visible/revision-matched events settle it, event-before-ACK is idempotent, and snapshot remains recovery authority.
 2. Events now reconcile request-scoped operations and preserve still-valid optimistic work; snapshots, disconnects, and conflicts intentionally clear operations without automatic retry.
 3. Command serialization is now an explicit capability/conflict rule at the central dispatch boundary because every mutation uses the current authoritative expected revision; UI controls no longer own an ad hoc global disabled flag.
-4. `CompletedTricks` is already projected to all participants. ENG-01's intended “Dummy all / others last allowed” policy conflicts with that payload and needs a security/product decision before UI.
+4. Resolved by ENG-01/OD-20: `CompletedTricks` is recipient-scoped in the server projector, `completedTrickCount` carries public progress, and raw snapshot/event tests reject broader non-Dummy history.
 5. ENG-02 terminology is unresolved: a single table has no inherent IMP comparison. Raw duplicate score cannot be labeled IMP without a reference result or accepted pair/session model.
 6. ADR-008 and current aggregate explicitly disable consensus whenever a bot is present. ENG-03 is a deliberate future product/architecture supersession and remains gated.
 7. Four-browser Playwright baseline is now committed and passing; the local `.playwright` configuration remains unrelated user work and is intentionally excluded from UX commits.

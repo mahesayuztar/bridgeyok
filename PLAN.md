@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14 dan UX-G1 PASS; ENG-01 dapat dimulai
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01 PASS
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1234,6 +1234,8 @@ Required order adalah audit baseline → behavior-preserving UX-01 extraction �
 - [x] UX-14 PASS
 
 UX-G1 **PASS pada 4 September 2026**. ENG-01 Play History dapat berjalan lebih dahulu; ENG-02 Table Score Sheet dan ENG-03 Bot Consensus Behavior tetap mengikuti urutan dan decision gate masing-masing. Jangan interleave ketiganya dalam satu commit atau memakai kelulusan UX-G1 untuk melewati dependency domain objective berikutnya.
+
+ENG-01 **PASS pada 5 September 2026**. Riwayat trick private tetap durable, projector membatasi payload per recipient sesuai OD-20, `completedTrickCount` memisahkan progress publik dari history entitlement, dan popover indikator UX-11 lulus raw-frame privacy serta browser/mobile gate. ENG-02 tetap blocked sampai semantics comparison source dan pair/session lifecycle disetujui.
 
 ### Phase 4 — WBF boundary, deal sources, dan DDS analysis (6–9 hari)
 
