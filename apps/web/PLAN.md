@@ -1,7 +1,7 @@
 # BridgeYok Web Roadmap
 
-> Status: **IN PROGRESS — GUX UX-01–UX-13 PASS; UX-14 belum dimulai**
-> Last updated: 2 September 2026
+> Status: **GUX COMPLETE — UX-01–UX-14 PASS; UX-G1 PASS**
+> Last updated: 4 September 2026
 > Scope: guest entry, lobby navigation, actionable errors, controller takeover, table UX/layout, dan objective GUX frontend-first yang regression-sensitive.
 > Implementation must not begin until the visual-reference and projection audits in Work 0 are complete.
 
@@ -590,7 +590,7 @@ Visual novelty bukan tujuan.
 
 ## 19. Objective GUX — Gameplay UX Reliability & Interaction Refactor
 
-**Status:** IN PROGRESS — UX-01–UX-13 PASS; UX-14 NOT STARTED
+**Status:** COMPLETE — UX-01–UX-14 PASS; UX-G1 PASS
 
 **Priority:** UX correctness dan gameplay feel kira-kira 10× lebih penting daripada decorative polish.
 
@@ -820,6 +820,8 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ### UX-14 — Cross-breakpoint gameplay verification
 
+**Status:** PASS — automated gameplay matrix, geometry assertions, privacy frames, and screenshot review completed 4 September 2026.
+
 - **Problem:** current compile/unit checks and one desktop E2E cannot detect gameplay overlap, latency feedback, touch, animation order, or orientation regressions.
 - **Scope:** automated browser fixtures/scenarios and screenshot/bounding-box evidence for auction, opening lead, dummy reveal/top/left/right, declarer own/dummy, defender, complete/next trick, desktop/touch drag, optimistic bid/play, rejection rollback, reconnect with optimistic action, board-click animation skip, claim, undo, bot identity, contract ownership, navbar actions, and trick indicator.
 - **Non-goals:** manual eyeballing alone is insufficient; no production-only fixture backdoor; no broad E2E duplication of cheap reducer tests.
@@ -834,13 +836,13 @@ Objective ini memperbaiki feedback aksi yang terlambat, batas component yang ter
 
 ## 20. GATE UX-G1 — Gameplay UX Refactor Complete
 
-Status saat ini: **BLOCKED — UX-01–UX-13 PASS; UX-14 masih NOT STARTED**.
+Status saat ini: **PASS — UX-01–UX-14 complete; post-gate engine work may proceed in roadmap order**.
 
 ```text
 [x] UX-01 PASS  [x] UX-02 PASS  [x] UX-03 PASS  [x] UX-04 PASS
 [x] UX-05 PASS  [x] UX-06 PASS  [x] UX-07 PASS  [x] UX-08 PASS
 [x] UX-09 PASS  [x] UX-10 PASS  [x] UX-11 PASS  [x] UX-12 PASS
-[x] UX-13 PASS  [ ] UX-14 PASS
+[x] UX-13 PASS  [x] UX-14 PASS
 ```
 
 Gate hanya PASS bila seluruh fourteen objectives memiliki acceptance, browser/mobile, regression, dan completion evidence. TypeScript compile, satu screenshot, atau happy path desktop tidak cukup. **ENG-01, ENG-02, dan ENG-03 dilarang mulai sebelum UX-G1 PASS.** Jika frontend menemukan engine limitation, catat contract/dependency dan lanjutkan frontend dengan boundary/fixture yang aman. Exception engine sebelum gate hanya boleh dibuat bila frontend contract literal mustahil diselesaikan tanpanya, disertai blocker reproduction, smallest compatible change, ADR amendment, dan explicit approval di roadmap.
@@ -940,8 +942,8 @@ UX-05 desktop/mobile drag: commits a432824, 0419430; real mouse pointer and Chro
 UX-06 viewport screenshots/geometry: commits 9275dce, 262b3be; Playwright 1920×1080, 1024×768, 768×1024, 390×844, 320×700; aspect ratio, clipping, board-zone containment, dummy/trick and own-hand/table non-overlap PASS
 UX-07–13 component/browser evidence: UX-07–09 commits 9275dce, 262b3be; UX-11–13 commits 8f535ad, c7f4aeb; formatter suits/NT/X/XX/missing identity/long name PASS; viewer-relative trick mapping NS/EW/0–13/no-seat PASS; selectable invite code without Clipboard API PASS; bot icon N/E/S/W at 1440/1024/390/320 plus portal semantics PASS
 UX-10 turn audio: commits a432824, 0419430; false→true/same-snapshot/scored-board unit proof plus Web Audio enabled/muted and localStorage persistence in four-browser flow PASS
-UX-14 matrix report: _______________________
-UX-G1 review/date: _________________________
+UX-14 matrix report: commits 5b4b7e4, bfb989d; unit 44/44, typecheck, lint, production build, Playwright 3/3 (3.6m); 1920×1080, 1024×768, 768×1024, 390×844, and 320×700 screenshots plus bounding-box, touch/mouse, delayed realtime, reconnect, reduced-motion/audio, and raw hidden-frame assertions PASS
+UX-G1 review/date: PASS — 4 September 2026; no severity-high gameplay UX or accessibility regression found in automated matrix and screenshot review
 ENG-01 privacy review: _____________________
 ENG-02 score semantics decision: ___________
 ENG-03 consensus transition report: ________

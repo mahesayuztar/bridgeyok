@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-13 PASS serta tetap menjadi gate untuk ENG-01–03
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14 dan UX-G1 PASS; ENG-01 dapat dimulai
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1191,7 +1191,7 @@ Work:
 
 **Status implementasi 30 Agustus 2026:** Work 1–5 selesai. Guest/table lifecycle, durable command transaction, process-local table actor, transport WebSocket v1, dan web lobby/table sudah tersedia. Web mencakup guest session restore, create/join via invite, seat/ready/owner controls, auction keyboard/mobile controls, follow-suit card input, declarer dummy control, current trick, result, next board/finish, explicit connected/degraded/offline state, resumable sequence, dan pembersihan private/pending state ketika koneksi atau meja berubah. Reducer unit test, lint, typecheck, dan production build web lulus; scripted WS contract, recipient privacy, package race, serta PostgreSQL command/resume integration test dari Work 4 tetap lulus. Phase 3 tetap terbuka; Work 6 berikutnya mengeraskan room/table transition dan menutup four-browser persisted/reconnect/privacy gate sebelum observability minimum.
 
-### Objective GUX — Gameplay UX Reliability & Interaction Refactor — IN PROGRESS / UX-01–UX-13 PASS
+### Objective GUX — Gameplay UX Reliability & Interaction Refactor — COMPLETE / UX-01–UX-14 PASS
 
 **Objective:** membuat aksi bridge terasa langsung, predictable, spatially continuous, dan usable di desktop/mobile tanpa decorative redesign atau perubahan prematur pada pure engine. UX correctness dan gameplay feel mempunyai prioritas kira-kira 10× decorative quality.
 
@@ -1231,9 +1231,9 @@ Required order adalah audit baseline → behavior-preserving UX-01 extraction �
 - [x] UX-11 PASS
 - [x] UX-12 PASS
 - [x] UX-13 PASS
-- [ ] UX-14 PASS
+- [x] UX-14 PASS
 
-ENG-01 Play History, ENG-02 Table Score Sheet, dan ENG-03 Bot Consensus Behavior berstatus **BLOCKED BY UX-G1**. Jangan interleave ketiganya dengan GUX. Frontend-discovered engine limitation dicatat sebagai dependency; engine exception sebelum gate memerlukan bukti frontend contract benar-benar mustahil, smallest compatible change, ADR amendment, dan explicit roadmap approval. Existing Phase 4 work yang bukan ENG-01/02/03 tidak otomatis dibatalkan, tetapi tidak boleh disisipkan ke commit GUX atau dipakai untuk melewati gate ini.
+UX-G1 **PASS pada 4 September 2026**. ENG-01 Play History dapat berjalan lebih dahulu; ENG-02 Table Score Sheet dan ENG-03 Bot Consensus Behavior tetap mengikuti urutan dan decision gate masing-masing. Jangan interleave ketiganya dalam satu commit atau memakai kelulusan UX-G1 untuk melewati dependency domain objective berikutnya.
 
 ### Phase 4 — WBF boundary, deal sources, dan DDS analysis (6–9 hari)
 
@@ -1412,7 +1412,7 @@ Semua decision berikut berlaku sebagai baseline implementasi. Phase 0 tidak memi
 | OD-18 | Gameplay UX reliability memakai server-authoritative optimistic client, logical/presentation separation, one canonical card primitive, one play-command path, dan UX-G1 engine gate. | Local legal call/play terlihat segera lalu reconcile/rollback dengan revision/request identity; known-illegal action dicegah; motion terurut dapat di-skip hanya lewat board; ENG-01/02/03 blocked sampai UX-01–14 PASS. Lihat ADR-009 dan `apps/web/PLAN.md`. |
 | OD-19 | Connection web terbaru untuk guest yang sudah duduk otomatis mengambil controller setelah projection fresh. | Tidak ada konfirmasi takeover; fencing epoch tetap tunggal, device lama ditolak `STALE_CONTROLLER`, dan mutation user yang ditolak tidak diulang otomatis. Lihat ADR-010. |
 
-Status OD-01 sampai OD-12: **CLOSED — accepted 29 Agustus 2026**. OD-13 sampai OD-16 mencatat refactor scope 30 Agustus 2026. OD-17 diterima 31 Agustus 2026 sebagai perubahan produk eksplisit dan menjadi baseline Phase 3–5. OD-18 diterima 1 September 2026 sebagai architecture/sequence baseline Objective GUX; implementation sedang berjalan dengan UX-01–UX-13 PASS, sedangkan UX-14 belum dimulai. OD-19 diterima 2 September 2026 dan menggantikan konfirmasi takeover manual dengan handoff otomatis pada connection terbaru.
+Status OD-01 sampai OD-12: **CLOSED — accepted 29 Agustus 2026**. OD-13 sampai OD-16 mencatat refactor scope 30 Agustus 2026. OD-17 diterima 31 Agustus 2026 sebagai perubahan produk eksplisit dan menjadi baseline Phase 3–5. OD-18 diterima 1 September 2026 sebagai architecture/sequence baseline Objective GUX; implementation UX-01–UX-14 dan UX-G1 selesai 4 September 2026. OD-19 diterima 2 September 2026 dan menggantikan konfirmasi takeover manual dengan handoff otomatis pada connection terbaru.
 
 ---
 
