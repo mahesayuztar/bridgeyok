@@ -120,7 +120,12 @@ export function BridgeHand({
   const cardGroups = sideDummy
     ? groupCardsForContract(cards, contractStrain)
     : [{ key: "hand", suit: undefined, suitIndex: 0, cards: organizedCards }];
-  const style = { "--card-count": Math.max(cards.length, 1) } as CSSProperties;
+  const style = {
+    "--card-count": Math.max(cards.length, 1),
+    ...(sideDummy
+      ? { "--side-dummy-suit-count": Math.max(cardGroups.length, 1) }
+      : {}),
+  } as CSSProperties;
   return (
     <section
       className={`bridge-hand ${className}`}
@@ -130,17 +135,14 @@ export function BridgeHand({
       style={style}
     >
       <div className="hand-cards">
-        {cardGroups.map((cardGroup) => (
+        {cardGroups.map((cardGroup, _cardGroupIndex) => (
           <div
             className={`hand-card-group${cardGroup.suit === undefined ? "" : " dummy-suit-group"}`}
             key={cardGroup.key}
             style={
               sideDummy
                 ? ({
-                    "--side-dummy-suit-row":
-                      cardGroup.suitIndex < 2
-                        ? cardGroup.suitIndex + 1
-                        : cardGroup.suitIndex + 2,
+                    "--side-dummy-suit-row": _cardGroupIndex + 1,
                   } as CSSProperties)
                 : undefined
             }
@@ -149,7 +151,7 @@ export function BridgeHand({
               : {
                   "data-suit": cardGroup.suit,
                   "data-density":
-                    cardGroup.cards.length >= 10 ? "tight" : "normal",
+                    cardGroup.cards.length >= 8 ? "tight" : "normal",
                   "aria-label": `${suitLabels[cardGroup.suit]} ${cardGroup.cards.length} kartu`,
                 })}
           >
