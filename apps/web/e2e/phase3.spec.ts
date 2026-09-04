@@ -230,7 +230,10 @@ async function returnCardFromInvalidDrop(page: Page) {
   await page.waitForTimeout(50);
 }
 
-function assertPrivateFrames(frames: string[]) {
+function assertPrivateFrames(
+  frames: string[],
+  historyPolicy: "full" | "latest",
+) {
   for (const encoded of frames) {
     let envelope: Record<string, unknown>;
     try {
@@ -246,6 +249,14 @@ function assertPrivateFrames(frames: string[]) {
       if (game.dummyRevealed !== true) {
         expect(game.dummyHand).toBeUndefined();
       }
+    }
+    if (game !== undefined && typeof game.completedTrickCount === "number") {
+      expect(Array.isArray(game.completedTricks)).toBe(true);
+      expect((game.completedTricks as unknown[]).length).toBe(
+        historyPolicy === "full"
+          ? game.completedTrickCount
+          : Math.min(game.completedTrickCount, 1),
+      );
     }
     expect(encoded).not.toContain("sessionId");
     expect(encoded).not.toContain("deviceCredential");
@@ -312,45 +323,52 @@ async function assertGameplayGeometry(page: Page) {
     });
     const dummyHand = rect(document.querySelector(".dummy-hand"));
     const currentTrick = rect(document.querySelector(".current-trick"));
-    const cards = [...document.querySelectorAll(".physical-card")].map((card) => {
-      const box = card.getBoundingClientRect();
-      const ownHand = card.closest<HTMLElement>(".own-hand");
-      const scrollContainer =
-        card.closest<HTMLElement>(".bridge-hand")
-          ?.querySelector<HTMLElement>(".hand-cards") ?? null;
-      const zoneElement =
-        ownHand?.querySelector<HTMLElement>(".hand-cards") ??
-        card.closest<HTMLElement>(".board-play-zone");
-      const zone = zoneElement?.getBoundingClientRect();
-      const verticalClip =
-        zone === undefined || box.top < zone.top - 1 || box.bottom > zone.bottom + 1;
-      const horizontalClip =
-        zone === undefined || box.left < zone.left - 1 || box.right > zone.right + 1;
-      const horizontalScrollAvailable =
-        scrollContainer !== null &&
-        scrollContainer.scrollWidth > scrollContainer.clientWidth;
-      return {
-        ratio: box.width / box.height,
-        width: box.width,
-        sideDummy: card.closest(".dummy-left, .dummy-right") !== null,
-        cornerFontSize: Number.parseFloat(
-          getComputedStyle(card.querySelector(".card-corner")!).fontSize,
-        ),
-        label: card.getAttribute("aria-label"),
-        className: card.className,
-        zoneClassName: card.closest(".board-play-zone, .own-hand")?.className,
-        bounds:
-          zone === undefined
-            ? null
-            : {
-                top: box.top - zone.top,
-                right: zone.right - box.right,
-                bottom: zone.bottom - box.bottom,
-                left: box.left - zone.left,
-              },
-        clipped: verticalClip || (horizontalClip && !horizontalScrollAvailable),
-      };
-    });
+    const cards = [...document.querySelectorAll(".physical-card")]
+      .filter((card) => card.getClientRects().length > 0)
+      .map((card) => {
+        const box = card.getBoundingClientRect();
+        const ownHand = card.closest<HTMLElement>(".own-hand");
+        const scrollContainer =
+          card.closest<HTMLElement>(".bridge-hand")
+            ?.querySelector<HTMLElement>(".hand-cards") ?? null;
+        const zoneElement =
+          ownHand?.querySelector<HTMLElement>(".hand-cards") ??
+          card.closest<HTMLElement>(".board-play-zone");
+        const zone = zoneElement?.getBoundingClientRect();
+        const verticalClip =
+          zone === undefined ||
+          box.top < zone.top - 1 ||
+          box.bottom > zone.bottom + 1;
+        const horizontalClip =
+          zone === undefined ||
+          box.left < zone.left - 1 ||
+          box.right > zone.right + 1;
+        const horizontalScrollAvailable =
+          scrollContainer !== null &&
+          scrollContainer.scrollWidth > scrollContainer.clientWidth;
+        return {
+          ratio: box.width / box.height,
+          width: box.width,
+          sideDummy: card.closest(".dummy-left, .dummy-right") !== null,
+          cornerFontSize: Number.parseFloat(
+            getComputedStyle(card.querySelector(".card-corner")!).fontSize,
+          ),
+          label: card.getAttribute("aria-label"),
+          className: card.className,
+          zoneClassName: card.closest(".board-play-zone, .own-hand")?.className,
+          bounds:
+            zone === undefined
+              ? null
+              : {
+                  top: box.top - zone.top,
+                  right: zone.right - box.right,
+                  bottom: zone.bottom - box.bottom,
+                  left: box.left - zone.left,
+                },
+          clipped:
+            verticalClip || (horizontalClip && !horizontalScrollAvailable),
+        };
+      });
     const ownCardSlots = [
       ...document.querySelectorAll<HTMLElement>(".own-hand .hand-card-slot"),
     ];
@@ -1251,6 +1269,40 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   expect(northTricks.won).toBe(eastTricks.lost);
   expect(northTricks.lost).toBe(eastTricks.won);
   expect(northTricks.won + northTricks.lost).toBe(1);
+  for (const page of trickPages) {
+    await expect(
+      page.getByRole("button", { name: /Buka riwayat trick/ }),
+    ).toBeVisible();
+  }
+  const latestHistoryTrigger = east.page.getByRole("button", {
+    name: /Buka riwayat trick/,
+  });
+  await latestHistoryTrigger.click();
+  const latestHistory = east.page.getByRole("dialog", {
+    name: "Riwayat trick",
+  });
+  await expect(latestHistory).toBeVisible();
+  await expect(latestHistory).toHaveAttribute("data-history-policy", "latest");
+  await expect(latestHistory.locator(".trick-history-item")).toHaveCount(1);
+  await expect(latestHistory.locator(".trick-history-play")).toHaveCount(4);
+  await expect(latestHistory.locator(".card-trick").first()).toBeVisible();
+  await east.page.keyboard.press("Escape");
+  await expect(latestHistory).toBeHidden();
+  await expect(latestHistoryTrigger).toBeFocused();
+
+  const fullHistoryTrigger = south.page.getByRole("button", {
+    name: /Buka riwayat trick/,
+  });
+  await fullHistoryTrigger.click();
+  const fullHistory = south.page.getByRole("dialog", {
+    name: "Riwayat trick",
+  });
+  await expect(fullHistory).toBeVisible();
+  await expect(fullHistory).toHaveAttribute("data-history-policy", "full");
+  await expect(fullHistory.locator(".trick-history-item")).toHaveCount(1);
+  await expect(fullHistory.locator(".trick-history-play")).toHaveCount(4);
+  await south.page.getByRole("button", { name: "Tutup riwayat trick" }).click();
+  await expect(fullHistory).toBeHidden();
   const claimTrigger = replacementTab.getByLabel("Ajukan claim");
   await expect(claimTrigger).toBeVisible();
   await claimTrigger.focus();
@@ -1294,6 +1346,54 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   );
   await Promise.all(activePages.map(assertCompletedDealGeometry));
 
+  await fullHistoryTrigger.click();
+  await expect(fullHistory).toBeVisible();
+  await expect(fullHistory.locator(".trick-history-item")).toHaveCount(13);
+  await expect(fullHistory.locator(".trick-history-play")).toHaveCount(52);
+  await expect(fullHistory.locator(".card-trick").first()).toBeVisible();
+  await expect(fullHistory.locator(".trick-history-item").first()).toContainText(
+    "Trick 1",
+  );
+  await expect(fullHistory.locator(".trick-history-item").last()).toContainText(
+    "Trick 13",
+  );
+  await south.page.screenshot({
+    path: testInfo.outputPath("trick-history-full-768x1024.png"),
+    fullPage: false,
+  });
+  await south.page.getByRole("button", { name: "Tutup riwayat trick" }).click();
+
+  const compactHistoryTrigger = replacementTab.getByRole("button", {
+    name: /Buka riwayat trick/,
+  });
+  await compactHistoryTrigger.click();
+  const compactHistory = replacementTab.getByRole("dialog", {
+    name: "Riwayat trick",
+  });
+  await expect(compactHistory).toBeVisible();
+  await expect(compactHistory).toHaveAttribute("data-history-policy", "latest");
+  await expect(compactHistory.locator(".trick-history-item")).toHaveCount(1);
+  await expect(compactHistory.locator(".trick-history-play")).toHaveCount(4);
+  await expect(compactHistory.locator(".card-trick").first()).toBeVisible();
+  await expect(compactHistory.locator(".trick-history-item")).toContainText(
+    "Trick 13",
+  );
+  const compactHistoryBox = await compactHistory.boundingBox();
+  expect(compactHistoryBox).not.toBeNull();
+  expect(compactHistoryBox!.x).toBeGreaterThanOrEqual(0);
+  expect(compactHistoryBox!.y).toBeGreaterThanOrEqual(0);
+  expect(compactHistoryBox!.x + compactHistoryBox!.width).toBeLessThanOrEqual(
+    320,
+  );
+  expect(compactHistoryBox!.y + compactHistoryBox!.height).toBeLessThanOrEqual(
+    700,
+  );
+  await replacementTab.screenshot({
+    path: testInfo.outputPath("trick-history-latest-320x700.png"),
+    fullPage: false,
+  });
+  await replacementTab.getByRole("button", { name: "Tutup riwayat trick" }).click();
+
   await replacementTab.locator(".board-play-zone").click({
     position: { x: 10, y: 10 },
   });
@@ -1302,9 +1402,10 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     "true",
   );
   await expect(replacementTab.locator(".board-result")).toHaveCount(0);
-  for (const player of players) {
-    assertPrivateFrames(player.frames);
-  }
+  assertPrivateFrames(north.frames, "latest");
+  assertPrivateFrames(east.frames, "latest");
+  assertPrivateFrames(south.frames, "full");
+  assertPrivateFrames(west.frames, "latest");
   await expect(
     replacementTab.getByRole("button", { name: "Board berikutnya" }),
   ).toHaveCount(0);
