@@ -190,3 +190,21 @@ SET status = EXCLUDED.status,
     score_ns = EXCLUDED.score_ns,
     result = EXCLUDED.result,
     completed_at = EXCLUDED.completed_at;
+
+-- name: InsertBoardSeatAttribution :exec
+INSERT INTO bridgeyok.board_seat_attributions (
+    table_id,
+    board_id,
+    seat,
+    occupant_id,
+    nickname,
+    is_bot
+) VALUES (
+    sqlc.arg(table_id),
+    sqlc.arg(board_id),
+    sqlc.arg(seat),
+    sqlc.arg(occupant_id),
+    sqlc.arg(nickname),
+    sqlc.arg(is_bot)
+)
+ON CONFLICT (board_id, seat) DO NOTHING;

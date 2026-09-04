@@ -238,6 +238,17 @@ func syncRelationalAggregate(ctx context.Context, queries *dbgen.Queries, aggreg
 		if err := upsertBoard(ctx, queries, aggregate, occurredAt); err != nil {
 			return err
 		}
+		if aggregate.CurrentBoardLineup != nil {
+			for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+				occupant := aggregate.CurrentBoardLineup.Seats[seat]
+				if err := queries.InsertBoardSeatAttribution(ctx, dbgen.InsertBoardSeatAttributionParams{
+					TableID: aggregate.ID, BoardID: aggregate.BoardID, Seat: string(seat), OccupantID: occupant.ID,
+					Nickname: occupant.Nickname, IsBot: occupant.IsBot,
+				}); err != nil {
+					return fmt.Errorf("persist board seat attribution %s: %w", seat, err)
+				}
+			}
+		}
 	}
 	return nil
 }

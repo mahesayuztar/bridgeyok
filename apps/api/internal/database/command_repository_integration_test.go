@@ -424,6 +424,34 @@ func TestCommandRepositoryPersistsAndHydratesCompletedBoard(t *testing.T) {
 	if boardStatus != "PASSED_OUT" || scoreNS == nil || *scoreNS != 0 || len(resultJSON) == 0 {
 		t.Fatalf("persisted board status=%s score=%v result=%s", boardStatus, scoreNS, resultJSON)
 	}
+	rows, err := environment.postgres.Pool().Query(environment.ctx,
+		"SELECT seat, occupant_id, nickname, is_bot FROM bridgeyok.board_seat_attributions WHERE table_id = $1 AND board_id = $2 ORDER BY seat",
+		environment.tableID, boardID,
+	)
+	if err != nil {
+		t.Fatalf("read board seat attributions: %v", err)
+	}
+	defer rows.Close()
+	attributionCount := 0
+	for rows.Next() {
+		var seat string
+		var occupantID string
+		var nickname string
+		var isBot bool
+		if err := rows.Scan(&seat, &occupantID, &nickname, &isBot); err != nil {
+			t.Fatalf("scan board seat attribution: %v", err)
+		}
+		if seat == "" || occupantID == "" || nickname == "" || isBot {
+			t.Fatalf("board seat attribution = %q %q %q bot=%t", seat, occupantID, nickname, isBot)
+		}
+		attributionCount++
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate board seat attributions: %v", err)
+	}
+	if attributionCount != 4 || len(aggregate.ScoreSheet) != 1 {
+		t.Fatalf("attributions = %d, score sheet rows = %d", attributionCount, len(aggregate.ScoreSheet))
+	}
 
 	restarted, err := Open(environment.ctx, os.Getenv("TEST_DATABASE_URL"), 2)
 	if err != nil {

@@ -65,6 +65,46 @@ func (q *Queries) FindProcessedCommand(ctx context.Context, arg FindProcessedCom
 	return outcome, err
 }
 
+const insertBoardSeatAttribution = `-- name: InsertBoardSeatAttribution :exec
+INSERT INTO bridgeyok.board_seat_attributions (
+    table_id,
+    board_id,
+    seat,
+    occupant_id,
+    nickname,
+    is_bot
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6
+)
+ON CONFLICT (board_id, seat) DO NOTHING
+`
+
+type InsertBoardSeatAttributionParams struct {
+	TableID    string `json:"table_id"`
+	BoardID    string `json:"board_id"`
+	Seat       string `json:"seat"`
+	OccupantID string `json:"occupant_id"`
+	Nickname   string `json:"nickname"`
+	IsBot      bool   `json:"is_bot"`
+}
+
+func (q *Queries) InsertBoardSeatAttribution(ctx context.Context, arg InsertBoardSeatAttributionParams) error {
+	_, err := q.db.Exec(ctx, insertBoardSeatAttribution,
+		arg.TableID,
+		arg.BoardID,
+		arg.Seat,
+		arg.OccupantID,
+		arg.Nickname,
+		arg.IsBot,
+	)
+	return err
+}
+
 const insertGameEvent = `-- name: InsertGameEvent :exec
 INSERT INTO bridgeyok.game_events (
     table_id,
