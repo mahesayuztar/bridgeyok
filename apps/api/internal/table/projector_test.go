@@ -135,6 +135,67 @@ func TestProjectRevealsOnlyDummyAfterOpeningLead(t *testing.T) {
 	}
 }
 
+func TestProjectScopesCompletedTricksByViewer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                string
+		completedTrickCount int
+	}{
+		{name: "no completed trick", completedTrickCount: 0},
+		{name: "opening trick", completedTrickCount: 1},
+		{name: "multiple tricks", completedTrickCount: 2},
+		{name: "complete board", completedTrickCount: 13},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			aggregate := testStartedAggregate(t)
+			calls := []bridge.Call{bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass()}
+			for _, call := range calls {
+				aggregate = acceptedDecision(t, aggregate, Command{
+					Name:      CommandMakeCall,
+					SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn),
+					Call:      &call,
+				}).NextState
+			}
+			aggregate = playTableCards(t, aggregate, test.completedTrickCount*4)
+			dummy := aggregate.Game.Auction.Contract.Dummy()
+
+			for _, viewerSeat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+				projection, domainError := Project(aggregate, sessionForSeat(t, aggregate, viewerSeat))
+				if domainError != nil {
+					t.Fatalf("Project(%s) error = %v", viewerSeat, domainError)
+				}
+				if projection.Game.CompletedTrickCount != test.completedTrickCount {
+					t.Fatalf("Project(%s) completedTrickCount = %d, want %d", viewerSeat, projection.Game.CompletedTrickCount, test.completedTrickCount)
+				}
+				wantHistoryLength := 0
+				if viewerSeat == dummy {
+					wantHistoryLength = test.completedTrickCount
+				} else if test.completedTrickCount > 0 {
+					wantHistoryLength = 1
+				}
+				if len(projection.Game.CompletedTricks) != wantHistoryLength {
+					t.Fatalf("Project(%s) completed tricks = %d, want %d", viewerSeat, len(projection.Game.CompletedTricks), wantHistoryLength)
+				}
+				if wantHistoryLength > 0 && !reflect.DeepEqual(projection.Game.CompletedTricks[len(projection.Game.CompletedTricks)-1], aggregate.Game.CompletedTricks[test.completedTrickCount-1]) {
+					t.Fatalf("Project(%s) latest trick does not match authoritative history", viewerSeat)
+				}
+				if wantHistoryLength > 0 {
+					projectedTrickIndex := len(projection.Game.CompletedTricks) - 1
+					authoritativeCard := aggregate.Game.CompletedTricks[test.completedTrickCount-1].Plays[0].Card
+					projection.Game.CompletedTricks[projectedTrickIndex].Plays[0].Card = bridge.Card{}
+					if aggregate.Game.CompletedTricks[test.completedTrickCount-1].Plays[0].Card != authoritativeCard {
+						t.Fatalf("mutating Project(%s) history changed authoritative state", viewerSeat)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestProjectRevealsFullDealOnlyAfterScore(t *testing.T) {
 	t.Parallel()
 

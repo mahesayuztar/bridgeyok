@@ -44,21 +44,22 @@ type ProjectedParticipant struct {
 
 // ProjectedGame contains public board state plus viewer-authorized cards.
 type ProjectedGame struct {
-	RulesetVersion  string               `json:"rulesetVersion"`
-	Board           bridge.BoardMetadata `json:"board"`
-	Phase           bridge.Phase         `json:"phase"`
-	Auction         bridge.Auction       `json:"auction"`
-	LegalCalls      []bridge.Call        `json:"legalCalls,omitempty"`
-	Turn            bridge.Seat          `json:"turn,omitempty"`
-	DummyRevealed   bool                 `json:"dummyRevealed"`
-	CurrentTrick    bridge.Trick         `json:"currentTrick"`
-	CompletedTricks []bridge.Trick       `json:"completedTricks"`
-	TricksNS        int                  `json:"tricksNS"`
-	TricksEW        int                  `json:"tricksEW"`
-	Result          *bridge.Result       `json:"result,omitempty"`
-	OwnHand         bridge.Hand          `json:"ownHand,omitempty"`
-	DummyHand       bridge.Hand          `json:"dummyHand,omitempty"`
-	FullDeal        *bridge.Deal         `json:"fullDeal,omitempty"`
+	RulesetVersion      string               `json:"rulesetVersion"`
+	Board               bridge.BoardMetadata `json:"board"`
+	Phase               bridge.Phase         `json:"phase"`
+	Auction             bridge.Auction       `json:"auction"`
+	LegalCalls          []bridge.Call        `json:"legalCalls,omitempty"`
+	Turn                bridge.Seat          `json:"turn,omitempty"`
+	DummyRevealed       bool                 `json:"dummyRevealed"`
+	CurrentTrick        bridge.Trick         `json:"currentTrick"`
+	CompletedTrickCount int                  `json:"completedTrickCount"`
+	CompletedTricks     []bridge.Trick       `json:"completedTricks"`
+	TricksNS            int                  `json:"tricksNS"`
+	TricksEW            int                  `json:"tricksEW"`
+	Result              *bridge.Result       `json:"result,omitempty"`
+	OwnHand             bridge.Hand          `json:"ownHand,omitempty"`
+	DummyHand           bridge.Hand          `json:"dummyHand,omitempty"`
+	FullDeal            *bridge.Deal         `json:"fullDeal,omitempty"`
 }
 
 // Project builds recipient-specific state without exposing credentials or hidden hands.
@@ -118,24 +119,36 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 	}
 	game := aggregate.Game
 	projectedGame := &ProjectedGame{
-		RulesetVersion:  game.RulesetVersion,
-		Board:           game.Board,
-		Phase:           game.Phase,
-		Auction:         projectAuction(game.Auction),
-		Turn:            game.Turn,
-		DummyRevealed:   game.DummyRevealed,
-		CurrentTrick:    projectTrick(game.CurrentTrick),
-		CompletedTricks: make([]bridge.Trick, len(game.CompletedTricks)),
-		TricksNS:        game.TricksNS,
-		TricksEW:        game.TricksEW,
-		Result:          projectResult(game.Result),
-		OwnHand:         bridge.Hand{},
+		RulesetVersion:      game.RulesetVersion,
+		Board:               game.Board,
+		Phase:               game.Phase,
+		Auction:             projectAuction(game.Auction),
+		Turn:                game.Turn,
+		DummyRevealed:       game.DummyRevealed,
+		CurrentTrick:        projectTrick(game.CurrentTrick),
+		CompletedTrickCount: len(game.CompletedTricks),
+		CompletedTricks:     []bridge.Trick{},
+		TricksNS:            game.TricksNS,
+		TricksEW:            game.TricksEW,
+		Result:              projectResult(game.Result),
+		OwnHand:             bridge.Hand{},
 	}
 	if game.Phase == bridge.PhaseAuction {
 		projectedGame.LegalCalls = append([]bridge.Call(nil), game.Auction.LegalCalls()...)
 	}
-	for _index, trick := range game.CompletedTricks {
-		projectedGame.CompletedTricks[_index] = projectTrick(trick)
+	if len(game.CompletedTricks) > 0 {
+		dummy := bridge.Seat("")
+		if game.Auction.Contract != nil {
+			dummy = game.Auction.Contract.Dummy()
+		}
+		if projection.ViewerSeat == dummy {
+			projectedGame.CompletedTricks = make([]bridge.Trick, len(game.CompletedTricks))
+			for _index, trick := range game.CompletedTricks {
+				projectedGame.CompletedTricks[_index] = projectTrick(trick)
+			}
+		} else {
+			projectedGame.CompletedTricks = []bridge.Trick{projectTrick(game.CompletedTricks[len(game.CompletedTricks)-1])}
+		}
 	}
 	if projection.ViewerSeat.Valid() {
 		projectedGame.OwnHand = game.Deal.Hand(projection.ViewerSeat)
