@@ -661,7 +661,7 @@ h2 {
   gap: clamp(0.7rem, 3vw, 2.5rem);
   margin: 0;
 }
-.table-facts div {
+.table-facts > div {
   display: grid;
   grid-template-columns: auto auto;
   align-items: baseline;
@@ -2257,8 +2257,8 @@ button.physical-card:disabled {
   .table-facts {
     gap: clamp(0.55rem, 1.5vw, 1rem);
   }
-  .table-facts div:nth-child(2),
-  .table-facts div:nth-child(3) {
+  .table-facts > div:nth-child(2),
+  .table-facts > div:nth-child(3) {
     display: none;
   }
   .contract-fact {
@@ -2427,7 +2427,7 @@ button.physical-card:disabled {
     justify-content: flex-start;
     min-width: 0;
   }
-  .table-facts div:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(5)) {
+  .table-facts > div:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(5)) {
     display: none;
   }
   .table-facts dt {
@@ -2732,10 +2732,10 @@ button.physical-card:disabled {
   .waiting-table {
     min-height: 21rem;
   }
-  .table-facts div:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(5)) {
+  .table-facts > div:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(5)) {
     display: none;
   }
-  .table-facts div:first-child {
+  .table-facts > div:first-child {
     display: none;
   }
   .contract-fact {
