@@ -330,6 +330,31 @@ func TestAggregateConsensusSnapshotRoundTrip(t *testing.T) {
 	}
 }
 
+func TestAggregatePlayHistorySnapshotRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	for _, call := range []bridge.Call{bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass()} {
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call}).NextState
+	}
+	aggregate = playTableCards(t, aggregate, 8)
+
+	encoded, err := json.Marshal(aggregate)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	var decoded Aggregate
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if err := decoded.Validate(); err != nil {
+		t.Fatalf("decoded.Validate() error = %v", err)
+	}
+	if !reflect.DeepEqual(decoded.Game.CompletedTricks, aggregate.Game.CompletedTricks) {
+		t.Fatal("completed trick history changed during JSON round trip")
+	}
+}
+
 func TestDecideRejectsUnauthorizedConsensusResponses(t *testing.T) {
 	t.Parallel()
 
