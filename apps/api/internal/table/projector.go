@@ -157,7 +157,7 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 		projectedGame.DummyHand = game.Deal.Hand(game.Auction.Contract.Dummy())
 	}
 	if game.Phase == bridge.PhaseBoardScored {
-		deal := projectDeal(game.Deal)
+		deal := projectFullDeal(*game)
 		projectedGame.FullDeal = &deal
 	}
 	projection.Game = projectedGame
@@ -199,4 +199,26 @@ func projectDeal(deal bridge.Deal) bridge.Deal {
 		South: deal.Hand(bridge.South),
 		West:  deal.Hand(bridge.West),
 	}
+}
+
+func projectFullDeal(game bridge.State) bridge.Deal {
+	deal := projectDeal(game.Deal)
+	tricks := make([]bridge.Trick, 0, len(game.CompletedTricks)+1)
+	tricks = append(tricks, game.CompletedTricks...)
+	tricks = append(tricks, game.CurrentTrick)
+	for _, trick := range tricks {
+		for _, play := range trick.Plays {
+			switch play.Seat {
+			case bridge.North:
+				deal.North = append(deal.North, play.Card)
+			case bridge.East:
+				deal.East = append(deal.East, play.Card)
+			case bridge.South:
+				deal.South = append(deal.South, play.Card)
+			case bridge.West:
+				deal.West = append(deal.West, play.Card)
+			}
+		}
+	}
+	return deal
 }

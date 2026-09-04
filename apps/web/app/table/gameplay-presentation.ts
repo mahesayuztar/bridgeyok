@@ -153,17 +153,6 @@ export function completedDealHands(game: GameProjection) {
     S: [...game.fullDeal.south],
     W: [...game.fullDeal.west],
   };
-  const playedCards = [
-    ...game.completedTricks.flatMap((trick) => trick.plays),
-    ...game.currentTrick.plays,
-  ];
-
-  playedCards.forEach((play) => {
-    if (!hands[play.seat].some((card) => cardKey(card) === cardKey(play.card))) {
-      hands[play.seat].push(play.card);
-    }
-  });
-
   return hands;
 }
 

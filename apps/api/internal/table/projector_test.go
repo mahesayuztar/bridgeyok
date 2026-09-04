@@ -200,20 +200,33 @@ func TestProjectRevealsFullDealOnlyAfterScore(t *testing.T) {
 	t.Parallel()
 
 	aggregate := testStartedAggregate(t)
-	for aggregate.State == StateActive {
-		call := bridge.Pass()
+	initialDeal := projectDeal(aggregate.Game.Deal)
+	for _, call := range []bridge.Call{bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass()} {
 		aggregate = acceptedDecision(t, aggregate, Command{
 			Name:      CommandMakeCall,
 			SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn),
 			Call:      &call,
 		}).NextState
 	}
+	aggregate = playTableCards(t, aggregate, 52)
 	projection, domainError := Project(aggregate, "session-owner")
 	if domainError != nil {
 		t.Fatalf("Project() error = %v", domainError)
 	}
-	if projection.Game.FullDeal == nil || !reflect.DeepEqual(*projection.Game.FullDeal, aggregate.Game.Deal) {
+	if projection.Game.FullDeal == nil {
 		t.Fatal("scored projection omitted full deal")
+	}
+	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+		gotHand := projection.Game.FullDeal.Hand(seat)
+		wantHand := initialDeal.Hand(seat)
+		if len(gotHand) != 13 {
+			t.Fatalf("full deal seat %s has %d cards, want 13", seat, len(gotHand))
+		}
+		for _, card := range wantHand {
+			if !slices.Contains(gotHand, card) {
+				t.Fatalf("full deal seat %s omitted %s", seat, card)
+			}
+		}
 	}
 }
 

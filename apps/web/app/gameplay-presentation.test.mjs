@@ -79,7 +79,7 @@ test("contract score is signed for the declaring partnership", () => {
   );
 });
 
-test("completed deal reconstructs every hand from remaining and played cards", () => {
+test("completed deal uses the authoritative reveal independently of scoped history", () => {
   const longSpadeHand = [
     "A",
     "K",
@@ -97,14 +97,14 @@ test("completed deal reconstructs every hand from remaining and played cards", (
   const game = {
     phase: "BOARD_SCORED",
     fullDeal: {
-      north: [{ suit: "H", rank: "A" }],
+      north: [{ suit: "H", rank: "A" }, ...longSpadeHand],
       east: [],
       south: [],
       west: [],
     },
-    completedTricks: longSpadeHand.map((card) => ({
-      plays: [{ seat: "N", card }],
-    })),
+    completedTricks: [
+      { plays: [{ seat: "E", card: { suit: "C", rank: "2" } }] },
+    ],
     completedTrickCount: 13,
     currentTrick: { plays: [] },
   };
