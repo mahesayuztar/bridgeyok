@@ -706,6 +706,123 @@ h2 {
   height: 1.25rem;
   margin-left: -2px;
 }
+.trick-indicator-button {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+}
+.trick-indicator-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent-strong);
+}
+.trick-history-popover {
+  width: min(34rem, calc(100vw - 1rem));
+  max-height: calc(100dvh - 1rem);
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 1rem 2.5rem rgb(23 34 29 / 18%);
+}
+.trick-history-popover::backdrop {
+  background: rgb(11 62 41 / 58%);
+}
+.trick-history-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.1rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+.trick-history-header .eyebrow {
+  margin-bottom: 0.2rem;
+}
+.trick-history-header h2 {
+  margin: 0;
+  font-size: 1.55rem;
+}
+.trick-history-close {
+  width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.trick-history-policy {
+  margin: 0;
+  padding: 0.8rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.trick-history-list {
+  display: grid;
+  max-height: min(31rem, calc(100dvh - 11rem));
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.trick-history-item {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.8fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+}
+.trick-history-item + .trick-history-item {
+  border-top: 1px solid var(--line);
+}
+.trick-history-summary {
+  display: grid;
+  gap: 0.2rem;
+}
+.trick-history-summary strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+}
+.trick-history-summary span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.trick-history-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+.trick-history-play {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.trick-history-play > span {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+.trick-history-play .card-trick {
+  width: var(--card-compact-width);
+  height: calc(var(--card-compact-width) * 1.4);
+  flex-basis: var(--card-compact-width);
+  padding: 0.2rem;
+}
+.trick-history-play .card-corner {
+  font-size: 0.66rem;
+}
+.trick-history-play .card-suit {
+  right: 0.15rem;
+  bottom: 0.1rem;
+  font-size: 1rem;
+}
 .contract-fact {
   max-width: min(22rem, 30vw);
   overflow: hidden;
@@ -3860,5 +3977,22 @@ button.physical-card.is-dragging {
 
   .board-result dd {
     font-size: 0.76rem;
+  }
+
+  .trick-history-popover {
+    inset: auto 0.5rem 0.5rem;
+    width: auto;
+    max-height: calc(100dvh - 1rem);
+    margin: 0;
+  }
+
+  .trick-history-list {
+    max-height: calc(100dvh - 11rem);
+  }
+
+  .trick-history-item {
+    grid-template-columns: 5.25rem minmax(0, 1fr);
+    gap: 0.65rem;
+    padding-inline: 0.8rem;
   }
 }
