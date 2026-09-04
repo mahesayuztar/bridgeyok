@@ -915,7 +915,8 @@ Gate hanya PASS bila seluruh fourteen objectives memiliki acceptance, browser/mo
 - **Acceptance:** every row traces to durable board result; aggregation/sign/IMP fixtures match approved semantics; pair identity is stable; refresh/restart retains same sheet.
 - **Browser/mobile:** navbar action and sheet remain readable/scrollable at narrow widths with concise headers.
 - **Regression tests:** passed out, positive/negative/tie, seat orientation, multiple boards, duplicate delivery, restart/reconnect, authorization.
-- **Completion gate:** ENG-02 remains BLOCKED until semantics are accepted in product contract/ADR; UI mock alone cannot pass it.
+- **Accepted semantics:** ADR-014/OD-21 defines a `table_id`-scoped raw duplicate ledger, immutable board-start pair identity, side-oriented pair totals, no one-table IMP, and Phase 5 ownership of comparison/IMP.
+- **Completion gate:** semantics gate PASS on 5 September 2026; implementation still requires durable rows, restart/reconnect, projection/privacy, and browser/mobile evidence.
 
 ### ENG-03 — Bot consensus behavior
 
@@ -947,7 +948,7 @@ UX-10 turn audio: commits a432824, 0419430; false→true/same-snapshot/scored-bo
 UX-14 matrix report: commits 5b4b7e4, bfb989d; unit 44/44, typecheck, lint, production build, Playwright 3/3 (3.6m); 1920×1080, 1024×768, 768×1024, 390×844, and 320×700 screenshots plus bounding-box, touch/mouse, delayed realtime, reconnect, reduced-motion/audio, and raw hidden-frame assertions PASS
 UX-G1 review/date: PASS — 4 September 2026; no severity-high gameplay UX or accessibility regression found in automated matrix and screenshot review
 ENG-01 privacy review: PASS — ADR-013/OD-20; commits 6516cab, 2f076aa, eb3273d, 4bdc3f5, d1199a7, 954f644, cd84008, e0156e1; projector matrix declarer/Dummy/defenders × trick 0/1/2/13 and defensive-copy PASS; private snapshot JSON round-trip PASS; web unit 46/46, typecheck, lint PASS; Playwright full 3/3 (4.6m) plus final scoped-history flow 1/1 (4.0m) across 1920×1080, 1024×768, 768×1024, 390×844, and 320×700; Dummy 13-trick/52-card scroll, non-Dummy latest-only, Escape/focus/close, full-deal independence, reconnect, and raw snapshot/event entitlement assertions PASS
-ENG-02 score semantics decision: ___________
+ENG-02 score semantics decision: PASS — ADR-014/OD-21, 5 September 2026; raw duplicate `score_ns` ledger per table, board-start pair identity, pair-oriented totals, no IMP without Team Match comparison
 ENG-03 consensus transition report: ________
 ```
 
@@ -957,7 +958,7 @@ Known risks discovered in the current repository:
 2. Events now reconcile request-scoped operations and preserve still-valid optimistic work; snapshots, disconnects, and conflicts intentionally clear operations without automatic retry.
 3. Command serialization is now an explicit capability/conflict rule at the central dispatch boundary because every mutation uses the current authoritative expected revision; UI controls no longer own an ad hoc global disabled flag.
 4. Resolved by ENG-01/OD-20: `CompletedTricks` is recipient-scoped in the server projector, `completedTrickCount` carries public progress, and raw snapshot/event tests reject broader non-Dummy history.
-5. ENG-02 terminology is unresolved: a single table has no inherent IMP comparison. Raw duplicate score cannot be labeled IMP without a reference result or accepted pair/session model.
+5. Resolved by ENG-02/OD-21: a single-table sheet is a raw duplicate ledger per `table_id`; pair identity comes from the immutable board-start lineup, orientation is applied per board, and IMP remains exclusive to a documented Team Match comparison.
 6. ADR-008 and current aggregate explicitly disable consensus whenever a bot is present. ENG-03 is a deliberate future product/architecture supersession and remains gated.
 7. Four-browser Playwright baseline is now committed and passing; the local `.playwright` configuration remains unrelated user work and is intentionally excluded from UX commits.
 8. UX-06 replaced the unbounded orientation offsets with shared card scales and explicit player/play zones; motion may now consume those stable anchors.

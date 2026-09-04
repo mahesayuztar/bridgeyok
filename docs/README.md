@@ -83,7 +83,7 @@ Objective GUX dan ENG-01 telah selesai. Use `apps/web/PLAN.md` sections 19–23 
 - Click/tap/drag share one command path. Known-illegal triggers are disabled; rule-invalidity toast is not the normal enforcement path.
 - Card movement/trick pacing is functional feedback in one sequenced queue. Only a board click skips the current normal gameplay animation.
 - Dummy, trick, participant, own-hand, and navbar zones must not overlap from 320 px mobile through desktop. Persistent gameplay actions use navbar space before floating panels; active copy stays concise.
-- ENG-01 history is complete under ADR-013/OD-20. ENG-02 score sheet remains blocked on semantics, and ENG-03 bot consensus remains a separate deliberate supersession of ADR-008.
+- ENG-01 history is complete under ADR-013/OD-20. ENG-02 semantics are accepted under ADR-014/OD-21 and implementation follows raw duplicate table scores without IMP. ENG-03 bot consensus remains a separate deliberate supersession of ADR-008.
 
 Repository risks to re-check before implementation: single-table IMP semantics are unresolved; ADR-008 currently disables consensus with any bot. ACK/rebase handling and recipient-scoped `CompletedTricks` are implemented and covered by delayed realtime/raw-frame tests.
 
