@@ -102,6 +102,8 @@ export interface TableProjection {
   lastSeq: Sequence;
   boardId?: TableId;
   boardNumber: number;
+  scoreSheet: ScoreSheetEntry[];
+  pairScoreTotals: PairScoreTotal[];
   viewerParticipantId: string;
   viewerRole: "OWNER" | "PARTICIPANT";
   viewerSeat?: "N" | "E" | "S" | "W";
@@ -117,6 +119,55 @@ export interface TableProjection {
   };
   actionRequest?: ActionRequest;
   canRequestUndo: boolean;
+}
+export interface ScoreSheetEntry {
+  boardId: TableId;
+  boardNumber: number;
+  result: ScoreSheetResult;
+  lineup: BoardLineup;
+}
+export interface ScoreSheetResult {
+  rulesetVersion: string;
+  passedOut: boolean;
+  contract?: ScoreContract;
+  tricksDeclarer: number;
+  tricksNS: number;
+  tricksEW: number;
+  vulnerability: "NONE" | "NS" | "EW" | "BOTH";
+  scoreNS: number;
+}
+export interface ScoreContract {
+  level: number;
+  strain: "C" | "D" | "H" | "S" | "NT";
+  doubling: "UNDOUBLED" | "DOUBLED" | "REDOUBLED";
+  declarer: "N" | "E" | "S" | "W";
+}
+export interface BoardLineup {
+  seats: {
+    N: ScoreParticipant;
+    E: ScoreParticipant;
+    S: ScoreParticipant;
+    W: ScoreParticipant;
+  };
+  northSouth: ScorePair;
+  eastWest: ScorePair;
+}
+export interface ScoreParticipant {
+  id: string;
+  nickname: string;
+  isBot: boolean;
+}
+export interface ScorePair {
+  id: string;
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  members: [ScoreParticipant, ScoreParticipant];
+}
+export interface PairScoreTotal {
+  pair: ScorePair;
+  score: number;
 }
 export interface ProjectedParticipant {
   id: string;

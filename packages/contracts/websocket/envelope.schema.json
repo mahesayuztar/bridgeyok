@@ -132,6 +132,96 @@
         "canRespond": { "type": "boolean" }
       }
     },
+    "scoreParticipant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "nickname", "isBot"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "nickname": { "type": "string", "minLength": 2, "maxLength": 64 },
+        "isBot": { "type": "boolean" }
+      }
+    },
+    "scorePair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "members"],
+      "properties": {
+        "id": { "type": "string", "minLength": 3 },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scoreParticipant" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "scoreContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "strain", "doubling", "declarer"],
+      "properties": {
+        "level": { "type": "integer", "minimum": 1, "maximum": 7 },
+        "strain": { "enum": ["C", "D", "H", "S", "NT"] },
+        "doubling": { "enum": ["UNDOUBLED", "DOUBLED", "REDOUBLED"] },
+        "declarer": { "enum": ["N", "E", "S", "W"] }
+      }
+    },
+    "scoreSheetResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rulesetVersion", "passedOut", "tricksDeclarer", "tricksNS", "tricksEW", "vulnerability", "scoreNS"],
+      "properties": {
+        "rulesetVersion": { "type": "string", "minLength": 1 },
+        "passedOut": { "type": "boolean" },
+        "contract": { "$ref": "#/$defs/scoreContract" },
+        "tricksDeclarer": { "type": "integer", "minimum": 0, "maximum": 13 },
+        "tricksNS": { "type": "integer", "minimum": 0, "maximum": 13 },
+        "tricksEW": { "type": "integer", "minimum": 0, "maximum": 13 },
+        "vulnerability": { "enum": ["NONE", "NS", "EW", "BOTH"] },
+        "scoreNS": { "type": "integer" }
+      }
+    },
+    "boardLineup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seats", "northSouth", "eastWest"],
+      "properties": {
+        "seats": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["N", "E", "S", "W"],
+          "properties": {
+            "N": { "$ref": "#/$defs/scoreParticipant" },
+            "E": { "$ref": "#/$defs/scoreParticipant" },
+            "S": { "$ref": "#/$defs/scoreParticipant" },
+            "W": { "$ref": "#/$defs/scoreParticipant" }
+          }
+        },
+        "northSouth": { "$ref": "#/$defs/scorePair" },
+        "eastWest": { "$ref": "#/$defs/scorePair" }
+      }
+    },
+    "scoreSheetEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boardId", "boardNumber", "result", "lineup"],
+      "properties": {
+        "boardId": { "$ref": "#/$defs/tableId" },
+        "boardNumber": { "type": "integer", "minimum": 1 },
+        "result": { "$ref": "#/$defs/scoreSheetResult" },
+        "lineup": { "$ref": "#/$defs/boardLineup" }
+      }
+    },
+    "pairScoreTotal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pair", "score"],
+      "properties": {
+        "pair": { "$ref": "#/$defs/scorePair" },
+        "score": { "type": "integer" }
+      }
+    },
     "tableProjection": {
       "type": "object",
       "additionalProperties": false,
@@ -142,6 +232,8 @@
         "revision",
         "lastSeq",
         "boardNumber",
+        "scoreSheet",
+        "pairScoreTotals",
         "viewerParticipantId",
         "viewerRole",
         "participants",
@@ -156,6 +248,8 @@
         "lastSeq": { "$ref": "#/$defs/sequence" },
         "boardId": { "$ref": "#/$defs/tableId" },
         "boardNumber": { "type": "integer", "minimum": 0 },
+        "scoreSheet": { "type": "array", "items": { "$ref": "#/$defs/scoreSheetEntry" } },
+        "pairScoreTotals": { "type": "array", "items": { "$ref": "#/$defs/pairScoreTotal" } },
         "viewerParticipantId": { "type": "string", "format": "uuid" },
         "viewerRole": { "enum": ["OWNER", "PARTICIPANT"] },
         "viewerSeat": { "enum": ["N", "E", "S", "W"] },

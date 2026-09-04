@@ -14,6 +14,8 @@
       "revision": 1,
       "lastSeq": 1,
       "boardNumber": 0,
+      "scoreSheet": [],
+      "pairScoreTotals": [],
       "viewerParticipantId": "c7f2974f-cd0d-4531-979c-b4bd47fd76d8",
       "viewerRole": "OWNER",
       "participants": [

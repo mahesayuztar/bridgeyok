@@ -15,6 +15,8 @@ type Projection struct {
 	LastSeq             int64                          `json:"lastSeq"`
 	BoardID             string                         `json:"boardId,omitempty"`
 	BoardNumber         int                            `json:"boardNumber"`
+	ScoreSheet          []ScoreSheetEntry              `json:"scoreSheet"`
+	PairScoreTotals     []PairScoreTotal               `json:"pairScoreTotals"`
 	ViewerParticipantID string                         `json:"viewerParticipantId"`
 	ViewerRole          Role                           `json:"viewerRole"`
 	ViewerSeat          bridge.Seat                    `json:"viewerSeat,omitempty"`
@@ -76,6 +78,8 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 		LastSeq:             aggregate.LastSeq,
 		BoardID:             aggregate.BoardID,
 		BoardNumber:         aggregate.BoardNumber,
+		ScoreSheet:          projectScoreSheet(aggregate.ScoreSheet),
+		PairScoreTotals:     calculatePairScoreTotals(aggregate.ScoreSheet),
 		ViewerParticipantID: viewer.ID,
 		ViewerRole:          viewer.Role,
 		Participants:        make([]ProjectedParticipant, 0, len(aggregate.Participants)),
@@ -162,6 +166,22 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 	}
 	projection.Game = projectedGame
 	return projection, nil
+}
+
+func projectScoreSheet(entries []ScoreSheetEntry) []ScoreSheetEntry {
+	projected := make([]ScoreSheetEntry, len(entries))
+	for _index, entry := range entries {
+		projected[_index] = entry
+		projected[_index].Lineup.Seats = make(map[bridge.Seat]ScoreParticipant, len(entry.Lineup.Seats))
+		for seat, member := range entry.Lineup.Seats {
+			projected[_index].Lineup.Seats[seat] = member
+		}
+		if entry.Result.Contract != nil {
+			contract := *entry.Result.Contract
+			projected[_index].Result.Contract = &contract
+		}
+	}
+	return projected
 }
 
 func projectAuction(auction bridge.Auction) bridge.Auction {

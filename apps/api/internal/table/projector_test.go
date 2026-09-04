@@ -95,9 +95,39 @@ func TestProjectEncodesEmptyCollectionsAsArrays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal() error = %v", err)
 	}
-	for _, expected := range []string{`"calls":[]`, `"plays":[]`, `"completedTricks":[]`} {
+	for _, expected := range []string{`"calls":[]`, `"plays":[]`, `"completedTricks":[]`, `"scoreSheet":[]`, `"pairScoreTotals":[]`} {
 		if !strings.Contains(string(encoded), expected) {
 			t.Fatalf("projection JSON does not contain %s: %s", expected, encoded)
+		}
+	}
+}
+
+func TestProjectCopiesScoreSheetWithoutPrivateSessions(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	for aggregate.State == StateActive {
+		call := bridge.Pass()
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call}).NextState
+	}
+	projection, domainError := Project(aggregate, "session-owner")
+	if domainError != nil {
+		t.Fatalf("Project() error = %v", domainError)
+	}
+	if len(projection.ScoreSheet) != 1 || len(projection.PairScoreTotals) != 2 {
+		t.Fatalf("projected score sheet = %+v, totals = %+v", projection.ScoreSheet, projection.PairScoreTotals)
+	}
+	projection.ScoreSheet[0].Result.ScoreNS = 999
+	if aggregate.ScoreSheet[0].Result.ScoreNS == 999 {
+		t.Fatal("projected score sheet mutated authoritative state")
+	}
+	encoded, err := json.Marshal(projection)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	for _, participant := range aggregate.Participants {
+		if strings.Contains(string(encoded), participant.SessionID) {
+			t.Fatalf("score sheet projection contains private session id %q", participant.SessionID)
 		}
 	}
 }
