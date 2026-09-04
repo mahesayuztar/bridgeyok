@@ -384,6 +384,15 @@ async function assertGameplayGeometry(page: Page) {
     const dummySuitGroupRows = new Set(
       dummySuitGroups.map((group) => Math.round(group.getBoundingClientRect().top)),
     ).size;
+    const dummySuitRects = dummySuitGroups
+      .map((group) => group.getBoundingClientRect())
+      .sort((firstGroup, secondGroup) => firstGroup.top - secondGroup.top);
+    const dummySuitVerticalGaps = dummySuitRects
+      .slice(0, -1)
+      .map(
+        (group, _groupIndex) =>
+          dummySuitRects[_groupIndex + 1]!.top - group.bottom,
+      );
     const dummySuitSpreads = dummySuitGroups.map((group) => {
       const groupCards = [
         ...group.querySelectorAll<HTMLElement>(".physical-card"),
@@ -443,14 +452,9 @@ async function assertGameplayGeometry(page: Page) {
         foregroundCard,
       );
     });
-    const dummySuitVerticalSpan = dummySuitGroups.length === 0
+    const dummySuitVerticalSpan = dummySuitRects.length === 0
       ? 0
-      : Math.max(
-          ...dummySuitGroups.map((group) => group.getBoundingClientRect().bottom),
-        ) -
-        Math.min(
-          ...dummySuitGroups.map((group) => group.getBoundingClientRect().top),
-        );
+      : dummySuitRects.at(-1)!.bottom - dummySuitRects[0]!.top;
     const playedCardsOverlap = trickCards.some((trickCard, _trickIndex) =>
       trickCards
         .slice(_trickIndex + 1)
@@ -470,6 +474,7 @@ async function assertGameplayGeometry(page: Page) {
         null,
       dummySuitGroupCount: dummySuitGroups.length,
       dummySuitGroupRows,
+      dummySuitVerticalGaps,
       dummySuitSpreads,
       dummySuitCardCounts,
       dummySuitExposures,
@@ -489,6 +494,10 @@ async function assertGameplayGeometry(page: Page) {
               centerDelta: Math.abs(
                 dummyHand.left + dummyHand.width / 2 -
                   (playZone.left + playZone.width / 2),
+              ),
+              verticalCenterDelta: Math.abs(
+                dummyHand.top + dummyHand.height / 2 -
+                  (playZone.top + playZone.height / 2),
               ),
               width: dummyHand.width,
               height: dummyHand.height,
@@ -564,7 +573,7 @@ async function assertGameplayGeometry(page: Page) {
   expect(
     geometry.cards
       .filter((card) => card.sideDummy)
-      .filter((card) => Math.abs(card.ratio - 7 / 5) >= 0.035),
+      .filter((card) => Math.abs(card.ratio - 5 / 7) >= 0.035),
   ).toEqual([]);
   expect(geometry.cards.filter((card) => card.clipped)).toEqual([]);
   expect(geometry.cards.every((card) => card.cornerFontSize >= 14)).toBe(true);
@@ -575,8 +584,16 @@ async function assertGameplayGeometry(page: Page) {
   ).toBe(true);
   expect(
     geometry.cards
-      .filter((card) => card.className.includes("card-dummy"))
+      .filter(
+        (card) =>
+          card.className.includes("card-dummy") && !card.sideDummy,
+      )
       .every((card) => card.width >= 50),
+  ).toBe(true);
+  expect(
+    geometry.cards
+      .filter((card) => card.sideDummy)
+      .every((card) => card.width >= 42),
   ).toBe(true);
   expect(
     geometry.cards
@@ -603,11 +620,13 @@ async function assertGameplayGeometry(page: Page) {
   expect(geometry.trickInsidePlayZone).toBe(true);
   if (geometry.dummyPlacement?.position === "left") {
     expect(geometry.dummyPlacement.leftDelta).toBeLessThanOrEqual(8);
-    expect(geometry.dummyPlacement.topDelta).toBeLessThanOrEqual(8);
-    expect(geometry.dummyPlacement.bottomDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.verticalCenterDelta).toBeLessThanOrEqual(1);
     expect(geometry.dummySuitGroupCount).toBeGreaterThan(0);
     expect(geometry.dummySuitGroupRows).toBe(geometry.dummySuitGroupCount);
     expect(geometry.dummySuitCardCounts.every((count) => count > 0)).toBe(true);
+    expect(
+      geometry.dummySuitVerticalGaps.every((gap) => gap >= 0 && gap <= 4),
+    ).toBe(true);
     expect(geometry.dummySuitOuterRankOrders).toEqual(
       geometry.dummySuitOuterRankOrders.map((ranks) =>
         [...ranks].sort(
@@ -637,11 +656,13 @@ async function assertGameplayGeometry(page: Page) {
     );
   } else if (geometry.dummyPlacement?.position === "right") {
     expect(geometry.dummyPlacement.rightDelta).toBeLessThanOrEqual(8);
-    expect(geometry.dummyPlacement.topDelta).toBeLessThanOrEqual(8);
-    expect(geometry.dummyPlacement.bottomDelta).toBeLessThanOrEqual(8);
+    expect(geometry.dummyPlacement.verticalCenterDelta).toBeLessThanOrEqual(1);
     expect(geometry.dummySuitGroupCount).toBeGreaterThan(0);
     expect(geometry.dummySuitGroupRows).toBe(geometry.dummySuitGroupCount);
     expect(geometry.dummySuitCardCounts.every((count) => count > 0)).toBe(true);
+    expect(
+      geometry.dummySuitVerticalGaps.every((gap) => gap >= 0 && gap <= 4),
+    ).toBe(true);
     expect(geometry.dummySuitOuterRankOrders).toEqual(
       geometry.dummySuitOuterRankOrders.map((ranks) =>
         [...ranks].sort(
