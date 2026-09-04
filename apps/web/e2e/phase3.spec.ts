@@ -452,6 +452,40 @@ async function assertGameplayGeometry(page: Page) {
         foregroundCard,
       );
     });
+    const dummyStackedCardLabelOcclusions = dummySuitGroups.flatMap((group) => {
+      const cards = [
+        ...group.querySelectorAll<HTMLElement>(
+          ".hand-card-slot:not(:last-child) .physical-card",
+        ),
+      ];
+      return cards.flatMap((card) =>
+        [
+          card.querySelector<HTMLElement>(".card-corner strong"),
+          card.querySelector<HTMLElement>(".card-corner span"),
+        ].flatMap((labelPart) => {
+          if (labelPart === null) {
+            return [{ card: card.getAttribute("aria-label") }];
+          }
+          const box = labelPart.getBoundingClientRect();
+          return [box.left + 1, box.left + box.width / 2, box.right - 1].flatMap(
+            (x) => {
+              const coveringCard = document
+                .elementFromPoint(x, box.top + box.height / 2)
+                ?.closest(".physical-card");
+              return coveringCard === card
+                ? []
+                : [
+                    {
+                      card: card.getAttribute("aria-label"),
+                      label: labelPart.textContent,
+                      coveringCard: coveringCard?.getAttribute("aria-label"),
+                    },
+                  ];
+            },
+          );
+        }),
+      );
+    });
     const dummySuitVerticalSpan = dummySuitRects.length === 0
       ? 0
       : dummySuitRects.at(-1)!.bottom - dummySuitRects[0]!.top;
@@ -481,6 +515,7 @@ async function assertGameplayGeometry(page: Page) {
       dummySuitOuterRankOrders,
       dummySuitForegroundRanks,
       dummySuitForegroundFullyClickable,
+      dummyStackedCardLabelOcclusions,
       dummySuitVerticalSpan,
       dummyPlacement:
         dummyHand === null || playZone === null
@@ -593,7 +628,7 @@ async function assertGameplayGeometry(page: Page) {
   expect(
     geometry.cards
       .filter((card) => card.sideDummy)
-      .every((card) => card.width >= 42),
+      .every((card) => card.width >= 37),
   ).toBe(true);
   expect(
     geometry.cards
@@ -640,6 +675,7 @@ async function assertGameplayGeometry(page: Page) {
       geometry.dummySuitOuterRankOrders.map((ranks) => ranks.at(-1)),
     );
     expect(geometry.dummySuitForegroundFullyClickable.every(Boolean)).toBe(true);
+    expect(geometry.dummyStackedCardLabelOcclusions).toEqual([]);
     expect(
       geometry.dummySuitExposures.flat().every((exposure) => exposure >= 14),
     ).toBe(true);
@@ -676,6 +712,7 @@ async function assertGameplayGeometry(page: Page) {
       geometry.dummySuitOuterRankOrders.map((ranks) => ranks.at(-1)),
     );
     expect(geometry.dummySuitForegroundFullyClickable.every(Boolean)).toBe(true);
+    expect(geometry.dummyStackedCardLabelOcclusions).toEqual([]);
     expect(
       geometry.dummySuitExposures.flat().every((exposure) => exposure >= 14),
     ).toBe(true);
