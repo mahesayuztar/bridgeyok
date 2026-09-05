@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -487,5 +489,47 @@ func actorCommand(requestID string, expectedRevision int64) CommandRequest {
 		RequestID:        requestID,
 		ExpectedRevision: expectedRevision,
 		Command:          Command{Name: CommandLockTable, Locked: true},
+	}
+}
+
+func TestActorRegistryResumesBotConsensusAfterHydration(t *testing.T) {
+	for _, kind := range []ActionRequestKind{ActionRequestClaim, ActionRequestUndo} {
+		for _, botPair := range []bool{false, true} {
+			t.Run(string(kind)+"/botPair="+strconv.FormatBool(botPair), func(t *testing.T) {
+				bots := []bridge.Seat{bridge.East}
+				if botPair {
+					bots = append(bots, bridge.West)
+				}
+				aggregate := botConsensusAggregate(t, kind, bridge.North, bots)
+				aggregate.ID = actorTableID
+				requestName, responseName := CommandRequestClaim, CommandRespondClaim
+				if kind == ActionRequestUndo {
+					requestName, responseName = CommandRequestUndo, CommandRespondUndo
+				}
+				aggregate = acceptedDecision(t, aggregate, Command{Name: requestName, SessionID: aggregate.OwnerSessionID, ClaimTricks: 5}).NextState
+				if kind == ActionRequestUndo {
+					aggregate = acceptedDecision(t, aggregate, Command{Name: responseName, SessionID: sessionForSeat(t, aggregate, bridge.South), Accepted: true}).NextState
+				}
+				if !botPair {
+					aggregate = acceptedDecision(t, aggregate, Command{Name: responseName, SessionID: sessionForSeat(t, aggregate, bridge.West), Accepted: true}).NextState
+				}
+				handler := &botActorCommandHandler{aggregate: aggregate}
+				registry := actorRegistryForTest(t, &actorHydrator{aggregate: aggregate}, handler, 4, time.Hour, nil)
+				recovered, err := registry.Snapshot(t.Context(), actorTableID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if recovered.ActionRequest != nil {
+					t.Fatal("hydration left ready bot consensus pending")
+				}
+				if kind == ActionRequestClaim && recovered.Game.Claimed == botPair {
+					t.Fatal("hydrated claim result violated bot partnership policy")
+				}
+				again, err := registry.Snapshot(t.Context(), actorTableID)
+				if err != nil || !reflect.DeepEqual(recovered, again) {
+					t.Fatal("repeated snapshot changed terminal outcome")
+				}
+			})
+		}
 	}
 }

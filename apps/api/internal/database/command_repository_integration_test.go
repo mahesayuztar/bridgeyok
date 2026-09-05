@@ -7,9 +7,11 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -636,4 +638,114 @@ func (environment commandTestEnvironment) process(t *testing.T, request table.Co
 		t.Fatalf("Process(%s) error = %v", request.RequestID, err)
 	}
 	return result
+}
+
+func TestCommandRepositoryRecoversPendingBotConsensus(t *testing.T) {
+	for _, kind := range []table.ActionRequestKind{table.ActionRequestClaim, table.ActionRequestUndo} {
+		for _, botPair := range []bool{false, true} {
+			t.Run(string(kind)+"/botPair="+strconv.FormatBool(botPair), func(t *testing.T) {
+				environment := newCommandTestEnvironment(t, 4)
+				aggregate := readyCommandTable(t, environment)
+				process := func(sessionID string, command table.Command) table.CommandResult {
+					result := environment.process(t, table.CommandRequest{
+						TableID: environment.tableID, SessionID: sessionID, RequestID: uuid.NewString(), ExpectedRevision: aggregate.Revision, Command: command,
+					})
+					if result.Outcome.Status != table.CommandStatusAccepted {
+						t.Fatalf("command %s: %+v", command.Name, result.Outcome)
+					}
+					aggregate = result.Aggregate
+					return result
+				}
+				deal, err := bridge.GenerateDeal(rand.Reader)
+				if err != nil {
+					t.Fatal(err)
+				}
+				process(aggregate.OwnerSessionID, table.Command{Name: table.CommandStartGame, Deal: &deal, BoardID: uuid.NewString()})
+				bid := bridge.Bid(1, bridge.StrainClubs)
+				process(aggregate.OwnerSessionID, table.Command{Name: table.CommandMakeCall, Call: &bid})
+				if kind == table.ActionRequestClaim {
+					pass := bridge.Pass()
+					for aggregate.Game.Phase == bridge.PhaseAuction {
+						process(commandSessionForSeat(t, aggregate, aggregate.Game.Turn), table.Command{Name: table.CommandMakeCall, Call: &pass})
+					}
+					for _playIndex := 0; _playIndex < 4; _playIndex++ {
+						seat := aggregate.Game.Turn
+						if seat == aggregate.Game.Auction.Contract.Dummy() {
+							seat = aggregate.Game.Auction.Contract.Declarer
+						}
+						cards, domainError := aggregate.Game.LegalCards(seat)
+						if domainError != nil || len(cards) == 0 {
+							t.Fatal("missing legal card")
+						}
+						process(commandSessionForSeat(t, aggregate, seat), table.Command{Name: table.CommandPlayCard, Card: &cards[0]})
+					}
+				}
+				bots := []bridge.Seat{bridge.East}
+				if botPair {
+					bots = append(bots, bridge.West)
+				}
+				for _, seat := range bots {
+					process(aggregate.OwnerSessionID, table.Command{Name: table.CommandReplaceWithBot, ParticipantID: aggregate.Seats[seat].ParticipantID, BotID: uuid.NewString(), OccurredAt: time.Now()})
+				}
+				requestName, responseName := table.CommandRequestClaim, table.CommandRespondClaim
+				if kind == table.ActionRequestUndo {
+					requestName, responseName = table.CommandRequestUndo, table.CommandRespondUndo
+				}
+				process(aggregate.OwnerSessionID, table.Command{Name: requestName, ClaimTricks: 5})
+				if kind == table.ActionRequestUndo {
+					process(commandSessionForSeat(t, aggregate, bridge.South), table.Command{Name: responseName, Accepted: true})
+				}
+				if !botPair {
+					process(commandSessionForSeat(t, aggregate, bridge.West), table.Command{Name: responseName, Accepted: true})
+				}
+				pendingRevision := aggregate.Revision
+				ownerSessionID := aggregate.OwnerSessionID
+				restarted, err := Open(environment.ctx, os.Getenv("TEST_DATABASE_URL"), 2)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(restarted.Close)
+				processor, err := table.NewCommandProcessor(restarted, nil, observability.NewLoggerWithWriter(slog.LevelDebug, environment.logs), time.Now)
+				if err != nil {
+					t.Fatal(err)
+				}
+				registry, err := table.NewActorRegistry(restarted, processor, table.ActorRegistryOptions{QueueCapacity: 4, IdleTimeout: time.Hour, Logger: observability.NewLoggerWithWriter(slog.LevelDebug, environment.logs), Now: time.Now})
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					if err := registry.Drain(context.Background()); err != nil {
+						t.Error(err)
+					}
+				})
+				recovered, err := registry.Snapshot(environment.ctx, environment.tableID)
+				if err != nil || recovered.ActionRequest != nil {
+					t.Fatalf("recover pending consensus: %v", err)
+				}
+				if kind == table.ActionRequestClaim && recovered.Game.Claimed == botPair {
+					t.Fatal("wrong recovered claim result")
+				}
+				duplicate, err := processor.Process(environment.ctx, table.CommandRequest{
+					TableID: environment.tableID, SessionID: ownerSessionID, RequestID: fmt.Sprintf("bot_action_%d", pendingRevision+1), ExpectedRevision: pendingRevision,
+					Command: table.Command{Name: responseName, BotSeat: bridge.East, Accepted: !botPair},
+				})
+				if err != nil || !duplicate.Duplicate || len(duplicate.Events) != 0 || !reflect.DeepEqual(duplicate.Aggregate, recovered) {
+					t.Fatal("duplicate recovery bot vote changed durable state")
+				}
+				events, err := restarted.ListEventsAfter(environment.ctx, environment.tableID, aggregate.LastSeq, maxRecoveryEvents)
+				if err != nil {
+					t.Fatal(err)
+				}
+				terminalEvents := 0
+				for _, event := range events {
+					if event.Type == string(kind)+"_ACCEPTED" || event.Type == string(kind)+"_REJECTED" {
+						terminalEvents++
+					}
+				}
+				if terminalEvents != 1 {
+					t.Fatalf("terminal events = %d", terminalEvents)
+				}
+			})
+		}
+	}
 }
