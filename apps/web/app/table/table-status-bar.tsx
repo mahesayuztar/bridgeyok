@@ -104,8 +104,8 @@ export function ActiveTableStatusBar({
         canSendCommand={canSendCommand}
         onCommand={onCommand}
       />
+      <ScoreSheet table={table} />
       <div className="status-actions">
-        <ScoreSheet table={table} />
         <div
           className="connection-status"
           data-state={connectionState}
