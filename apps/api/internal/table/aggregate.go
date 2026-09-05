@@ -226,6 +226,22 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		}
 	}
 
+	if command.BotSeat != "" {
+		if participant.Role != RoleOwner || !aggregate.Seats[command.BotSeat].IsBot {
+			return Decision{}, reject(ErrorBotRequired, "bot command requires an owner and occupied bot seat")
+		}
+		switch command.Name {
+		case CommandMakeCall, CommandPlayCard:
+		case CommandRespondClaim, CommandRespondUndo:
+			accepted, ready := botConsensusResponse(aggregate, command.BotSeat)
+			if !ready || accepted != command.Accepted {
+				return Decision{}, reject(ErrorResponseNotAllowed, "bot response does not match partnership consent")
+			}
+		default:
+			return Decision{}, reject(ErrorResponseNotAllowed, "bots cannot initiate consensus or table mutations")
+		}
+	}
+
 	next := aggregate.clone()
 	var events []Event
 	switch command.Name {
@@ -500,8 +516,8 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		if next.State != StateActive || next.Game == nil {
 			return Decision{}, reject(ErrorInvalidState, "claim requires an active board")
 		}
-		if next.hasBot() {
-			return Decision{}, reject(ErrorInvalidState, "claim is unavailable while a bot is seated")
+		if len(next.Seats) != 4 {
+			return Decision{}, reject(ErrorNotReady, "consensus requires four occupied seats")
 		}
 		if next.ActionRequest != nil {
 			return Decision{}, reject(ErrorActionPending, "another claim or undo request is pending")
@@ -520,6 +536,9 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 			return Decision{}, reject(ErrorRequestMissing, "there is no claim awaiting a response")
 		}
 		seat, seated := next.seatForParticipant(participant.ID)
+		if command.BotSeat != "" {
+			seat, seated = command.BotSeat, true
+		}
 		if !seated || seat.Partnership() == next.ActionRequest.RequesterSeat.Partnership() || slices.Contains(next.ActionRequest.ApprovedBy, seat) {
 			return Decision{}, reject(ErrorResponseNotAllowed, "seat cannot respond to this claim")
 		}
@@ -549,8 +568,8 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		if (next.State != StateActive && next.State != StateBetweenBoards) || next.Game == nil {
 			return Decision{}, reject(ErrorInvalidState, "undo requires a current board")
 		}
-		if next.hasBot() {
-			return Decision{}, reject(ErrorInvalidState, "undo is unavailable while a bot is seated")
+		if len(next.Seats) != 4 {
+			return Decision{}, reject(ErrorNotReady, "consensus requires four occupied seats")
 		}
 		if next.ActionRequest != nil {
 			return Decision{}, reject(ErrorActionPending, "another claim or undo request is pending")
@@ -566,6 +585,9 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 			return Decision{}, reject(ErrorRequestMissing, "there is no undo awaiting a response")
 		}
 		seat, seated := next.seatForParticipant(participant.ID)
+		if command.BotSeat != "" {
+			seat, seated = command.BotSeat, true
+		}
 		if !seated || seat == next.ActionRequest.RequesterSeat || slices.Contains(next.ActionRequest.ApprovedBy, seat) {
 			return Decision{}, reject(ErrorResponseNotAllowed, "seat cannot respond to this undo")
 		}
@@ -846,15 +868,6 @@ func (aggregate Aggregate) activeOccupantCount() int {
 		}
 	}
 	return count
-}
-
-func (aggregate Aggregate) hasBot() bool {
-	for _, assignment := range aggregate.Seats {
-		if assignment.IsBot {
-			return true
-		}
-	}
-	return false
 }
 
 func (aggregate Aggregate) seatForParticipant(participantID string) (bridge.Seat, bool) {

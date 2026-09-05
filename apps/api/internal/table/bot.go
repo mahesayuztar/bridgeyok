@@ -1,9 +1,27 @@
 package table
 
-import "github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
+import (
+	"slices"
+
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
+)
 
 func nextBotCommand(aggregate Aggregate) (Command, bool) {
-	if aggregate.State != StateActive || aggregate.Game == nil || aggregate.ActionRequest != nil {
+	if aggregate.ActionRequest != nil {
+		for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+			accepted, ready := botConsensusResponse(aggregate, seat)
+			if !ready {
+				continue
+			}
+			name := CommandRespondClaim
+			if aggregate.ActionRequest.Kind == ActionRequestUndo {
+				name = CommandRespondUndo
+			}
+			return Command{Name: name, BotSeat: seat, Accepted: accepted}, true
+		}
+		return Command{}, false
+	}
+	if aggregate.State != StateActive || aggregate.Game == nil {
 		return Command{}, false
 	}
 
@@ -33,4 +51,26 @@ func nextBotCommand(aggregate Aggregate) (Command, bool) {
 	default:
 		return Command{}, false
 	}
+}
+
+func botConsensusResponse(aggregate Aggregate, seat bridge.Seat) (bool, bool) {
+	request := aggregate.ActionRequest
+	if request == nil || !aggregate.Seats[seat].IsBot || seat == request.RequesterSeat || slices.Contains(request.ApprovedBy, seat) {
+		return false, false
+	}
+	if request.Kind == ActionRequestClaim && seat.Partnership() == request.RequesterSeat.Partnership() {
+		return false, false
+	}
+	partner := seat.Partner()
+	assignment, occupied := aggregate.Seats[partner]
+	if !occupied {
+		return false, false
+	}
+	if assignment.IsBot {
+		return false, true
+	}
+	if partner == request.RequesterSeat || slices.Contains(request.ApprovedBy, partner) {
+		return true, true
+	}
+	return false, false
 }

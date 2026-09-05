@@ -102,7 +102,7 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 			projection.Participants = append(projection.Participants, ProjectedParticipant{ID: assignment.ParticipantID, Nickname: "Bot", Role: RoleParticipant, IsBot: true})
 		}
 	}
-	if aggregate.UndoableAction != nil && (aggregate.State == StateActive || aggregate.State == StateBetweenBoards) && projection.ViewerSeat == aggregate.UndoableAction.ActorSeat && aggregate.ActionRequest == nil && !aggregate.hasBot() {
+	if aggregate.UndoableAction != nil && (aggregate.State == StateActive || aggregate.State == StateBetweenBoards) && projection.ViewerSeat == aggregate.UndoableAction.ActorSeat && aggregate.ActionRequest == nil && len(aggregate.Seats) == 4 {
 		projection.CanRequestUndo = true
 	}
 	if aggregate.ActionRequest != nil {
