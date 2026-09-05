@@ -15,6 +15,7 @@ BridgeYok supports one pending consensus request per table.
 - Both opponents must accept the exact claim. Any rejection clears the request and resumes the unchanged game.
 - Only the actor of the latest accepted call or play may request undo.
 - The other three seats must accept undo. Any rejection clears the request without changing the game.
+- As of ENG-03 (5 September 2026), requests require four occupied seats and bots follow the explicit partnership policy in ADR-008. A human requester supplies implicit consent for their bot partner on undo; bot-bot responders reject deterministically.
 - While a request is pending, new calls and plays are rejected.
 - Accepted undo restores the private server snapshot immediately before that action and cannot be redone.
 - Requests, responses, acceptance, and rejection are durable ordered table events. The server remains authoritative and idempotency/revision fencing still applies.

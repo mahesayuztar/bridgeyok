@@ -925,7 +925,7 @@ Gate hanya PASS bila seluruh fourteen objectives memiliki acceptance, browser/mo
 - **Non-goals:** frontend never fabricates bot votes; no strategic claim evaluation, autonomous proposal, or bot AI redesign.
 - **Affected:** ADR-007/ADR-008 at implementation time, aggregate action request model, bot automation/actor, projector/events/protocol if bot response needs representation, frontend consensus progress.
 - **Architecture:** one durable human response may deterministically schedule bot follow-up through the same actor/repository path; bot-bot side deterministically rejects. Exactly one terminal outcome and no unresolved request after all possible decisions.
-- **Dependencies:** UX-G1 PASS and explicit supersession of current “consensus unavailable with any bot” decision.
+- **Dependencies:** UX-G1 and ENG-02 PASS; ADR-007/ADR-008 explicitly supersede the bot-disable rule on 5 September 2026. Human requesters implicitly consent for their bot partner on undo; eligible bot-bot responders reject, and human-bot responders follow the human. Four occupied seats are required.
 - **Sequence:** state-transition table → aggregate tests → actor automated response → persistence/reconnect → projection/frontend → softlock E2E.
 - **Acceptance:** bot+bot partnership rejects and terminates; human+bot partnership follows human for accept/reject; initiator edge cases deterministic; restart/reconnect reaches same result; no pending request can become unanswerable.
 - **Browser/mobile:** consensus progress/result updates without fake local bot action and controls recover after terminal decision.
