@@ -1508,3 +1508,131 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
 
   await Promise.all(players.map((player) => player.context.close()));
 });
+
+test("bot consensus follows human partners, recovers pending votes, and rejects bot pairs", async ({ browser }, testInfo) => {
+  test.setTimeout(240_000);
+  const ownerContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const guestContext = await browser.newContext({ viewport: { width: 320, height: 700 }, hasTouch: true });
+  const owner = await ownerContext.newPage();
+  const guest = await guestContext.newPage();
+  const receivedFrames: string[] = [];
+  const sentFrames: string[] = [];
+  let ownerProjection: import("../app/table-state").LiveTableProjection | undefined;
+  for (const page of [owner, guest]) {
+    page.on("websocket", (socket) => {
+      if (!socket.url().startsWith("ws://localhost:8180")) return;
+      socket.on("framesent", (event) => sentFrames.push(String(event.payload)));
+      socket.on("framereceived", (event) => {
+        const encoded = String(event.payload);
+        receivedFrames.push(encoded);
+        if (page !== owner) return;
+        const envelope = JSON.parse(encoded) as Record<string, unknown>;
+        const payload = envelope.payload as Record<string, unknown> | undefined;
+        const projection = (envelope.kind === "snapshot" ? payload : payload?.table) as typeof ownerProjection;
+        if (projection?.tableId !== undefined && projection.lastSeq >= (ownerProjection?.lastSeq ?? 0)) ownerProjection = projection;
+      });
+    });
+  }
+  try {
+    await enterAsGuest(owner, "Bot Owner");
+    await enterAsGuest(guest, "Human Partner");
+    await owner.getByRole("button", { name: "Buat meja" }).click();
+    await waitForConnection(owner);
+    const inviteCode = (await owner.locator(".invite-inline .invite-code").textContent())!.trim();
+    await guest.getByLabel("Kode undangan").fill(inviteCode);
+    await guest.getByRole("button", { name: "Masuk", exact: true }).click();
+    await waitForConnection(guest);
+    await takeSeat(owner, "Bot Owner", "N");
+    await takeSeat(guest, "Human Partner", "E");
+    for (const seat of ["S", "W"]) {
+      await owner.getByRole("button", { name: `Buka menu kursi kosong ${seat}` }).click();
+      await owner.getByRole("button", { name: "Tambah bot" }).click();
+      await expect(owner.getByRole("button", { name: `Buka menu Bot, kursi ${seat}, bot` })).toBeVisible();
+    }
+    await setReady(owner, "Bot Owner");
+    await setReady(guest, "Human Partner");
+    await owner.getByRole("button", { name: "Mulai board" }).click();
+    await makeBid(owner, 1, "NT");
+    await owner.getByLabel("Minta undo", { exact: true }).click();
+    await expect(guest.locator(".consensus-request")).toContainText("1 setuju");
+    await guest.reload();
+    await waitForConnection(guest);
+    await expect(guest.locator(".consensus-request")).toContainText("1 setuju");
+    await expect(guest.getByRole("button", { name: "Terima", exact: true })).toBeEnabled();
+    await guest.screenshot({ path: testInfo.outputPath("bot-undo-pending-320x700.png") });
+    await guest.getByRole("button", { name: "Tolak", exact: true }).click();
+    await expect(owner.locator(".consensus-request")).toHaveCount(0);
+    await expect(owner.locator(".auction-table tbody")).toContainText("1NT");
+    await owner.getByLabel("Minta undo", { exact: true }).click();
+    await expect(guest.locator(".consensus-request")).toContainText("1 setuju");
+    await guest.getByRole("button", { name: "Terima", exact: true }).click();
+    await expect(owner.locator(".consensus-request")).toHaveCount(0);
+    await expect(owner.locator(".auction-table tbody")).not.toContainText("1NT");
+    await expect(owner.getByRole("button", { name: /^Pass/ })).toBeEnabled();
+    await makeBid(owner, 1, "NT");
+    await makeCall(guest, /^Pass/);
+
+    async function reachClaimBoundary(pages: Page[]) {
+      for (let _playIndex = 0; _playIndex < 52; _playIndex++) {
+        await expect.poll(async () => {
+          const game = ownerProjection?.game;
+          if (game?.phase === "PLAY" && game.currentTrick.plays.length === 0 && (game.turn === "N" || game.turn === "S")) return true;
+          const counts = await Promise.all(pages.map((page) => page.locator('button[aria-label^="Mainkan "]:enabled').count()));
+          return counts.some((count) => count > 0);
+        }).toBe(true);
+        const game = ownerProjection?.game;
+        if (game?.phase === "PLAY" && game.currentTrick.plays.length === 0 && (game.turn === "N" || game.turn === "S")) {
+          await expect(owner.getByLabel("Ajukan claim", { exact: true })).toBeVisible();
+          return;
+        }
+        for (const page of pages) {
+          const card = page.locator('button[aria-label^="Mainkan "]:enabled').first();
+          if (await card.count() === 0) continue;
+          const label = (await card.getAttribute("aria-label"))!;
+          await card.click({ position: { x: 5, y: 5 }, timeout: 10_000 });
+          await expect(page.getByRole("button", { name: label, exact: true })).toHaveCount(0);
+          break;
+        }
+      }
+      throw new Error("No human-controlled trick boundary reached");
+    }
+
+    await reachClaimBoundary([owner, guest]);
+    await owner.getByLabel("Ajukan claim", { exact: true }).click();
+    await owner.getByRole("button", { name: "Claim 0 trick", exact: true }).click();
+    await expect(guest.locator(".consensus-request")).toContainText("0 setuju");
+    await expect(owner.locator('button[aria-label^="Mainkan "]:enabled')).toHaveCount(0);
+    await guest.getByRole("button", { name: "Tolak", exact: true }).click();
+    await expect(owner.locator(".consensus-request")).toHaveCount(0);
+    await owner.getByLabel("Ajukan claim", { exact: true }).click();
+    await owner.getByRole("button", { name: "Claim 0 trick", exact: true }).click();
+    await guest.getByRole("button", { name: "Terima", exact: true }).click();
+    await expect(owner.locator(".board-result")).toBeVisible();
+    await expect(owner.locator(".consensus-request")).toHaveCount(0);
+    await owner.getByRole("button", { name: "Buka skor meja" }).click();
+    await expect(owner.getByRole("dialog", { name: "Skor meja" }).locator("tbody tr")).toHaveCount(1);
+    await owner.getByRole("button", { name: "Tutup skor meja" }).click();
+    await owner.getByRole("button", { name: "Buka menu Human Partner, kursi E" }).click();
+    await owner.getByRole("button", { name: "Keluarkan & ganti bot" }).click();
+    await expect(owner.getByRole("button", { name: "Buka menu Bot, kursi E, bot" })).toBeVisible();
+    await owner.locator(".board-play-zone").click({ position: { x: 10, y: 10 } });
+    await expect(owner.getByRole("button", { name: /^Pass/ })).toBeEnabled();
+    await makeBid(owner, 1, "NT");
+    await reachClaimBoundary([owner]);
+    const rejectedBefore = receivedFrames.filter((frame) => frame.includes('"eventType":"CLAIM_REJECTED"')).length;
+    await owner.getByLabel("Ajukan claim", { exact: true }).click();
+    await owner.getByRole("button", { name: "Claim 0 trick", exact: true }).click();
+    await expect.poll(() => receivedFrames.filter((frame) => frame.includes('"eventType":"CLAIM_REJECTED"')).length).toBeGreaterThan(rejectedBefore);
+    await expect(owner.locator(".consensus-request")).toHaveCount(0);
+    await expect(owner.locator('button[aria-label^="Mainkan "]:enabled').first()).toBeEnabled();
+    await owner.screenshot({ path: testInfo.outputPath("bot-pair-rejection-1440x900.png") });
+    const encodedFrames = receivedFrames.join("\n");
+    for (const eventType of ["UNDO_REJECTED", "UNDO_ACCEPTED", "CLAIM_REJECTED", "CLAIM_ACCEPTED"]) expect(encodedFrames).toContain(eventType);
+    for (const frame of sentFrames) {
+      expect(frame).not.toMatch(/botSeat|bot_seat|approvedBy/);
+    }
+    assertPrivateFrames(receivedFrames, "latest");
+  } finally {
+    await Promise.all([ownerContext.close(), guestContext.close()]);
+  }
+});
