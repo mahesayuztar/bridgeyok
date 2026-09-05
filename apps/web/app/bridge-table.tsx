@@ -142,6 +142,7 @@ export default function BridgeTable({
     return (
       <main className="table-client waiting-client">
         <WaitingTableStatusBar
+          table={table}
           connectionState={session.connectionState}
           onLeaveTable={() => void returnToLobby()}
         />

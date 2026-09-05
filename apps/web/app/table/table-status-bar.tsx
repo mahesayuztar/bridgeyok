@@ -2,6 +2,7 @@ import type { LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
 import { ConsensusControls } from "./consensus-controls";
 import { contractSummaryLabel } from "./gameplay-presentation";
+import { ScoreSheet } from "./score-sheet";
 import { TrickIndicator } from "./trick-indicator";
 
 const vulnerabilityLabels = {
@@ -20,9 +21,11 @@ const connectionLabels = {
 };
 
 export function WaitingTableStatusBar({
+  table,
   connectionState,
   onLeaveTable,
 }: {
+  table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
   onLeaveTable: () => void;
 }) {
@@ -31,6 +34,7 @@ export function WaitingTableStatusBar({
       <span className="table-wordmark">BridgeYok</span>
       <span>Meja tunggu</span>
       <div className="status-actions">
+        <ScoreSheet table={table} />
         <div className="connection-status" data-state={connectionState}>
           <span className="status-mark" />
           {connectionLabels[connectionState]}
@@ -101,6 +105,7 @@ export function ActiveTableStatusBar({
         onCommand={onCommand}
       />
       <div className="status-actions">
+        <ScoreSheet table={table} />
         <div
           className="connection-status"
           data-state={connectionState}

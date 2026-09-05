@@ -834,6 +834,144 @@ h2 {
   align-items: center;
   gap: 0.5rem;
 }
+.score-sheet-trigger {
+  display: inline-flex;
+  min-height: 2.2rem;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.55rem;
+  border-color: var(--line);
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.score-sheet-trigger strong {
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+.score-sheet-popover {
+  width: min(42rem, calc(100vw - 1rem));
+  max-height: calc(100dvh - 1rem);
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 1rem 2.5rem rgb(23 34 29 / 18%);
+}
+.score-sheet-popover::backdrop {
+  background: rgb(11 62 41 / 58%);
+}
+.score-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+.score-sheet-header .eyebrow {
+  margin-bottom: 0.35rem;
+}
+.score-sheet-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+.score-sheet-close {
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  border-color: var(--line);
+  background: transparent;
+  font-size: 1.25rem;
+}
+.score-sheet-totals {
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+.score-sheet-totals h3 {
+  margin: 0 0 0.55rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.score-sheet-totals dl {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+.score-sheet-totals dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+}
+.score-sheet-totals dl > div[data-viewer-pair="true"] {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+.score-sheet-totals dt {
+  overflow-wrap: anywhere;
+}
+.score-sheet-totals dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.score-sheet-empty {
+  margin: 0;
+  padding: 2rem 1.1rem;
+  color: var(--muted);
+}
+.score-sheet-table-wrap {
+  max-height: min(28rem, calc(100dvh - 14rem));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.score-sheet-table-wrap:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+.score-sheet-table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+.score-sheet-table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.score-sheet-table th,
+.score-sheet-table td {
+  padding: 0.75rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.score-sheet-table thead th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  background: var(--background);
+  color: var(--muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.score-sheet-table tbody th,
+.score-sheet-table td > strong {
+  font-variant-numeric: tabular-nums;
+}
+.score-sheet-table td > span {
+  display: block;
+  max-width: 12rem;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
 .table-menu {
   position: relative;
 }
@@ -3719,6 +3857,17 @@ button.physical-card.is-dragging {
 }
 
 @media (max-width: 48rem) {
+  .score-sheet-popover {
+    inset: auto 0.5rem 0.5rem;
+    width: auto;
+    max-height: calc(100dvh - 1rem);
+    margin: 0;
+  }
+
+  .score-sheet-table-wrap {
+    max-height: calc(100dvh - 14rem);
+  }
+
   .dummy-hand {
     --side-dummy-card-width: clamp(2.35rem, 10vw, 2.55rem);
     --side-dummy-card-height: calc(var(--side-dummy-card-width) * 1.4);
