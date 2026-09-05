@@ -36,6 +36,8 @@ func TestDecodeClientEnvelope(t *testing.T) {
 		{name: "invalid controller epoch", message: commandMessage("table.lock", `{"locked":true}`, `,"expected_revision":0,"controller_epoch":0`), wantErr: true},
 		{name: "extra payload field", message: commandMessage("table.take_seat", `{"seat":"N","hidden":true}`, `,"expected_revision":0`), wantErr: true},
 		{name: "claim outside range", message: commandMessage("game.request_claim", `{"tricks":14}`, `,"expected_revision":0`), wantErr: true},
+		{name: "forged bot claim vote", message: commandMessage("game.respond_claim", `{"accepted":true,"botSeat":"E"}`, `,"expected_revision":0`), wantErr: true},
+		{name: "forged bot undo vote", message: commandMessage("game.respond_undo", `{"accepted":true,"bot_seat":"S"}`, `,"expected_revision":0`), wantErr: true},
 		{name: "response missing decision", message: commandMessage("game.respond_undo", `{}`, `,"expected_revision":0`), wantErr: true},
 		{name: "bot seat invalid", message: commandMessage("table.add_bot", `{"seat":"X"}`, `,"expected_revision":0`), wantErr: true},
 		{name: "trailing value", message: `{"v":1,"kind":"control","name":"client.heartbeat","payload":{}} {}`, wantErr: true},
@@ -130,7 +132,7 @@ func TestTableCommandMapsConsensusMutations(t *testing.T) {
 			if err != nil {
 				t.Fatalf("tableCommand() error = %v", err)
 			}
-			if command.Name != test.wantName || command.ClaimTricks != test.wantTricks || command.Accepted != test.wantAccepted {
+			if command.Name != test.wantName || command.ClaimTricks != test.wantTricks || command.Accepted != test.wantAccepted || command.BotSeat != "" {
 				t.Fatalf("tableCommand() = %+v", command)
 			}
 		})
