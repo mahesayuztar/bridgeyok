@@ -1025,6 +1025,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await takeSeat(west.page, "Wira", "W");
 
   const replacementTab = await north.context.newPage();
+  await replacementTab.clock.install();
   await replacementTab.setViewportSize({ width: 320, height: 700 });
   await replacementTab.routeWebSocket(/\/v1\/ws/, delayAuthoritativeGameplay);
   replacementTab.on("websocket", (socket) => {
@@ -1368,6 +1369,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     activePages.map((page) => expect(page.locator(".board-result")).toBeVisible()),
   );
   await Promise.all(activePages.map(assertCompletedDealGeometry));
+  await replacementTab.clock.pauseAt(await replacementTab.evaluate(() => Date.now() + 500));
 
   await replacementTab.getByRole("button", { name: "Buka skor meja" }).click();
   const durableScoreText = await scoreSheet.locator("tbody").textContent();
@@ -1462,6 +1464,8 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     "data-exiting",
     "true",
   );
+  await replacementTab.clock.runFor(200);
+  await replacementTab.clock.resume();
   await expect(replacementTab.locator(".board-result")).toHaveCount(0);
   assertPrivateFrames(north.frames, "latest");
   assertPrivateFrames(east.frames, "latest");
