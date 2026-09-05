@@ -916,7 +916,7 @@ Gate hanya PASS bila seluruh fourteen objectives memiliki acceptance, browser/mo
 - **Browser/mobile:** navbar action and sheet remain readable/scrollable at narrow widths with concise headers.
 - **Regression tests:** passed out, positive/negative/tie, seat orientation, multiple boards, duplicate delivery, restart/reconnect, authorization.
 - **Accepted semantics:** ADR-014/OD-21 defines a `table_id`-scoped raw duplicate ledger, immutable board-start pair identity, side-oriented pair totals, no one-table IMP, and Phase 5 ownership of comparison/IMP.
-- **Completion gate:** semantics gate PASS on 5 September 2026; implementation still requires durable rows, restart/reconnect, projection/privacy, and browser/mobile evidence.
+- **Completion gate:** ENG-02 PASS on 5 September 2026. Durable result/lineup persistence, duplicate scoring delivery, repository restart hydration, recipient privacy, pair identity/orientation/substitution, navbar accessibility, refresh, and desktop/mobile pointer/scroll verification passed. Evidence is recorded below.
 
 ### ENG-03 — Bot consensus behavior
 
@@ -949,6 +949,7 @@ UX-14 matrix report: commits 5b4b7e4, bfb989d; unit 44/44, typecheck, lint, prod
 UX-G1 review/date: PASS — 4 September 2026; no severity-high gameplay UX or accessibility regression found in automated matrix and screenshot review
 ENG-01 privacy review: PASS — ADR-013/OD-20; commits 6516cab, 2f076aa, eb3273d, 4bdc3f5, d1199a7, 954f644, cd84008, e0156e1; projector matrix declarer/Dummy/defenders × trick 0/1/2/13 and defensive-copy PASS; private snapshot JSON round-trip PASS; web unit 46/46, typecheck, lint PASS; Playwright full 3/3 (4.6m) plus final scoped-history flow 1/1 (4.0m) across 1920×1080, 1024×768, 768×1024, 390×844, and 320×700; Dummy 13-trick/52-card scroll, non-Dummy latest-only, Escape/focus/close, full-deal independence, reconnect, and raw snapshot/event entitlement assertions PASS
 ENG-02 score semantics decision: PASS — ADR-014/OD-21, 5 September 2026; raw duplicate `score_ns` ledger per table, board-start pair identity, pair-oriented totals, no IMP without Team Match comparison
+ENG-02 implementation gate: PASS — 5 September 2026; backend/contracts commits 561fa7b, 4154cbd, a344e2c, 7b0d892; UI/reliability/test commits f6499eb, 60e7bf2, 1bc4b1a, 3a74684, f5a3fd6. Web unit 47/47, contracts 3/3, typecheck, lint, production build, API race suite, uncached PostgreSQL database/realtime integration, and targeted duplicate-score/restart integration PASS. Pair seat-order/side changes preserve identity; mid-board substitution preserves old attribution and captures a new pair on the next board; passed-out/multi-pair zero totals, positive/negative orientation, undo/re-score, and participant-only projection PASS. Final Playwright 3/3 (3.9m), four guest contexts, 1920×1080 / 1024×768 / 768×1024 / 390×844 / 320×700, empty/one/two-board rows, refresh row-and-total equality, Escape/close/focus return, horizontal keyboard scroll, 320×300 vertical keyboard scroll, raw-frame privacy, real pointer gameplay, and screenshot review PASS. Mobile score action occupies the consensus navbar row so it cannot cover trick history; totals remain in the sheet. Screenshots: test-results/phase3-four-guests-finish--55c7a-d-keep-hidden-hands-private/score-sheet-{width}x{height}.png.
 ENG-03 consensus transition report: ________
 ```
 

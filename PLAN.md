@@ -1235,7 +1235,9 @@ Required order adalah audit baseline → behavior-preserving UX-01 extraction �
 
 UX-G1 **PASS pada 4 September 2026**. ENG-01 Play History dapat berjalan lebih dahulu; ENG-02 Table Score Sheet dan ENG-03 Bot Consensus Behavior tetap mengikuti urutan dan decision gate masing-masing. Jangan interleave ketiganya dalam satu commit atau memakai kelulusan UX-G1 untuk melewati dependency domain objective berikutnya.
 
-ENG-01 **PASS pada 5 September 2026**. Riwayat trick private tetap durable, projector membatasi payload per recipient sesuai OD-20, `completedTrickCount` memisahkan progress publik dari history entitlement, dan popover indikator UX-11 lulus raw-frame privacy serta browser/mobile gate. ENG-02 tetap blocked sampai semantics comparison source dan pair/session lifecycle disetujui.
+ENG-01 **PASS pada 5 September 2026**. Riwayat trick private tetap durable, projector membatasi payload per recipient sesuai OD-20, `completedTrickCount` memisahkan progress publik dari history entitlement, dan popover indikator UX-11 lulus raw-frame privacy serta browser/mobile gate. Semantics ENG-02 disetujui pada 5 September 2026 melalui ADR-014/OD-21: raw duplicate points per meja, identitas pasangan dari lineup awal board, dan IMP tetap milik Team Match.
+
+ENG-02 **PASS pada 5 September 2026**. Navbar menyediakan ledger hasil board dan total pasangan dari proyeksi authoritative. Atribusi tetap mengikuti lineup awal board meski kursi atau pemain berubah; pengiriman ulang command tidak menggandakan skor, dan restart/refresh mempertahankan hasil. Unit, contract, race, PostgreSQL integration, build, serta Playwright 3/3 lulus dengan pemeriksaan desktop/tablet/mobile hingga 320 px, scroll keyboard, pointer nyata, dan privasi payload. Bukti lengkap berada di `apps/web/PLAN.md` bagian 23. ENG-03 tetap mengikuti decision gate supersession ADR-008; belum diimplementasikan.
 
 ### Phase 4 — WBF boundary, deal sources, dan DDS analysis (6–9 hari)
 
@@ -1375,7 +1377,7 @@ Suggested epics:
 | Animation queue mengaburkan state atau mengubah ordering | medium/high | pisahkan logical/presentation state, central queue, board-only skip, burst-event tests | legality menunggu timer atau trick hilang/terurut salah |
 | Board geometry collision pada dummy/mobile | high/high | explicit zones + shared card scale + bounding-box matrix 320px–desktop | dummy/trick/playable hand overlap atau rank terpotong |
 | History membocorkan completed tricks | medium/critical | server-side entitlement projection dan raw-frame privacy matrix | non-Dummy menerima history lebih luas dari policy |
-| Istilah IMP score sheet tidak mempunyai comparison source | high/high | block ENG-02 sampai semantics/reference/pair lifecycle disetujui | UI melabel raw duplicate score sebagai IMP |
+| Semantics score sheet dan comparison source | resolved / OD-21 | ledger satu meja memakai raw duplicate points; IMP hanya pada Team Match | cegah regresi label dan orientasi skor melalui contract/fixture tests |
 | Bot consensus tidak pernah terminal | medium/high | durable actor-owned transition table dan exhaustive bot/human tests | `actionRequest` tersisa tanpa responder yang mungkin |
 | Board pasangan Team Match berbeda | medium/critical | shared board identity + immutable deal/provenance | dealer/vulnerability/deal mismatch |
 | IMP diterapkan dua kali atau orientasi salah | medium/high | unique comparison + idempotent finalization + golden boundaries | total berubah setelah retry |
