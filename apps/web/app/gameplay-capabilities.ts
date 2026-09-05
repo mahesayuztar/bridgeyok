@@ -56,7 +56,6 @@ export function canSendTableCommand(
   const seat = isSeat(payload.seat) ? payload.seat : undefined;
   const participantId = typeof payload.participant_id === "string" ? payload.participant_id : undefined;
   const participant = table.participants.find((candidate) => candidate.id === participantId);
-  const hasBot = table.participants.some((candidate) => candidate.isBot);
 
   switch (name) {
     case "game.make_call":
@@ -69,10 +68,10 @@ export function canSendTableCommand(
     case "game.request_claim": {
       const dummy = game?.auction.contract === undefined ? undefined : oppositeSeat(game.auction.contract.declarer);
       const remainingTricks = game === undefined ? 0 : 13 - game.completedTrickCount;
-      return !hasBot && table.actionRequest === undefined && game?.phase === "PLAY" && game.currentTrick.plays.length === 0 && table.viewerSeat !== undefined && table.viewerSeat !== dummy && Number.isInteger(payload.tricks) && Number(payload.tricks) >= 0 && Number(payload.tricks) <= remainingTricks;
+      return Object.keys(table.seats).length === 4 && table.actionRequest === undefined && game?.phase === "PLAY" && game.currentTrick.plays.length === 0 && table.viewerSeat !== undefined && table.viewerSeat !== dummy && Number.isInteger(payload.tricks) && Number(payload.tricks) >= 0 && Number(payload.tricks) <= remainingTricks;
     }
     case "game.request_undo":
-      return !hasBot && table.actionRequest === undefined && table.canRequestUndo;
+      return Object.keys(table.seats).length === 4 && table.actionRequest === undefined && table.canRequestUndo;
     case "game.respond_claim":
       return table.actionRequest?.kind === "CLAIM" && table.actionRequest.canRespond && typeof payload.accepted === "boolean";
     case "game.respond_undo":

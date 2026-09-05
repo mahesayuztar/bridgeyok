@@ -103,3 +103,27 @@ test("consensus capabilities expose only the projected responder", () => {
   assert.equal(canSendTableCommand(context(table), "game.respond_undo", { accepted: true }), false);
   assert.equal(canSendTableCommand(context(table), "game.make_call", { call: { kind: "PASS" } }), false);
 });
+
+test("bot presence follows projected consensus eligibility and requires occupied seats", () => {
+  const table = activeTable();
+  table.seats = {
+    N: table.seats.N,
+    E: { participantId: "east-bot", isBot: true },
+    S: { participantId: "south" },
+    W: { participantId: "west" },
+  };
+  table.participants.push({ id: "east-bot", nickname: "Bot", isBot: true });
+  table.canRequestUndo = true;
+  assert.equal(canSendTableCommand(context(table), "game.request_undo"), true);
+  table.game.phase = "PLAY";
+  table.game.auction.contract = { level: 1, strain: "C", declarer: "N", doubling: "UNDOUBLED" };
+  table.game.dummyRevealed = true;
+  table.game.completedTrickCount = 1;
+  assert.equal(canSendTableCommand(context(table), "game.request_claim", { tricks: 5 }), true);
+  table.viewerSeat = "S";
+  assert.equal(canSendTableCommand(context(table), "game.request_claim", { tricks: 5 }), false);
+  table.viewerSeat = "N";
+  delete table.seats.E;
+  assert.equal(canSendTableCommand(context(table), "game.request_claim", { tricks: 5 }), false);
+  assert.equal(canSendTableCommand(context(table), "game.request_undo"), false);
+});

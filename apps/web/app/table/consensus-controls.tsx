@@ -16,18 +16,17 @@ export function ConsensusControls({
     game?.auction.contract === undefined
       ? undefined
       : oppositeSeat(game.auction.contract.declarer);
-  const hasBot = table.participants.some((participant) => participant.isBot);
   const remainingTricks =
     game === undefined ? 0 : 13 - game.completedTrickCount;
   const claimAvailable =
-    !hasBot &&
+    Object.keys(table.seats).length === 4 &&
     request === undefined &&
     game?.phase === "PLAY" &&
     game.currentTrick.plays.length === 0 &&
     table.viewerSeat !== undefined &&
     table.viewerSeat !== dummy;
   const undoAvailable =
-    !hasBot && request === undefined && table.canRequestUndo;
+    request === undefined && table.canRequestUndo;
 
   return (
     <div className="consensus-navigation">
