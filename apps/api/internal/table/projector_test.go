@@ -338,3 +338,22 @@ func sessionForSeat(t *testing.T, aggregate Aggregate, seat bridge.Seat) string 
 	t.Fatalf("seat %s references missing participant", seat)
 	return ""
 }
+
+func TestProjectPreservesZeroClaimAndEmptyApprovals(t *testing.T) {
+	t.Parallel()
+	aggregate := botConsensusAggregate(t, ActionRequestClaim, bridge.North, []bridge.Seat{bridge.West})
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandRequestClaim, SessionID: aggregate.OwnerSessionID, ClaimTricks: 0}).NextState
+	for _, sessionID := range []string{aggregate.OwnerSessionID, sessionForSeat(t, aggregate, bridge.East)} {
+		projection, domainError := Project(aggregate, sessionID)
+		if domainError != nil {
+			t.Fatal(domainError)
+		}
+		encoded, err := json.Marshal(projection.ActionRequest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(encoded), `"claimTricks":0`) || !strings.Contains(string(encoded), `"approvedBy":[]`) {
+			t.Fatalf("zero claim wire representation = %s", encoded)
+		}
+	}
+}

@@ -150,3 +150,12 @@ test("normalizes presence snapshots and rejects malformed timestamps", () => {
   assert.deepEqual(normalizePresenceSnapshot({ participants: [offline] }), [offline]);
   assert.deepEqual(normalizePresenceSnapshot({ participants: null }), []);
 });
+
+test("preserves zero-trick consensus requests with no approvals", () => {
+  const projection = activeProjection();
+  projection.actionRequest = { kind: "CLAIM", requesterSeat: "N", claimTricks: 0, approvedBy: [], canRespond: false };
+  const table = normalizeLiveTableProjection(projection);
+  assert.notEqual(table, null);
+  assert.equal(table.actionRequest.claimTricks, 0);
+  assert.deepEqual(table.actionRequest.approvedBy, []);
+});

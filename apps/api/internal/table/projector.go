@@ -31,7 +31,7 @@ type Projection struct {
 type ProjectedActionRequest struct {
 	Kind          ActionRequestKind `json:"kind"`
 	RequesterSeat bridge.Seat       `json:"requesterSeat"`
-	ClaimTricks   int               `json:"claimTricks,omitempty"`
+	ClaimTricks   int               `json:"claimTricks"`
 	ApprovedBy    []bridge.Seat     `json:"approvedBy"`
 	CanRespond    bool              `json:"canRespond"`
 }
@@ -111,7 +111,7 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 			Kind:          request.Kind,
 			RequesterSeat: request.RequesterSeat,
 			ClaimTricks:   request.ClaimTricks,
-			ApprovedBy:    append([]bridge.Seat(nil), request.ApprovedBy...),
+			ApprovedBy:    append([]bridge.Seat{}, request.ApprovedBy...),
 		}
 		if projection.ViewerSeat.Valid() && projection.ViewerSeat != request.RequesterSeat && !slices.Contains(request.ApprovedBy, projection.ViewerSeat) {
 			projectedRequest.CanRespond = request.Kind == ActionRequestUndo || projection.ViewerSeat.Partnership() != request.RequesterSeat.Partnership()
