@@ -399,17 +399,24 @@ func TestCommandRepositoryPersistsAndHydratesCompletedBoard(t *testing.T) {
 	if aggregate.State != table.StateActive || aggregate.Game == nil || aggregate.BoardID != boardID {
 		t.Fatalf("started aggregate = %+v", aggregate)
 	}
+	var finalCall table.CommandRequest
 	for _callIndex := 0; _callIndex < 4; _callIndex++ {
 		call := bridge.Pass()
-		result := environment.process(t, table.CommandRequest{
+		finalCall = table.CommandRequest{
 			TableID: environment.tableID, SessionID: commandSessionForSeat(t, aggregate, aggregate.Game.Turn),
 			RequestID: "passed_out_" + string(rune('a'+_callIndex)), ExpectedRevision: aggregate.Revision,
 			Command: table.Command{Name: table.CommandMakeCall, Call: &call},
-		})
+		}
+		result := environment.process(t, finalCall)
 		aggregate = result.Aggregate
 	}
 	if aggregate.State != table.StateBetweenBoards || aggregate.Game.Result == nil || !aggregate.Game.Result.PassedOut {
 		t.Fatalf("completed aggregate = %+v", aggregate)
+	}
+
+	duplicate := environment.process(t, finalCall)
+	if !duplicate.Duplicate || len(duplicate.Events) != 0 || !reflect.DeepEqual(duplicate.Aggregate, aggregate) {
+		t.Fatal("duplicate scoring command changed the durable ledger")
 	}
 
 	var boardStatus string
