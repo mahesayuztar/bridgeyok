@@ -258,6 +258,10 @@ function assertPrivateFrames(
           : Math.min(game.completedTrickCount, 1),
       );
     }
+    if (table !== undefined) {
+      expect(Array.isArray(table.scoreSheet)).toBe(true);
+      expect(Array.isArray(table.pairScoreTotals)).toBe(true);
+    }
     expect(encoded).not.toContain("sessionId");
     expect(encoded).not.toContain("deviceCredential");
     expect(encoded).not.toContain("accessToken");
@@ -1039,6 +1043,21 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await replacementTab.getByRole("button", { name: /^Buka menu Nara, kursi [NESW]$/ }).click();
   await replacementTab.getByRole("button", { name: "Saya siap" }).click();
 
+  const emptyScoreTrigger = replacementTab.getByRole("button", { name: "Buka skor meja" });
+  await emptyScoreTrigger.click();
+  const scoreSheet = replacementTab.getByRole("dialog", { name: "Skor meja" });
+  await expect(scoreSheet).toBeVisible();
+  await expect(scoreSheet).toContainText("Belum ada hasil board.");
+  const emptyScoreBox = await scoreSheet.boundingBox();
+  expect(emptyScoreBox).not.toBeNull();
+  expect(emptyScoreBox!.x).toBeGreaterThanOrEqual(0);
+  expect(emptyScoreBox!.y).toBeGreaterThanOrEqual(0);
+  expect(emptyScoreBox!.x + emptyScoreBox!.width).toBeLessThanOrEqual(320);
+  expect(emptyScoreBox!.y + emptyScoreBox!.height).toBeLessThanOrEqual(700);
+  await replacementTab.keyboard.press("Escape");
+  await expect(scoreSheet).toBeHidden();
+  await expect(emptyScoreTrigger).toBeFocused();
+
   const activePages = [replacementTab, east.page, south.page, west.page];
   for (const page of activePages) {
     await expect(page.getByRole("button", { name: /^Buka menu Nara, kursi [NESW]$/ }).locator(".player-copy")).toContainText("Siap");
@@ -1350,6 +1369,43 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   );
   await Promise.all(activePages.map(assertCompletedDealGeometry));
 
+  await replacementTab.getByRole("button", { name: "Buka skor meja" }).click();
+  const durableScoreText = await scoreSheet.locator("tbody").textContent();
+  const durableTotalsText = await scoreSheet.locator("dl").textContent();
+  await replacementTab.getByRole("button", { name: "Tutup skor meja" }).click();
+  const originalScoreViewport = replacementTab.viewportSize()!;
+  for (const viewport of [...profiles.map((profile) => profile.viewport), originalScoreViewport]) {
+    await replacementTab.setViewportSize(viewport);
+    const scoredSheetTrigger = replacementTab.getByRole("button", { name: "Buka skor meja" });
+    await scoredSheetTrigger.click();
+    await expect(scoreSheet).toBeVisible();
+    await expect(scoreSheet).toContainText("Duplicate points · bukan IMP");
+    await expect(scoreSheet.locator(".score-sheet-totals dl > div")).toHaveCount(2);
+    await expect(scoreSheet.locator(".score-sheet-table tbody tr")).toHaveCount(1);
+    for (const profile of profiles) {
+      await expect(scoreSheet.locator(".score-sheet-table tbody")).toContainText(profile.nickname);
+    }
+    const sheetBox = (await scoreSheet.boundingBox())!;
+    expect(sheetBox.x).toBeGreaterThanOrEqual(0);
+    expect(sheetBox.y).toBeGreaterThanOrEqual(0);
+    expect(sheetBox.x + sheetBox.width).toBeLessThanOrEqual(viewport.width);
+    expect(sheetBox.y + sheetBox.height).toBeLessThanOrEqual(viewport.height);
+    const scoreRegion = scoreSheet.getByRole("region", { name: "Hasil board meja ini" });
+    if (viewport.width <= 390) {
+      await scoreRegion.focus();
+      await replacementTab.keyboard.press("ArrowRight");
+      await expect.poll(() => scoreRegion.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+      await scoreSheet.locator("tbody td").last().scrollIntoViewIfNeeded();
+    }
+    await replacementTab.screenshot({
+      path: testInfo.outputPath(`score-sheet-${viewport.width}x${viewport.height}.png`),
+      fullPage: false,
+    });
+    await replacementTab.getByRole("button", { name: "Tutup skor meja" }).click();
+    await expect(scoreSheet).toBeHidden();
+    await expect(scoredSheetTrigger).toBeFocused();
+  }
+
   await fullHistoryTrigger.click();
   await expect(fullHistory).toBeVisible();
   await expect(fullHistory.locator(".trick-history-item")).toHaveCount(13);
@@ -1417,11 +1473,33 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await expect(
     replacementTab.locator('.auction-table th[data-turn="true"]'),
   ).toHaveText("E");
+  await east.page.reload();
+  await waitForConnection(east.page);
+  const reconnectedScoreTrigger = east.page.getByRole("button", { name: "Buka skor meja" });
+  await reconnectedScoreTrigger.click();
+  const reconnectedScoreSheet = east.page.getByRole("dialog", { name: "Skor meja" });
+  await expect(reconnectedScoreSheet.locator(".score-sheet-table tbody tr")).toHaveCount(1);
+  await expect(reconnectedScoreSheet.locator("tbody")).toHaveText(durableScoreText!);
+  await expect(reconnectedScoreSheet.locator("dl")).toHaveText(durableTotalsText!);
+  await east.page.keyboard.press("Escape");
+  await expect(reconnectedScoreSheet).toBeHidden();
+  await expect(reconnectedScoreTrigger).toBeFocused();
   await makeCall(east.page, /^Pass/);
   await makeCall(south.page, /^Pass/);
   await makeCall(west.page, /^Pass/);
   await makeCall(replacementTab, /^Pass/);
-  await expect(replacementTab.getByText("Passed out").first()).toBeVisible();
+  await expect(replacementTab.locator(".board-result")).toContainText("Passed out");
+  await replacementTab.getByRole("button", { name: "Buka skor meja" }).click();
+  await expect(scoreSheet.locator(".score-sheet-table tbody tr")).toHaveCount(2);
+  await expect(scoreSheet.locator(".score-sheet-table tbody tr").last()).toContainText("Passed out");
+  await expect(scoreSheet.locator("dl")).toHaveText(durableTotalsText!);
+  await replacementTab.setViewportSize({ width: 320, height: 300 });
+  const shortScoreRegion = scoreSheet.getByRole("region", { name: "Hasil board meja ini" });
+  await shortScoreRegion.focus();
+  await replacementTab.keyboard.press("ArrowDown");
+  await expect.poll(() => shortScoreRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await replacementTab.setViewportSize(originalScoreViewport);
+  await replacementTab.getByRole("button", { name: "Tutup skor meja" }).click();
   await replacementTab.getByLabel("Buka menu meja").click();
   await replacementTab.getByRole("button", { name: "Akhiri meja" }).click();
   for (const page of activePages) {
