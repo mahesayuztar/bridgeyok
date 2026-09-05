@@ -300,6 +300,38 @@ func scoreTestLineup(northSouth ScorePair, eastWest ScorePair) BoardLineup {
 	}
 }
 
+func TestScoreSheetPairIdentityIgnoresSeatOrder(t *testing.T) {
+	t.Parallel()
+
+	original := testStartedAggregate(t).CurrentBoardLineup
+	for _, test := range []struct {
+		name         string
+		seats        [4]bridge.Seat
+		swappedSides bool
+	}{
+		{name: "within pairs", seats: [4]bridge.Seat{bridge.South, bridge.West, bridge.North, bridge.East}},
+		{name: "across sides", seats: [4]bridge.Seat{bridge.East, bridge.North, bridge.West, bridge.South}, swappedSides: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			aggregate := testReadyAggregate(t)
+			originalSeats := aggregate.Seats
+			aggregate.Seats = make(map[bridge.Seat]SeatAssignment, 4)
+			for _index, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+				aggregate.Seats[test.seats[_index]] = originalSeats[seat]
+			}
+			deal := testDeal(t)
+			aggregate = acceptedDecision(t, aggregate, Command{Name: CommandStartGame, SessionID: "session-owner", Deal: &deal, BoardID: "board-one"}).NextState
+			wantNS, wantEW := original.NorthSouth, original.EastWest
+			if test.swappedSides {
+				wantNS, wantEW = wantEW, wantNS
+			}
+			if !reflect.DeepEqual(aggregate.CurrentBoardLineup.NorthSouth, wantNS) || !reflect.DeepEqual(aggregate.CurrentBoardLineup.EastWest, wantEW) {
+				t.Fatal("pair identity changed with seat order")
+			}
+		})
+	}
+}
+
 func TestScoreSheetUndoRemovesAndRescoreRestoresBoard(t *testing.T) {
 	t.Parallel()
 
@@ -609,7 +641,32 @@ func TestDecideActiveTableParticipantReplacement(t *testing.T) {
 
 	pass := bridge.Pass()
 	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: "session-owner", Call: &pass}).NextState
-	acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: replacement.SessionID, Call: &pass})
+	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: replacement.SessionID, Call: &pass}).NextState
+	for aggregate.State == StateActive {
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &pass}).NextState
+	}
+	firstLineup := aggregate.ScoreSheet[0].Lineup
+	if firstLineup.Seats[bridge.East].ID != east.ID {
+		t.Fatal("mid-board substitution rewrote score attribution")
+	}
+	aggregate = acceptedDecision(t, aggregate, Command{
+		Name: CommandRequestNextBoard, SessionID: "session-owner", Deal: &deal, BoardID: "board-two",
+	}).NextState
+	if aggregate.CurrentBoardLineup.Seats[bridge.East].ID != replacement.ID || aggregate.CurrentBoardLineup.EastWest.ID == firstLineup.EastWest.ID {
+		t.Fatal("next board did not capture the replacement pair")
+	}
+	for aggregate.State == StateActive {
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &pass}).NextState
+	}
+	projection, domainError := Project(aggregate, "session-owner")
+	if domainError != nil || len(projection.ScoreSheet) != 2 || len(projection.PairScoreTotals) != 3 {
+		t.Fatalf("replacement ledger: rows=%d pairs=%d error=%v", len(projection.ScoreSheet), len(projection.PairScoreTotals), domainError)
+	}
+	for _, total := range projection.PairScoreTotals {
+		if total.Score != 0 {
+			t.Fatalf("passed-out pair total = %d, want zero", total.Score)
+		}
+	}
 }
 
 func TestDecideOfflineParticipantTimeout(t *testing.T) {
