@@ -1,13 +1,22 @@
+import { useRef, useState } from "react";
+import type { TableSession } from "../use-table-session";
+import { BoardReplayModal } from "./board-replay-modal";
 import { boardResultLabel, type LiveTableProjection } from "../table-state";
 import { compactContractLabel } from "./gameplay-presentation";
 
 export function ScoreSheet({
   table,
   compact = false,
+  loadBoardReplay,
 }: {
   table: LiveTableProjection;
   compact?: boolean;
+  loadBoardReplay: TableSession["loadBoardReplay"];
 }) {
+  const selectedTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<
+    LiveTableProjection["scoreSheet"][number] | null
+  >(null);
   const scoreSheetId = `score-sheet-${table.tableId}`;
   const scoreSheetTitleId = `${scoreSheetId}-title`;
   const scoreNS = table.scoreSheet.reduce(
@@ -84,8 +93,24 @@ export function ScoreSheet({
               </thead>
               <tbody>
                 {table.scoreSheet.map((entry) => (
-                  <tr key={entry.boardId}>
-                    <th scope="row">{entry.boardNumber}</th>
+                  <tr
+                    key={entry.boardId}
+                    onClick={(event) => {
+                      selectedTriggerRef.current =
+                        event.currentTarget.querySelector("button");
+                      selectedTriggerRef.current?.focus();
+                      setSelectedEntry(entry);
+                    }}
+                  >
+                    <th scope="row">
+                      <button
+                        className="score-replay-trigger"
+                        type="button"
+                        aria-label={`Replay board ${entry.boardNumber}`}
+                      >
+                        {entry.boardNumber}
+                      </button>
+                    </th>
                     <td data-strain={entry.result.contract?.strain}>
                       {compactContractLabel(entry.result.contract)}
                       {entry.result.contract === undefined
@@ -105,6 +130,19 @@ export function ScoreSheet({
           </div>
         )}
       </div>
+      {selectedEntry === null ? null : (
+        <BoardReplayModal
+          key={selectedEntry.boardId}
+          table={table}
+          entry={selectedEntry}
+          loadBoardReplay={loadBoardReplay}
+          onClose={() => {
+            setSelectedEntry(null);
+            document.getElementById(scoreSheetId)?.showPopover();
+            selectedTriggerRef.current?.focus();
+          }}
+        />
+      )}
     </>
   );
 }

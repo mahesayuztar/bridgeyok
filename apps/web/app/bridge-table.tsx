@@ -143,6 +143,7 @@ export default function BridgeTable({
     return (
       <main className="table-client waiting-client">
         <WaitingTableStatusBar
+          loadBoardReplay={session.loadBoardReplay}
           table={table}
           connectionState={session.connectionState}
           onLeaveTable={() => void returnToLobby()}
@@ -188,6 +189,7 @@ export default function BridgeTable({
       data-board-complete={boardComplete}
     >
       <ActiveTableStatusBar
+        loadBoardReplay={session.loadBoardReplay}
         table={table}
         connectionState={session.connectionState}
         inviteCode={session.inviteCode}

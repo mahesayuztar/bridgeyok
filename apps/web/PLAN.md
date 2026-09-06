@@ -973,3 +973,12 @@ Referensi: tiga screenshot pengguna pada 6 September 2026. Perubahan ini menggan
 - Riwayat kartu memakai `PlayingCard` yang sama dengan meja, orientasi terhadap viewer, satu trick per tampilan, dan navigasi sebelumnya/berikutnya. Batas proyeksi full/latest tetap berlaku; membuka ulang history menampilkan trick terbaru.
 - Tombol keluar menggantikan BY pada navbar aktif. Dialog native meminta konfirmasi, mengembalikan fokus ketika dibatalkan, dan mencegah shortcut auction berjalan selama dialog terbuka.
 - Validasi: TypeScript, ESLint, dan 49 unit test lulus. Pengujian browser dengan API lokal dan `DATABASE_URL` env sedang berjalan untuk desktop, tablet, mobile 320–400 px, history, serta keluar dari meja.
+
+## Completed board replay — 7 September 2026
+
+- Score History rows open a participant-authorized replay of their board record (ADR 0017).
+- A native modal contains one shared TableSurface with all four hands, board-start seat labels, AuctionTable only at trick 0, and previous/next recorded trick navigation. Starting trick 1 hides the auction and centers trick cards. The footer shows only arrows and numeric progress.
+- The final navigation step uses the persistent BoardResult presentation. Pass-out and claim do not synthesize unplayed tricks; rewind restores cards from the original deal.
+- Current scored boards use a consistent snapshot until the permanent record is available. Older boards lacking both record and snapshot show a recoverable unavailable message.
+- Verification: 52 web unit tests, 3 contract tests, TypeScript, production build, API race tests, Go vet/lint, and isolated PostgreSQL replay integration pass. Dedicated four-player Playwright replay passes at 1920×1080, 1024×768, 768×1024, 390×844, and 320×700: row click, 52-card deal, auction only at trick 0, forward/back navigation, all 13 tricks, result with full deal, Escape/close focus restoration, and reopening.
+- Existing full gameplay browser suite stops before replay at its completed-deal card-size assertion (side-card height versus top-card width). That unrelated geometry assertion remains unchanged. Remote PostgreSQL integration exceeded the existing 45-second test deadline; the identical replay cases pass against isolated PostgreSQL 17 (migration 00006).

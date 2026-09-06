@@ -3,6 +3,7 @@
 import type { components } from "@bridgeyok/contracts/openapi";
 import type { MutationCommandEnvelope } from "@bridgeyok/contracts/realtime";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { normalizeBoardReplay, type BoardReplay } from "./board-replay";
 import { issueFromFailure, issueFromServer, type ClientIssue } from "./client-issue";
 import { canSendTableCommand } from "./gameplay-capabilities";
 import { createRequestId } from "./request-id";
@@ -145,6 +146,7 @@ function isSessionFailure(error: unknown) {
 }
 
 export type TableSession = {
+  loadBoardReplay: (boardId: string, signal: AbortSignal) => Promise<BoardReplay>;
   initializing: boolean;
   recoveryState: TableRecoveryState;
   busy: boolean;
@@ -257,6 +259,15 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
       return (await response.json()) as T;
     },
     [ensureAccessToken, refreshCredentials]
+  );
+
+  const loadBoardReplay = useCallback(
+    (boardId: string, signal: AbortSignal) =>
+      authenticatedRequest<components["schemas"]["BoardReplay"]>(
+        `/v1/boards/${encodeURIComponent(boardId)}/replay`,
+        { signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]) }
+      ).then(normalizeBoardReplay),
+    [authenticatedRequest]
   );
 
   const stopConnection = useCallback(() => {
@@ -853,6 +864,7 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     dismissIssue,
     dismissNotice,
     canSendCommand,
-    sendCommand
+    sendCommand,
+    loadBoardReplay
   };
 }

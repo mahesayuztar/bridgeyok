@@ -1494,3 +1494,8 @@ Referensi domain dan technical baseline:
 - Replay via the existing engine reducer, compare complete final state, then remove only the archived sequence interval atomically.
 - Keep existing reconnect snapshot fallback and commit-before-publish; no retention infrastructure added.
 - Data/rollback/legacy retention policy: ADR 0016.
+
+
+## Completed board replay — 7 September 2026
+
+Implemented participant-only `GET /v1/boards/{boardId}/replay` from validated board records, with consistent current-scored snapshot fallback (ADR 0017). Score History rows open one TableSurface with all four hands. Auction appears only at trick 0; subsequent steps show centered recorded tricks. Numeric previous/next navigation ends in the existing result presentation with the full deal restored. Reconciliation and game authority remain unchanged. Validation and the unrelated existing browser geometry failure are recorded in `apps/web/PLAN.md`.

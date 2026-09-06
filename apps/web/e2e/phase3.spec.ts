@@ -1704,3 +1704,146 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
     await Promise.all([ownerContext.close(), guestContext.close()]);
   }
 });
+
+test("completed board replay shows four hands and navigates recorded tricks", async ({
+  browser,
+}, testInfo) => {
+  test.setTimeout(240_000);
+  const players = [];
+  for (const nickname of [
+    "Replay North",
+    "Replay East",
+    "Replay South",
+    "Replay West",
+  ]) {
+    const context = await browser.newContext({ reducedMotion: "reduce" });
+    const page = await context.newPage();
+    await enterAsGuest(page, nickname);
+    players.push({ context, page, nickname });
+  }
+  const north = players[0]!;
+  try {
+    await north.page.getByRole("button", { name: "Buat meja" }).click();
+    await waitForConnection(north.page);
+    const inviteCode = (await north.page
+      .locator(".invite-inline .invite-code")
+      .textContent())!.trim();
+    for (const player of players.slice(1)) {
+      await player.page.getByLabel("Kode undangan").fill(inviteCode);
+      await player.page
+        .getByRole("button", { name: "Masuk", exact: true })
+        .click();
+      await waitForConnection(player.page);
+    }
+    for (const [_index, player] of players.entries()) {
+      await takeSeat(
+        player.page,
+        player.nickname,
+        (["N", "E", "S", "W"] as const)[_index]!,
+      );
+      await setReady(player.page, player.nickname);
+    }
+    await north.page.getByRole("button", { name: "Mulai board" }).click();
+    await makeBid(north.page, 1, "♣");
+    for (const player of players.slice(1)) await makeCall(player.page, /^Pass/);
+    for (let _cardIndex = 0; _cardIndex < 52; _cardIndex++)
+      await playNextCard(players.map((player) => player.page));
+    await expect(north.page.locator(".board-result")).toBeVisible();
+    await north.page.getByRole("button", { name: "Buka skor meja" }).click();
+    const scoreSheet = north.page.getByRole("dialog", { name: "History" });
+    await scoreSheet.locator("tbody tr").first().locator("td").first().click();
+    const replayModal = north.page.getByRole("dialog", {
+      name: "Replay board 1",
+      exact: true,
+    });
+    await expect(replayModal.locator(".table-surface")).toHaveCount(1);
+    await expect(
+      replayModal.locator(".replay-hand .physical-card"),
+    ).toHaveCount(52);
+    await expect(replayModal.locator(".auction-table")).toHaveCount(1);
+    await expect(
+      replayModal.getByRole("button", { name: "Trick sebelumnya" }),
+    ).toBeDisabled();
+    for (const viewport of [
+      { width: 1920, height: 1080 },
+      { width: 1024, height: 768 },
+      { width: 768, height: 1024 },
+      { width: 390, height: 844 },
+      { width: 320, height: 700 },
+    ]) {
+      await north.page.setViewportSize(viewport);
+      const geometry = await replayModal.evaluate((dialog) => {
+        const surface = dialog
+          .querySelector(".board-play-zone")!
+          .getBoundingClientRect();
+        const cards = [
+          ...dialog.querySelectorAll(".replay-hand .physical-card"),
+        ].map((card) => card.getBoundingClientRect());
+        return {
+          overflow: dialog.scrollWidth > dialog.clientWidth,
+          outside: cards.some(
+            (card) =>
+              card.left < surface.left - 1 ||
+              card.right > surface.right + 1 ||
+              card.top < surface.top - 1 ||
+              card.bottom > surface.bottom + 1,
+          ),
+        };
+      });
+      expect(geometry).toEqual({ overflow: false, outside: false });
+      await north.page.screenshot({
+        path: testInfo.outputPath(
+          `board-replay-${viewport.width}x${viewport.height}.png`,
+        ),
+      });
+    }
+    await replayModal.getByRole("button", { name: "Trick berikutnya" }).click();
+    await expect(replayModal.locator(".auction-table")).toHaveCount(0);
+    await expect(
+      replayModal.locator(".replay-hand .physical-card"),
+    ).toHaveCount(48);
+    await expect(replayModal.locator(".trick-slot .physical-card")).toHaveCount(
+      4,
+    );
+    await north.page.screenshot({
+      path: testInfo.outputPath("board-replay-trick-320x700.png"),
+    });
+    await north.page.keyboard.press("ArrowLeft");
+    await expect(replayModal.locator(".auction-table")).toHaveCount(1);
+    await expect(
+      replayModal.locator(".replay-hand .physical-card"),
+    ).toHaveCount(52);
+    for (let _step = 0; _step < 14; _step++)
+      await replayModal
+        .getByRole("button", { name: "Trick berikutnya" })
+        .click();
+    await expect(replayModal.locator(".board-result")).toBeVisible();
+    await expect(replayModal.locator(".auction-table")).toHaveCount(0);
+    await expect(
+      replayModal.locator(".replay-hand .physical-card"),
+    ).toHaveCount(52);
+    await expect(
+      replayModal.getByRole("button", { name: "Trick berikutnya" }),
+    ).toBeDisabled();
+    await north.page.screenshot({
+      path: testInfo.outputPath("board-replay-result-320x700.png"),
+    });
+    await north.page.keyboard.press("Escape");
+    await expect(replayModal).toHaveCount(0);
+    await expect(
+      scoreSheet.getByRole("button", { name: "Replay board 1", exact: true }),
+    ).toBeFocused();
+
+    await scoreSheet
+      .getByRole("button", { name: "Replay board 1", exact: true })
+      .click();
+    await expect(
+      north.page
+        .getByRole("dialog", { name: "Replay board 1", exact: true })
+        .locator(".replay-hand .physical-card"),
+    ).toHaveCount(52);
+    await north.page.getByRole("button", { name: "Tutup replay" }).click();
+  } finally {
+    for (const player of players) await player.context.close();
+  }
+});

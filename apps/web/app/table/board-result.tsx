@@ -15,8 +15,10 @@ export function BoardResult({
   table,
   canSendCommand,
   onCommand,
+  persistent = false,
 }: {
   table: LiveTableProjection;
+  persistent?: boolean;
   canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
 }) {
@@ -31,7 +33,7 @@ export function BoardResult({
   const resultKey = result === undefined ? null : table.boardId;
 
   useEffect(() => {
-    if (resultKey === null) return;
+    if (resultKey === null || persistent) return;
     let fadeTimer: ReturnType<typeof setTimeout> | null = null;
     let dismissalStarted = false;
 
@@ -59,7 +61,7 @@ export function BoardResult({
       if (fadeTimer !== null) clearTimeout(fadeTimer);
       document.removeEventListener("click", dismissResult);
     };
-  }, [resultKey]);
+  }, [resultKey, persistent]);
 
   if (result === undefined) return null;
   if (hidden) return null;

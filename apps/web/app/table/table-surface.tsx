@@ -17,6 +17,7 @@ export function TableSurface({
   onCommand,
   onBoardClick,
   children,
+  seatLabels,
 }: {
   table: LiveTableProjection;
   orientation: TableOrientation;
@@ -25,31 +26,37 @@ export function TableSurface({
   onCommand: TableSession["sendCommand"];
   onBoardClick?: () => void;
   children: ReactNode;
+  seatLabels?: Partial<Record<Seat, string>>;
 }) {
   const isOwner = table.viewerRole === "OWNER";
   return (
     <div className="table-surface">
       {(Object.entries(orientation) as Array<[VisualPosition, Seat]>).map(
-        ([position, seat]) => (
-          <ParticipantPosition
-            key={seat}
-            table={table}
-            presence={presence}
-            seat={seat}
-            position={position}
-            canSendCommand={canSendCommand}
-            turn={table.game?.turn === seat}
-            onCommand={onCommand}
-            {...(isOwner
-              ? {
-                  onRemove: (participantId: string) =>
-                    onCommand("table.remove_participant", {
-                      participant_id: participantId,
-                    }),
-                }
-              : {})}
-          />
-        ),
+        ([position, seat]) =>
+          seatLabels !== undefined ? (
+            <div key={seat} className={`player-position player-${position}`}>
+              {seat} · {seatLabels[seat] ?? seat}
+            </div>
+          ) : (
+            <ParticipantPosition
+              key={seat}
+              table={table}
+              presence={presence}
+              seat={seat}
+              position={position}
+              canSendCommand={canSendCommand}
+              turn={table.game?.turn === seat}
+              onCommand={onCommand}
+              {...(isOwner
+                ? {
+                    onRemove: (participantId: string) =>
+                      onCommand("table.remove_participant", {
+                        participant_id: participantId,
+                      }),
+                  }
+                : {})}
+            />
+          ),
       )}
       <div
         className="board-play-zone"
@@ -57,7 +64,9 @@ export function TableSurface({
         onClick={(event) => {
           if (
             event.target instanceof Element &&
-            event.target.closest("button, a, input, select, textarea, details, [role='dialog']")
+            event.target.closest(
+              "button, a, input, select, textarea, details, [role='dialog']",
+            )
           )
             return;
           onBoardClick?.();

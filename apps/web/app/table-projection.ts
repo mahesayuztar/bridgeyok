@@ -221,7 +221,7 @@ function normalizePairScoreTotal(value: unknown): PairScoreTotal | null {
   return pair === null ? null : { pair, score: value.score as number };
 }
 
-function normalizeGame(value: unknown): GameProjection | null {
+export function normalizeGame(value: unknown): GameProjection | null {
   if (!isRecord(value) || !isRecord(value.board) || !isRecord(value.auction)) {
     return null;
   }

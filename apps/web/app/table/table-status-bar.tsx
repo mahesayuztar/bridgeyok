@@ -26,17 +26,19 @@ export function WaitingTableStatusBar({
   table,
   connectionState,
   onLeaveTable,
+  loadBoardReplay,
 }: {
   table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
   onLeaveTable: () => void;
+  loadBoardReplay: TableSession["loadBoardReplay"];
 }) {
   return (
     <header className="table-status-bar">
       <span className="table-wordmark">BridgeYok</span>
       <span>Meja tunggu</span>
       <div className="status-actions">
-        <ScoreSheet table={table} />
+        <ScoreSheet loadBoardReplay={loadBoardReplay} table={table} />
         <div className="connection-status" data-state={connectionState}>
           <span className="status-mark" />
           {connectionLabels[connectionState]}
@@ -58,6 +60,7 @@ export function ActiveTableStatusBar({
   soundMuted,
   onSoundMutedChange,
   onLeaveTable,
+  loadBoardReplay,
 }: {
   table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
@@ -67,6 +70,7 @@ export function ActiveTableStatusBar({
   soundMuted: boolean;
   onSoundMutedChange: (muted: boolean) => void;
   onLeaveTable: () => void;
+  loadBoardReplay: TableSession["loadBoardReplay"];
 }) {
   const leaveDialogRef = useRef<HTMLDialogElement>(null);
   const game = table.game;
@@ -117,7 +121,7 @@ export function ActiveTableStatusBar({
         </div>
       </dialog>
       <div className="play-status-facts">
-        <ScoreSheet table={table} compact />
+        <ScoreSheet loadBoardReplay={loadBoardReplay} table={table} compact />
         <div
           className="board-marker"
           role="img"
