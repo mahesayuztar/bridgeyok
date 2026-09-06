@@ -839,6 +839,18 @@ async function assertCompletedDealGeometry(page: Page) {
           ),
         ),
       crossHandCollisions,
+      sameHandCollisions: hands.flatMap((hand) =>
+        hand.cards.flatMap((card, _cardIndex) =>
+          hand.cards.slice(_cardIndex + 1).filter((otherCard) => overlaps(card, otherCard)),
+        ),
+      ).length,
+      clippedLabels: [...document.querySelectorAll(".completed-deal-hand .card-corner")].filter((corner) => {
+        const card = rect(corner.closest(".physical-card")!);
+        return [...corner.children].some((label) => {
+          const box = rect(label);
+          return box.left < card.left || box.right > card.right || box.top < card.top || box.bottom > card.bottom;
+        });
+      }).length,
       resultCollisions:
         resultBox === null
           ? -1
@@ -860,6 +872,8 @@ async function assertCompletedDealGeometry(page: Page) {
   expect(geometry.ownHandCount).toBe(0);
   expect(geometry.cardsInsidePlayZone).toBe(true);
   expect(geometry.crossHandCollisions).toBe(0);
+  expect(geometry.sameHandCollisions).toBe(0);
+  expect(geometry.clippedLabels).toBe(0);
   expect(geometry.resultCollisions).toBe(0);
   expect(
     geometry.participantThicknesses.every(
@@ -1378,6 +1392,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   const originalScoreViewport = replacementTab.viewportSize()!;
   for (const viewport of [...profiles.map((profile) => profile.viewport), originalScoreViewport]) {
     await replacementTab.setViewportSize(viewport);
+    await assertCompletedDealGeometry(replacementTab);
     const scoredSheetTrigger = replacementTab.getByRole("button", { name: "Buka skor meja" });
     await scoredSheetTrigger.click();
     await expect(scoreSheet).toBeVisible();
