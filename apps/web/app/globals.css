@@ -2087,18 +2087,6 @@ button.physical-card:disabled {
   position: absolute;
 }
 
-.trick-seat-label {
-  position: absolute;
-  z-index: 2;
-
-  top: 0.15rem;
-  right: 0.18rem;
-
-  color: var(--muted);
-
-  font-size: 0.55rem;
-}
-
 /* =========================================================
    TOP
    ========================================================= */
