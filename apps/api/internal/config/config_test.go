@@ -213,3 +213,26 @@ func mapLookup(values map[string]string) lookupFunc {
 		return value, ok
 	}
 }
+
+func TestDDSConfigurationBounds(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name  string
+		value string
+		key   string
+		valid bool
+	}{
+		{"defaults", "", "DDS_TIMEOUT", true}, {"explicit timeout", "5s", "DDS_TIMEOUT", true}, {"negative timeout", "-1s", "DDS_TIMEOUT", false}, {"excessive timeout", "61s", "DDS_TIMEOUT", false}, {"no workers", "0", "DDS_CONCURRENCY", false}, {"too many workers", "5", "DDS_CONCURRENCY", false}, {"bounded workers", "2", "DDS_CONCURRENCY", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			values := map[string]string{"DATABASE_URL": "postgresql://test:test@localhost/test", "AUTH_SECRET": strings.Repeat("x", 32), test.key: test.value}
+			configuration, err := load(func(key string) (string, bool) { value, exists := values[key]; return value, exists })
+			if (err == nil) != test.valid {
+				t.Fatalf("configuration error: %v", err)
+			}
+			if test.name == "defaults" && (configuration.DDSTimeout != 10*time.Second || configuration.DDSConcurrency != 1 || configuration.DDSExecutable != "./bin/bridgeyok-dds") {
+				t.Fatal("unexpected DDS defaults")
+			}
+		})
+	}
+}

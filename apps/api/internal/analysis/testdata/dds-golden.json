@@ -1,0 +1,955 @@
+{
+  "source": "https://github.com/dds-bridge/dds/blob/8d75755c8df81999557758c9757514edb94017bc/examples/hands.cpp",
+  "license": "Apache-2.0; tools/dds/LICENSE.upstream",
+  "fixtures": [
+    {
+      "name": "normal",
+      "boardNumber": 1,
+      "deal": {
+        "north": [
+          {
+            "suit": "S",
+            "rank": "Q"
+          },
+          {
+            "suit": "S",
+            "rank": "J"
+          },
+          {
+            "suit": "S",
+            "rank": "6"
+          },
+          {
+            "suit": "H",
+            "rank": "K"
+          },
+          {
+            "suit": "H",
+            "rank": "6"
+          },
+          {
+            "suit": "H",
+            "rank": "5"
+          },
+          {
+            "suit": "H",
+            "rank": "2"
+          },
+          {
+            "suit": "D",
+            "rank": "J"
+          },
+          {
+            "suit": "D",
+            "rank": "8"
+          },
+          {
+            "suit": "D",
+            "rank": "5"
+          },
+          {
+            "suit": "C",
+            "rank": "T"
+          },
+          {
+            "suit": "C",
+            "rank": "9"
+          },
+          {
+            "suit": "C",
+            "rank": "8"
+          }
+        ],
+        "east": [
+          {
+            "suit": "S",
+            "rank": "8"
+          },
+          {
+            "suit": "S",
+            "rank": "7"
+          },
+          {
+            "suit": "S",
+            "rank": "3"
+          },
+          {
+            "suit": "H",
+            "rank": "J"
+          },
+          {
+            "suit": "H",
+            "rank": "9"
+          },
+          {
+            "suit": "H",
+            "rank": "7"
+          },
+          {
+            "suit": "D",
+            "rank": "A"
+          },
+          {
+            "suit": "D",
+            "rank": "T"
+          },
+          {
+            "suit": "D",
+            "rank": "7"
+          },
+          {
+            "suit": "D",
+            "rank": "6"
+          },
+          {
+            "suit": "D",
+            "rank": "4"
+          },
+          {
+            "suit": "C",
+            "rank": "Q"
+          },
+          {
+            "suit": "C",
+            "rank": "4"
+          }
+        ],
+        "south": [
+          {
+            "suit": "S",
+            "rank": "K"
+          },
+          {
+            "suit": "S",
+            "rank": "5"
+          },
+          {
+            "suit": "H",
+            "rank": "T"
+          },
+          {
+            "suit": "H",
+            "rank": "8"
+          },
+          {
+            "suit": "H",
+            "rank": "3"
+          },
+          {
+            "suit": "D",
+            "rank": "K"
+          },
+          {
+            "suit": "D",
+            "rank": "Q"
+          },
+          {
+            "suit": "D",
+            "rank": "9"
+          },
+          {
+            "suit": "C",
+            "rank": "A"
+          },
+          {
+            "suit": "C",
+            "rank": "7"
+          },
+          {
+            "suit": "C",
+            "rank": "6"
+          },
+          {
+            "suit": "C",
+            "rank": "5"
+          },
+          {
+            "suit": "C",
+            "rank": "2"
+          }
+        ],
+        "west": [
+          {
+            "suit": "S",
+            "rank": "A"
+          },
+          {
+            "suit": "S",
+            "rank": "T"
+          },
+          {
+            "suit": "S",
+            "rank": "9"
+          },
+          {
+            "suit": "S",
+            "rank": "4"
+          },
+          {
+            "suit": "S",
+            "rank": "2"
+          },
+          {
+            "suit": "H",
+            "rank": "A"
+          },
+          {
+            "suit": "H",
+            "rank": "Q"
+          },
+          {
+            "suit": "H",
+            "rank": "4"
+          },
+          {
+            "suit": "D",
+            "rank": "3"
+          },
+          {
+            "suit": "D",
+            "rank": "2"
+          },
+          {
+            "suit": "C",
+            "rank": "K"
+          },
+          {
+            "suit": "C",
+            "rank": "J"
+          },
+          {
+            "suit": "C",
+            "rank": "3"
+          }
+        ]
+      },
+      "expected": {
+        "solverVersion": "dds-2.9.0-8d75755",
+        "doubleDummyTable": {
+          "N": {
+            "S": 5,
+            "H": 6,
+            "D": 5,
+            "C": 7,
+            "NT": 6
+          },
+          "E": {
+            "S": 8,
+            "H": 6,
+            "D": 7,
+            "C": 5,
+            "NT": 6
+          },
+          "S": {
+            "S": 5,
+            "H": 6,
+            "D": 5,
+            "C": 7,
+            "NT": 6
+          },
+          "W": {
+            "S": 8,
+            "H": 6,
+            "D": 7,
+            "C": 5,
+            "NT": 6
+          }
+        },
+        "makeableContracts": [
+          {
+            "declarer": "E",
+            "strain": "S",
+            "level": 2
+          },
+          {
+            "declarer": "W",
+            "strain": "S",
+            "level": 2
+          },
+          {
+            "declarer": "E",
+            "strain": "D",
+            "level": 1
+          },
+          {
+            "declarer": "W",
+            "strain": "D",
+            "level": 1
+          },
+          {
+            "declarer": "N",
+            "strain": "C",
+            "level": 1
+          },
+          {
+            "declarer": "S",
+            "strain": "C",
+            "level": 1
+          }
+        ],
+        "par": {
+          "scoreNS": -110,
+          "contracts": [
+            {
+              "declarers": [
+                "E",
+                "W"
+              ],
+              "strain": "S",
+              "level": 2,
+              "overTricks": 0,
+              "underTricks": 0,
+              "doubled": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "vulnerable_sacrifice",
+      "boardNumber": 2,
+      "deal": {
+        "north": [
+          {
+            "suit": "S",
+            "rank": "A"
+          },
+          {
+            "suit": "S",
+            "rank": "K"
+          },
+          {
+            "suit": "S",
+            "rank": "9"
+          },
+          {
+            "suit": "S",
+            "rank": "6"
+          },
+          {
+            "suit": "H",
+            "rank": "K"
+          },
+          {
+            "suit": "H",
+            "rank": "Q"
+          },
+          {
+            "suit": "H",
+            "rank": "8"
+          },
+          {
+            "suit": "D",
+            "rank": "A"
+          },
+          {
+            "suit": "D",
+            "rank": "9"
+          },
+          {
+            "suit": "D",
+            "rank": "8"
+          },
+          {
+            "suit": "C",
+            "rank": "K"
+          },
+          {
+            "suit": "C",
+            "rank": "6"
+          },
+          {
+            "suit": "C",
+            "rank": "3"
+          }
+        ],
+        "east": [
+          {
+            "suit": "S",
+            "rank": "Q"
+          },
+          {
+            "suit": "S",
+            "rank": "J"
+          },
+          {
+            "suit": "S",
+            "rank": "T"
+          },
+          {
+            "suit": "S",
+            "rank": "5"
+          },
+          {
+            "suit": "S",
+            "rank": "4"
+          },
+          {
+            "suit": "S",
+            "rank": "3"
+          },
+          {
+            "suit": "S",
+            "rank": "2"
+          },
+          {
+            "suit": "H",
+            "rank": "T"
+          },
+          {
+            "suit": "D",
+            "rank": "6"
+          },
+          {
+            "suit": "C",
+            "rank": "Q"
+          },
+          {
+            "suit": "C",
+            "rank": "J"
+          },
+          {
+            "suit": "C",
+            "rank": "8"
+          },
+          {
+            "suit": "C",
+            "rank": "2"
+          }
+        ],
+        "south": [
+          {
+            "suit": "H",
+            "rank": "J"
+          },
+          {
+            "suit": "H",
+            "rank": "9"
+          },
+          {
+            "suit": "H",
+            "rank": "7"
+          },
+          {
+            "suit": "H",
+            "rank": "5"
+          },
+          {
+            "suit": "H",
+            "rank": "4"
+          },
+          {
+            "suit": "H",
+            "rank": "3"
+          },
+          {
+            "suit": "D",
+            "rank": "K"
+          },
+          {
+            "suit": "D",
+            "rank": "7"
+          },
+          {
+            "suit": "D",
+            "rank": "5"
+          },
+          {
+            "suit": "D",
+            "rank": "3"
+          },
+          {
+            "suit": "D",
+            "rank": "2"
+          },
+          {
+            "suit": "C",
+            "rank": "9"
+          },
+          {
+            "suit": "C",
+            "rank": "4"
+          }
+        ],
+        "west": [
+          {
+            "suit": "S",
+            "rank": "8"
+          },
+          {
+            "suit": "S",
+            "rank": "7"
+          },
+          {
+            "suit": "H",
+            "rank": "A"
+          },
+          {
+            "suit": "H",
+            "rank": "6"
+          },
+          {
+            "suit": "H",
+            "rank": "2"
+          },
+          {
+            "suit": "D",
+            "rank": "Q"
+          },
+          {
+            "suit": "D",
+            "rank": "J"
+          },
+          {
+            "suit": "D",
+            "rank": "T"
+          },
+          {
+            "suit": "D",
+            "rank": "4"
+          },
+          {
+            "suit": "C",
+            "rank": "A"
+          },
+          {
+            "suit": "C",
+            "rank": "T"
+          },
+          {
+            "suit": "C",
+            "rank": "7"
+          },
+          {
+            "suit": "C",
+            "rank": "5"
+          }
+        ]
+      },
+      "expected": {
+        "solverVersion": "dds-2.9.0-8d75755",
+        "doubleDummyTable": {
+          "N": {
+            "S": 4,
+            "H": 10,
+            "D": 8,
+            "C": 6,
+            "NT": 9
+          },
+          "E": {
+            "S": 9,
+            "H": 2,
+            "D": 3,
+            "C": 7,
+            "NT": 3
+          },
+          "S": {
+            "S": 4,
+            "H": 10,
+            "D": 8,
+            "C": 6,
+            "NT": 9
+          },
+          "W": {
+            "S": 9,
+            "H": 2,
+            "D": 3,
+            "C": 7,
+            "NT": 3
+          }
+        },
+        "makeableContracts": [
+          {
+            "declarer": "E",
+            "strain": "S",
+            "level": 3
+          },
+          {
+            "declarer": "W",
+            "strain": "S",
+            "level": 3
+          },
+          {
+            "declarer": "N",
+            "strain": "H",
+            "level": 4
+          },
+          {
+            "declarer": "S",
+            "strain": "H",
+            "level": 4
+          },
+          {
+            "declarer": "N",
+            "strain": "D",
+            "level": 2
+          },
+          {
+            "declarer": "S",
+            "strain": "D",
+            "level": 2
+          },
+          {
+            "declarer": "E",
+            "strain": "C",
+            "level": 1
+          },
+          {
+            "declarer": "W",
+            "strain": "C",
+            "level": 1
+          },
+          {
+            "declarer": "N",
+            "strain": "NT",
+            "level": 3
+          },
+          {
+            "declarer": "S",
+            "strain": "NT",
+            "level": 3
+          }
+        ],
+        "par": {
+          "scoreNS": 100,
+          "contracts": [
+            {
+              "declarers": [
+                "E",
+                "W"
+              ],
+              "strain": "S",
+              "level": 4,
+              "overTricks": 0,
+              "underTricks": 1,
+              "doubled": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "nonvulnerable_sacrifice",
+      "boardNumber": 1,
+      "deal": {
+        "north": [
+          {
+            "suit": "S",
+            "rank": "7"
+          },
+          {
+            "suit": "S",
+            "rank": "3"
+          },
+          {
+            "suit": "H",
+            "rank": "Q"
+          },
+          {
+            "suit": "H",
+            "rank": "J"
+          },
+          {
+            "suit": "H",
+            "rank": "T"
+          },
+          {
+            "suit": "D",
+            "rank": "A"
+          },
+          {
+            "suit": "D",
+            "rank": "Q"
+          },
+          {
+            "suit": "D",
+            "rank": "5"
+          },
+          {
+            "suit": "D",
+            "rank": "4"
+          },
+          {
+            "suit": "C",
+            "rank": "T"
+          },
+          {
+            "suit": "C",
+            "rank": "7"
+          },
+          {
+            "suit": "C",
+            "rank": "5"
+          },
+          {
+            "suit": "C",
+            "rank": "2"
+          }
+        ],
+        "east": [
+          {
+            "suit": "S",
+            "rank": "Q"
+          },
+          {
+            "suit": "S",
+            "rank": "T"
+          },
+          {
+            "suit": "S",
+            "rank": "6"
+          },
+          {
+            "suit": "H",
+            "rank": "8"
+          },
+          {
+            "suit": "H",
+            "rank": "7"
+          },
+          {
+            "suit": "H",
+            "rank": "6"
+          },
+          {
+            "suit": "D",
+            "rank": "K"
+          },
+          {
+            "suit": "D",
+            "rank": "J"
+          },
+          {
+            "suit": "D",
+            "rank": "9"
+          },
+          {
+            "suit": "C",
+            "rank": "A"
+          },
+          {
+            "suit": "C",
+            "rank": "Q"
+          },
+          {
+            "suit": "C",
+            "rank": "8"
+          },
+          {
+            "suit": "C",
+            "rank": "4"
+          }
+        ],
+        "south": [
+          {
+            "suit": "S",
+            "rank": "5"
+          },
+          {
+            "suit": "H",
+            "rank": "A"
+          },
+          {
+            "suit": "H",
+            "rank": "9"
+          },
+          {
+            "suit": "H",
+            "rank": "5"
+          },
+          {
+            "suit": "H",
+            "rank": "4"
+          },
+          {
+            "suit": "H",
+            "rank": "3"
+          },
+          {
+            "suit": "H",
+            "rank": "2"
+          },
+          {
+            "suit": "D",
+            "rank": "7"
+          },
+          {
+            "suit": "D",
+            "rank": "6"
+          },
+          {
+            "suit": "D",
+            "rank": "3"
+          },
+          {
+            "suit": "D",
+            "rank": "2"
+          },
+          {
+            "suit": "C",
+            "rank": "K"
+          },
+          {
+            "suit": "C",
+            "rank": "6"
+          }
+        ],
+        "west": [
+          {
+            "suit": "S",
+            "rank": "A"
+          },
+          {
+            "suit": "S",
+            "rank": "K"
+          },
+          {
+            "suit": "S",
+            "rank": "J"
+          },
+          {
+            "suit": "S",
+            "rank": "9"
+          },
+          {
+            "suit": "S",
+            "rank": "8"
+          },
+          {
+            "suit": "S",
+            "rank": "4"
+          },
+          {
+            "suit": "S",
+            "rank": "2"
+          },
+          {
+            "suit": "H",
+            "rank": "K"
+          },
+          {
+            "suit": "D",
+            "rank": "T"
+          },
+          {
+            "suit": "D",
+            "rank": "8"
+          },
+          {
+            "suit": "C",
+            "rank": "J"
+          },
+          {
+            "suit": "C",
+            "rank": "9"
+          },
+          {
+            "suit": "C",
+            "rank": "3"
+          }
+        ]
+      },
+      "expected": {
+        "solverVersion": "dds-2.9.0-8d75755",
+        "doubleDummyTable": {
+          "N": {
+            "S": 3,
+            "H": 9,
+            "D": 8,
+            "C": 3,
+            "NT": 4
+          },
+          "E": {
+            "S": 10,
+            "H": 4,
+            "D": 4,
+            "C": 9,
+            "NT": 8
+          },
+          "S": {
+            "S": 3,
+            "H": 9,
+            "D": 8,
+            "C": 3,
+            "NT": 4
+          },
+          "W": {
+            "S": 10,
+            "H": 4,
+            "D": 4,
+            "C": 9,
+            "NT": 8
+          }
+        },
+        "makeableContracts": [
+          {
+            "declarer": "E",
+            "strain": "S",
+            "level": 4
+          },
+          {
+            "declarer": "W",
+            "strain": "S",
+            "level": 4
+          },
+          {
+            "declarer": "N",
+            "strain": "H",
+            "level": 3
+          },
+          {
+            "declarer": "S",
+            "strain": "H",
+            "level": 3
+          },
+          {
+            "declarer": "N",
+            "strain": "D",
+            "level": 2
+          },
+          {
+            "declarer": "S",
+            "strain": "D",
+            "level": 2
+          },
+          {
+            "declarer": "E",
+            "strain": "C",
+            "level": 3
+          },
+          {
+            "declarer": "W",
+            "strain": "C",
+            "level": 3
+          },
+          {
+            "declarer": "E",
+            "strain": "NT",
+            "level": 2
+          },
+          {
+            "declarer": "W",
+            "strain": "NT",
+            "level": 2
+          }
+        ],
+        "par": {
+          "scoreNS": -300,
+          "contracts": [
+            {
+              "declarers": [
+                "N",
+                "S"
+              ],
+              "strain": "H",
+              "level": 5,
+              "overTricks": 0,
+              "underTricks": 2,
+              "doubled": true
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

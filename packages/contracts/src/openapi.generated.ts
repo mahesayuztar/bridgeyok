@@ -216,10 +216,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/boards/{boardId}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analyze a completed board for an active table participant
+         * @description Read-only DDS analysis. Historical boards created before source persistence return 404. No client-supplied deal is accepted.
+         */
+        get: operations["analyzeCompletedBoard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        AnalysisStrain: "C" | "D" | "H" | "S" | "NT";
+        AnalysisTricks: number;
+        AnalysisHand: {
+            C: components["schemas"]["AnalysisTricks"];
+            D: components["schemas"]["AnalysisTricks"];
+            H: components["schemas"]["AnalysisTricks"];
+            S: components["schemas"]["AnalysisTricks"];
+            NT: components["schemas"]["AnalysisTricks"];
+        };
+        AnalysisResult: {
+            /** @constant */
+            solverVersion: "dds-2.9.0-8d75755";
+            doubleDummyTable: {
+                N: components["schemas"]["AnalysisHand"];
+                E: components["schemas"]["AnalysisHand"];
+                S: components["schemas"]["AnalysisHand"];
+                W: components["schemas"]["AnalysisHand"];
+            };
+            /** @description Maximum makeable undoubled level for each declarer and strain that can take at least seven tricks. */
+            makeableContracts: {
+                declarer: components["schemas"]["TableSeat"];
+                strain: components["schemas"]["AnalysisStrain"];
+                level: number;
+            }[];
+            par: {
+                scoreNS: number;
+                contracts: {
+                    declarers: components["schemas"]["TableSeat"][];
+                    strain: components["schemas"]["AnalysisStrain"];
+                    level: number;
+                    overTricks: number;
+                    underTricks: number;
+                    doubled: boolean;
+                }[];
+            };
+        };
+        BoardAnalysis: {
+            /** Format: uuid */
+            boardId: string;
+            metadata: {
+                number: number;
+                dealer: components["schemas"]["TableSeat"];
+                /** @enum {string} */
+                vulnerability: "NONE" | "NS" | "EW" | "BOTH";
+            };
+            provenance: {
+                /** @enum {string} */
+                type: "secure_random" | "deterministic" | "prepared" | "constraint";
+                version: string;
+                /** Format: uuid */
+                reference?: string;
+            };
+            analysis: components["schemas"]["AnalysisResult"];
+        };
         HealthResponse: {
             /** @enum {string} */
             status: "ok" | "ready" | "unavailable";
@@ -643,6 +718,34 @@ export interface operations {
                 };
             };
             401: components["responses"]["ProblemResponse"];
+        };
+    };
+    analyzeCompletedBoard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dealer-aware double-dummy analysis */
+            200: {
+                headers: {
+                    "Cache-Control"?: "private, no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardAnalysis"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            503: components["responses"]["ProblemResponse"];
+            504: components["responses"]["ProblemResponse"];
         };
     };
 }

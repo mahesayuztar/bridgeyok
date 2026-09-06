@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/analysis"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/config"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/database"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpapi"
@@ -95,6 +96,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	ddsSolver, err := analysis.NewDDS(appConfig.DDSExecutable, appConfig.DDSTimeout, appConfig.DDSConcurrency)
+	if err != nil {
+		logger.Error("analysis initialization failed")
+		os.Exit(1)
+	}
+	analysisService, err := analysis.NewService(postgres, ddsSolver)
+	if err != nil {
+		logger.Error("analysis service initialization failed")
+		os.Exit(1)
+	}
 	handler := httpapi.NewRouter(httpapi.Options{
 		Logger:         logger,
 		AllowedOrigins: appConfig.AllowedOrigins,
@@ -102,6 +113,7 @@ func main() {
 		Identity:       identityService,
 		Table:          tableService,
 		Realtime:       realtimeServer,
+		Analysis:       analysisService,
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

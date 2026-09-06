@@ -9,6 +9,96 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AnalysisResultSolverVersion.
+const (
+	Dds2908d75755 AnalysisResultSolverVersion = "dds-2.9.0-8d75755"
+)
+
+// Valid indicates whether the value is a known member of the AnalysisResultSolverVersion enum.
+func (e AnalysisResultSolverVersion) Valid() bool {
+	switch e {
+	case Dds2908d75755:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AnalysisStrain.
+const (
+	AnalysisStrainC  AnalysisStrain = "C"
+	AnalysisStrainD  AnalysisStrain = "D"
+	AnalysisStrainH  AnalysisStrain = "H"
+	AnalysisStrainNT AnalysisStrain = "NT"
+	AnalysisStrainS  AnalysisStrain = "S"
+)
+
+// Valid indicates whether the value is a known member of the AnalysisStrain enum.
+func (e AnalysisStrain) Valid() bool {
+	switch e {
+	case AnalysisStrainC:
+		return true
+	case AnalysisStrainD:
+		return true
+	case AnalysisStrainH:
+		return true
+	case AnalysisStrainNT:
+		return true
+	case AnalysisStrainS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BoardAnalysisMetadataVulnerability.
+const (
+	BOTH BoardAnalysisMetadataVulnerability = "BOTH"
+	EW   BoardAnalysisMetadataVulnerability = "EW"
+	NONE BoardAnalysisMetadataVulnerability = "NONE"
+	NS   BoardAnalysisMetadataVulnerability = "NS"
+)
+
+// Valid indicates whether the value is a known member of the BoardAnalysisMetadataVulnerability enum.
+func (e BoardAnalysisMetadataVulnerability) Valid() bool {
+	switch e {
+	case BOTH:
+		return true
+	case EW:
+		return true
+	case NONE:
+		return true
+	case NS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BoardAnalysisProvenanceType.
+const (
+	Constraint    BoardAnalysisProvenanceType = "constraint"
+	Deterministic BoardAnalysisProvenanceType = "deterministic"
+	Prepared      BoardAnalysisProvenanceType = "prepared"
+	SecureRandom  BoardAnalysisProvenanceType = "secure_random"
+)
+
+// Valid indicates whether the value is a known member of the BoardAnalysisProvenanceType enum.
+func (e BoardAnalysisProvenanceType) Valid() bool {
+	switch e {
+	case Constraint:
+		return true
+	case Deterministic:
+		return true
+	case Prepared:
+		return true
+	case SecureRandom:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthResponseStatus.
 const (
 	Ok          HealthResponseStatus = "ok"
@@ -50,22 +140,22 @@ func (e TableRole) Valid() bool {
 
 // Defines values for TableSeat.
 const (
-	E TableSeat = "E"
-	N TableSeat = "N"
-	S TableSeat = "S"
-	W TableSeat = "W"
+	TableSeatE TableSeat = "E"
+	TableSeatN TableSeat = "N"
+	TableSeatS TableSeat = "S"
+	TableSeatW TableSeat = "W"
 )
 
 // Valid indicates whether the value is a known member of the TableSeat enum.
 func (e TableSeat) Valid() bool {
 	switch e {
-	case E:
+	case TableSeatE:
 		return true
-	case N:
+	case TableSeatN:
 		return true
-	case S:
+	case TableSeatS:
 		return true
-	case W:
+	case TableSeatW:
 		return true
 	default:
 		return false
@@ -98,6 +188,75 @@ func (e TableState) Valid() bool {
 		return false
 	}
 }
+
+// AnalysisHand defines model for AnalysisHand.
+type AnalysisHand struct {
+	C  AnalysisTricks `json:"C"`
+	D  AnalysisTricks `json:"D"`
+	H  AnalysisTricks `json:"H"`
+	NT AnalysisTricks `json:"NT"`
+	S  AnalysisTricks `json:"S"`
+}
+
+// AnalysisResult defines model for AnalysisResult.
+type AnalysisResult struct {
+	DoubleDummyTable struct {
+		E AnalysisHand `json:"E"`
+		N AnalysisHand `json:"N"`
+		S AnalysisHand `json:"S"`
+		W AnalysisHand `json:"W"`
+	} `json:"doubleDummyTable"`
+
+	// MakeableContracts Maximum makeable undoubled level for each declarer and strain that can take at least seven tricks.
+	MakeableContracts []struct {
+		Declarer TableSeat      `json:"declarer"`
+		Level    int            `json:"level"`
+		Strain   AnalysisStrain `json:"strain"`
+	} `json:"makeableContracts"`
+	Par struct {
+		Contracts []struct {
+			Declarers   []TableSeat    `json:"declarers"`
+			Doubled     bool           `json:"doubled"`
+			Level       int            `json:"level"`
+			OverTricks  int            `json:"overTricks"`
+			Strain      AnalysisStrain `json:"strain"`
+			UnderTricks int            `json:"underTricks"`
+		} `json:"contracts"`
+		ScoreNS int `json:"scoreNS"`
+	} `json:"par"`
+	SolverVersion AnalysisResultSolverVersion `json:"solverVersion"`
+}
+
+// AnalysisResultSolverVersion defines model for AnalysisResult.SolverVersion.
+type AnalysisResultSolverVersion string
+
+// AnalysisStrain defines model for AnalysisStrain.
+type AnalysisStrain string
+
+// AnalysisTricks defines model for AnalysisTricks.
+type AnalysisTricks = int
+
+// BoardAnalysis defines model for BoardAnalysis.
+type BoardAnalysis struct {
+	Analysis AnalysisResult     `json:"analysis"`
+	BoardId  openapi_types.UUID `json:"boardId"`
+	Metadata struct {
+		Dealer        TableSeat                          `json:"dealer"`
+		Number        int                                `json:"number"`
+		Vulnerability BoardAnalysisMetadataVulnerability `json:"vulnerability"`
+	} `json:"metadata"`
+	Provenance struct {
+		Reference *openapi_types.UUID         `json:"reference,omitempty"`
+		Type      BoardAnalysisProvenanceType `json:"type"`
+		Version   string                      `json:"version"`
+	} `json:"provenance"`
+}
+
+// BoardAnalysisMetadataVulnerability defines model for BoardAnalysis.Metadata.Vulnerability.
+type BoardAnalysisMetadataVulnerability string
+
+// BoardAnalysisProvenanceType defines model for BoardAnalysis.Provenance.Type.
+type BoardAnalysisProvenanceType string
 
 // CreateGuestSessionRequest defines model for CreateGuestSessionRequest.
 type CreateGuestSessionRequest struct {

@@ -248,6 +248,43 @@ paths:
                 $ref: "#/components/schemas/RealtimeTicket"
         "401":
           $ref: "#/components/responses/ProblemResponse"
+  /v1/boards/{boardId}/analysis:
+    get:
+      operationId: analyzeCompletedBoard
+      summary: Analyze a completed board for an active table participant
+      description: Read-only DDS analysis. Historical boards created before source persistence return 404. No client-supplied deal is accepted.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: boardId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Dealer-aware double-dummy analysis
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BoardAnalysis"
+        "401":
+          $ref: "#/components/responses/ProblemResponse"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+        "504":
+          $ref: "#/components/responses/ProblemResponse"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -291,6 +328,144 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    AnalysisStrain:
+      type: string
+      enum: [C, D, H, S, NT]
+    AnalysisTricks:
+      type: integer
+      minimum: 0
+      maximum: 13
+    AnalysisHand:
+      type: object
+      additionalProperties: false
+      required: [C, D, H, S, NT]
+      properties:
+        C:
+          $ref: "#/components/schemas/AnalysisTricks"
+        D:
+          $ref: "#/components/schemas/AnalysisTricks"
+        H:
+          $ref: "#/components/schemas/AnalysisTricks"
+        S:
+          $ref: "#/components/schemas/AnalysisTricks"
+        NT:
+          $ref: "#/components/schemas/AnalysisTricks"
+    AnalysisResult:
+      type: object
+      additionalProperties: false
+      required: [solverVersion, doubleDummyTable, makeableContracts, par]
+      properties:
+        solverVersion:
+          type: string
+          const: dds-2.9.0-8d75755
+        doubleDummyTable:
+          type: object
+          additionalProperties: false
+          required: [N, E, S, W]
+          properties:
+            N:
+              $ref: "#/components/schemas/AnalysisHand"
+            E:
+              $ref: "#/components/schemas/AnalysisHand"
+            S:
+              $ref: "#/components/schemas/AnalysisHand"
+            W:
+              $ref: "#/components/schemas/AnalysisHand"
+        makeableContracts:
+          type: array
+          maxItems: 20
+          description: Maximum makeable undoubled level for each declarer and strain that can take at least seven tricks.
+          items:
+            type: object
+            additionalProperties: false
+            required: [declarer, strain, level]
+            properties:
+              declarer:
+                $ref: "#/components/schemas/TableSeat"
+              strain:
+                $ref: "#/components/schemas/AnalysisStrain"
+              level:
+                type: integer
+                minimum: 1
+                maximum: 7
+        par:
+          type: object
+          additionalProperties: false
+          required: [scoreNS, contracts]
+          properties:
+            scoreNS:
+              type: integer
+              minimum: -7600
+              maximum: 7600
+            contracts:
+              type: array
+              maxItems: 10
+              items:
+                type: object
+                additionalProperties: false
+                required: [declarers, strain, level, overTricks, underTricks, doubled]
+                properties:
+                  declarers:
+                    type: array
+                    minItems: 1
+                    maxItems: 2
+                    uniqueItems: true
+                    items:
+                      $ref: "#/components/schemas/TableSeat"
+                  strain:
+                    $ref: "#/components/schemas/AnalysisStrain"
+                  level:
+                    type: integer
+                    minimum: 1
+                    maximum: 7
+                  overTricks:
+                    type: integer
+                    minimum: 0
+                    maximum: 6
+                  underTricks:
+                    type: integer
+                    minimum: 0
+                    maximum: 13
+                  doubled:
+                    type: boolean
+    BoardAnalysis:
+      type: object
+      additionalProperties: false
+      required: [boardId, metadata, provenance, analysis]
+      properties:
+        boardId:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+          additionalProperties: false
+          required: [number, dealer, vulnerability]
+          properties:
+            number:
+              type: integer
+              minimum: 1
+            dealer:
+              $ref: "#/components/schemas/TableSeat"
+            vulnerability:
+              type: string
+              enum: [NONE, NS, EW, BOTH]
+        provenance:
+          type: object
+          additionalProperties: false
+          required: [type, version]
+          properties:
+            type:
+              type: string
+              enum: [secure_random, deterministic, prepared, constraint]
+            version:
+              type: string
+              minLength: 1
+              maxLength: 64
+            reference:
+              type: string
+              format: uuid
+        analysis:
+          $ref: "#/components/schemas/AnalysisResult"
     HealthResponse:
       type: object
       additionalProperties: false

@@ -12,6 +12,9 @@ import (
 )
 
 type Config struct {
+	DDSExecutable                    string
+	DDSTimeout                       time.Duration
+	DDSConcurrency                   int
 	Environment                      string
 	Host                             string
 	Port                             int
@@ -167,7 +170,16 @@ func load(lookup lookupFunc) (Config, error) {
 		return Config{}, err
 	}
 
+	ddsTimeout, err := durationValue(lookup, "DDS_TIMEOUT", 10*time.Second)
+	if err != nil || ddsTimeout > time.Minute {
+		return Config{}, fmt.Errorf("DDS_TIMEOUT must be positive and at most one minute")
+	}
+	ddsConcurrency, err := integerValue(lookup, "DDS_CONCURRENCY", 1, 1, 4)
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
+		DDSExecutable: valueOrDefault(lookup, "DDS_EXECUTABLE", "./bin/bridgeyok-dds"), DDSTimeout: ddsTimeout, DDSConcurrency: ddsConcurrency,
 		Environment:                      environment,
 		Host:                             valueOrDefault(lookup, "API_HOST", "0.0.0.0"),
 		Port:                             port,
