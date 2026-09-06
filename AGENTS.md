@@ -1,5 +1,15 @@
 # AGENTS.md
 
+# Deployment Endpoints
+
+* Production web: https://bridgeyok-web.vercel.app
+* Production API and WebSocket server: https://bridgeyok-api.vercel.app
+* Production WebSocket endpoint: wss://bridgeyok-api.vercel.app/v1/ws
+* The web build uses `NEXT_PUBLIC_API_BASE_URL=https://bridgeyok-api.vercel.app`.
+* The API Origin allowlist must include `https://bridgeyok-web.vercel.app`.
+
+---
+
 # Core Development Principles
 
 ## Preserve Existing Architecture
