@@ -123,3 +123,13 @@ gate-local-down:
 	@env -u DATABASE_URL -u MIGRATION_DATABASE_URL ./scripts/local-gate.sh down
 
 bootstrap: install migrate-up generate
+
+.PHONY: build-dds test-analysis test-deal-sources
+build-dds:
+	./scripts/build-dds.sh
+
+test-analysis: build-dds
+	go test -race -tags=integration ./apps/api/internal/analysis
+
+test-deal-sources:
+	go test -race -tags=testfixture ./apps/api/internal/deal

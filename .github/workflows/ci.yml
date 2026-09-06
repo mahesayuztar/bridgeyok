@@ -72,6 +72,8 @@ jobs:
           make lint-engine
           make test-api
           make test-engine-fixtures
+          make test-deal-sources
+          make test-analysis
           make fuzz-engine
           make test-api-integration
           make build-api

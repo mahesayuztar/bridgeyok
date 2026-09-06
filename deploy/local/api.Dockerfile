@@ -2,9 +2,15 @@ FROM golang:1.27.0-bookworm AS builder
 
 WORKDIR /workspace
 
+ENV GOMAXPROCS=2 GOFLAGS=-p=2
+
 COPY go.work go.work.sum ./
 COPY apps/api/go.mod apps/api/go.sum ./apps/api/
 RUN cd apps/api && go mod download
+
+COPY scripts/build-dds.sh ./scripts/build-dds.sh
+COPY tools/dds ./tools/dds
+RUN ./scripts/build-dds.sh
 
 COPY apps/api ./apps/api
 RUN mkdir -p /out && \
@@ -20,7 +26,7 @@ ARG RELEASE_ID=local
 LABEL io.bridgeyok.release="${RELEASE_ID}"
 
 RUN apt-get update && \
-    apt-get install --yes --no-install-recommends ca-certificates curl && \
+    apt-get install --yes --no-install-recommends ca-certificates curl libstdc++6 procps && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd --system bridgeyok && \
     useradd --system --gid bridgeyok --home-dir /workspace bridgeyok && \
@@ -29,6 +35,8 @@ RUN apt-get update && \
 
 WORKDIR /workspace
 
+COPY --from=builder --chown=bridgeyok:bridgeyok /workspace/bin/bridgeyok-dds ./bin/bridgeyok-dds
+COPY --from=builder --chown=bridgeyok:bridgeyok /workspace/bin/dds-LICENSE ./bin/dds-LICENSE
 COPY --from=builder --chown=bridgeyok:bridgeyok /out/bridgeyok-api ./bin/bridgeyok-api
 COPY --from=builder --chown=bridgeyok:bridgeyok /out/wsprobe ./bin/wsprobe
 COPY --from=builder --chown=bridgeyok:bridgeyok /out/wscheck ./bin/wscheck
