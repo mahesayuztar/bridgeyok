@@ -1262,7 +1262,7 @@ ENG-03 **PASS pada 6 September 2026**. Claim/undo tersedia pada empat seat teris
 
 **Objective of Done:**
 
-- [ ] Setiap WBF law relevan mempunyai klasifikasi, alasan, dan evidence; reviewer bridge berpengalaman menyetujui boundary.
+- [x] Setiap WBF law relevan mempunyai klasifikasi, alasan, dan evidence; reviewer bridge berpengalaman menyetujui boundary.
 - [x] Semua law mekanis dalam matrix mempunyai positive/negative test dan illegal action ditolak tanpa revision change.
 - [x] Keempat deal source menghasilkan 52 kartu valid dan provenance yang dapat dibaca kembali; prepared/constraint failure bersifat eksplisit dan tidak membuat board parsial.
 - [x] Board identity, dealer, dan vulnerability tidak berubah ketika deal dipakai ulang pada context yang mengharuskannya.
