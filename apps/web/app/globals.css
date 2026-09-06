@@ -3837,69 +3837,56 @@ button.physical-card.is-dragging {
 }
 
 .completed-deal-hand {
-  --hand-card-width: clamp(1.15rem, 2.1vw, 1.65rem);
-  --hand-card-height: clamp(2rem, 3vw, 2.35rem);
-  --side-dummy-card-width: var(--hand-card-width);
-  --side-dummy-card-height: var(--hand-card-height);
-  --side-dummy-suit-gap: 0.28rem;
+  --hand-card-width: clamp(2.7rem, 4vw, 3.6rem);
+  --hand-card-height: calc(var(--hand-card-width) * 1.4);
+  --side-dummy-card-width: calc(var(--hand-card-height) * 0.82);
+  --side-dummy-card-height: var(--hand-card-width);
+  --side-dummy-card-exposure: clamp(0.65rem, 1.1vw, 0.95rem);
+  --side-dummy-suit-gap: clamp(0.3rem, 0.8vh, 0.55rem);
 }
 
 .completed-deal-top,
 .completed-deal-bottom {
-  width: calc(100% - 0.5rem);
+  width: min(72%, 48rem);
 }
 
 .completed-deal-left,
 .completed-deal-right {
+  top: 50%;
+  bottom: auto;
   width: min(30%, 22rem);
   max-width: min(30%, 22rem);
-  height: auto;
-}
-
-.completed-deal-hand .hand-cards {
-  gap: 1px;
+  height: calc(
+    var(--side-dummy-card-height) * 4 + var(--side-dummy-suit-gap) * 3
+  );
+  max-height: calc(100% - var(--hand-card-height) * 2 - 2rem);
+  transform: translateY(-50%);
 }
 
 .completed-deal-left .hand-cards,
 .completed-deal-right .hand-cards {
-  grid-template-rows: none;
-  grid-auto-rows: auto;
+  grid-template-rows: repeat(4, var(--side-dummy-card-height));
   row-gap: var(--side-dummy-suit-gap);
 }
 
-.completed-deal-hand .hand-card-group {
-  height: auto;
-  flex-wrap: wrap;
-  gap: 1px;
+.completed-deal-hand .physical-card {
+  padding: 0.22rem;
 }
 
-.completed-deal-hand .hand-card-slot,
-.completed-deal-hand .hand-card-slot:last-child {
-  width: var(--hand-card-width);
-  min-width: var(--hand-card-width);
-  max-width: var(--hand-card-width);
-  height: var(--hand-card-height);
-  flex: 0 0 var(--hand-card-width);
-}
-
-.completed-deal-hand .hand-card-slot .physical-card {
-  width: var(--hand-card-width);
-  height: var(--hand-card-height);
-  aspect-ratio: auto;
-  padding: 0.12rem 0;
-}
-
-.completed-deal-hand.dummy-hand .card-corner,
-.completed-deal-hand .hand-card-group[data-density="tight"] .card-corner {
-  align-items: center;
-  margin: 0;
+.completed-deal-hand .card-corner {
   font-size: clamp(0.72rem, 1vw, 0.95rem);
-  line-height: 1;
-  transform: none;
 }
 
 .completed-deal-hand .card-suit {
-  display: none;
+  right: 0.2rem;
+  bottom: 0.16rem;
+  display: block;
+  font-size: clamp(1.15rem, 1.8vw, 1.7rem);
+}
+
+.completed-deal-hand.dummy-right .card-suit {
+  right: auto;
+  left: 0.2rem;
 }
 
 .board-result {
@@ -3932,6 +3919,12 @@ button.physical-card.is-dragging {
 }
 
 @media (max-width: 48rem) {
+  .completed-deal-hand {
+    --hand-card-width: clamp(2.15rem, 10.5vw, 2.65rem);
+    --side-dummy-card-exposure: clamp(0.34rem, 1.75vw, 0.6rem);
+    --side-dummy-suit-gap: 0.28rem;
+  }
+
   .completed-deal-top,
   .completed-deal-bottom {
     width: calc(100% - 0.5rem);
@@ -3941,6 +3934,23 @@ button.physical-card.is-dragging {
   .completed-deal-right {
     width: calc(50% - 3.25rem);
     max-width: calc(50% - 3.25rem);
+  }
+
+  .completed-deal-hand .card-corner,
+  .completed-deal-left .hand-card-group[data-density="tight"] .card-corner,
+  .completed-deal-right .hand-card-group[data-density="tight"] .card-corner {
+    font-size: 0.66rem;
+  }
+
+  .completed-deal-hand .card-suit {
+    right: 0.16rem;
+    bottom: 0.12rem;
+    font-size: 1rem;
+  }
+
+  .completed-deal-hand.dummy-right .card-suit {
+    right: auto;
+    left: 0.16rem;
   }
 
   .board-result {
@@ -4258,10 +4268,16 @@ button.physical-card.is-dragging {
   max-height: calc(100dvh - 5rem);
 }
 .trick-history-popover {
+  --history-card-width: min(var(--card-trick-width), 4rem, 19vw, 20dvh);
+  --history-card-height: calc(var(--history-card-width) * 1.4);
   inset: 0;
   width: min(15rem, calc(100vw - 1rem));
   margin: auto;
   box-shadow: none;
+}
+.trick-history-list {
+  max-height: none;
+  overflow: visible;
 }
 .trick-history-item {
   display: block;
@@ -4270,13 +4286,13 @@ button.physical-card.is-dragging {
 .trick-history-cards {
   position: relative;
   display: block;
-  width: 12rem;
-  height: 13rem;
+  width: calc(var(--history-card-width) * 3 + 0.5rem);
+  height: calc(var(--history-card-height) * 2 + 0.25rem);
   margin: auto;
 }
 .trick-history-play {
   position: absolute;
-  display: block;
+  display: flex;
 }
 .trick-history-play > span {
   position: absolute;
@@ -4285,7 +4301,7 @@ button.physical-card.is-dragging {
   top: 0.3rem;
 }
 .trick-history-play .card-trick {
-  width: var(--card-trick-width);
+  width: var(--history-card-width);
   height: auto;
   aspect-ratio: var(--card-aspect-ratio);
 }
@@ -4297,19 +4313,23 @@ button.physical-card.is-dragging {
 }
 .history-left {
   left: 0;
-  top: 3rem;
+  top: 50%;
+  transform: translateY(-50%);
 }
 .history-top {
-  left: 4rem;
+  left: 50%;
+  transform: translateX(-50%);
   top: 0;
   z-index: 3;
 }
 .history-right {
   right: 0;
-  top: 3rem;
+  top: 50%;
+  transform: translateY(-50%);
 }
 .history-bottom {
-  left: 4rem;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 0;
   z-index: 2;
 }
