@@ -47,6 +47,16 @@ type BridgeyokBoardDeal struct {
 	SourceRecord []byte `json:"source_record"`
 }
 
+type BridgeyokBoardRecord struct {
+	BoardID       string             `json:"board_id"`
+	TableID       string             `json:"table_id"`
+	FirstSeq      int64              `json:"first_seq"`
+	LastSeq       int64              `json:"last_seq"`
+	FinalRevision int64              `json:"final_revision"`
+	Record        []byte             `json:"record"`
+	CompactedAt   pgtype.Timestamptz `json:"compacted_at"`
+}
+
 type BridgeyokBoardSeatAttribution struct {
 	TableID    string `json:"table_id"`
 	BoardID    string `json:"board_id"`
