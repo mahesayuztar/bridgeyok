@@ -3838,35 +3838,17 @@ button.physical-card.is-dragging {
 
 .completed-deal-hand {
   --hand-card-width: clamp(2.7rem, 4vw, 3.6rem);
-  --hand-card-height: calc(var(--hand-card-width) * 1.4);
-  --side-dummy-card-width: calc(var(--hand-card-height) * 0.82);
-  --side-dummy-card-height: var(--hand-card-width);
-  --side-dummy-card-exposure: clamp(0.65rem, 1.1vw, 0.95rem);
-  --side-dummy-suit-gap: clamp(0.3rem, 0.8vh, 0.55rem);
-}
 
-.completed-deal-top,
-.completed-deal-bottom {
-  width: min(72%, 48rem);
-}
+  /* Semua card dibuat lebih tinggi */
+  --hand-card-height: calc(var(--hand-card-width) * 1.58);
 
-.completed-deal-left,
-.completed-deal-right {
-  top: 50%;
-  bottom: auto;
-  width: min(30%, 22rem);
-  max-width: min(30%, 22rem);
-  height: calc(
-    var(--side-dummy-card-height) * 4 + var(--side-dummy-suit-gap) * 3
-  );
-  max-height: calc(100% - var(--hand-card-height) * 2 - 2rem);
-  transform: translateY(-50%);
-}
+  --side-dummy-card-width: clamp(1.6rem, 2.1vw, 2rem);
 
-.completed-deal-left .hand-cards,
-.completed-deal-right .hand-cards {
-  grid-template-rows: repeat(4, var(--side-dummy-card-height));
-  row-gap: var(--side-dummy-suit-gap);
+  /* Side dummy juga ikut lebih tinggi */
+  --side-dummy-card-height: calc(var(--hand-card-width) * 1.42);
+
+  --side-dummy-card-exposure: clamp(1.3rem, 2vw, 1.7rem);
+  --side-dummy-suit-gap: clamp(0.35rem, 0.9vh, 0.65rem);
 }
 
 .completed-deal-hand .physical-card {
@@ -3874,19 +3856,47 @@ button.physical-card.is-dragging {
 }
 
 .completed-deal-hand .card-corner {
-  font-size: clamp(0.72rem, 1vw, 0.95rem);
+  font-size: clamp(1rem, 1.4vw, 1.25rem);
 }
 
+/* Suit card normal diperbesar */
 .completed-deal-hand .card-suit {
   right: 0.2rem;
   bottom: 0.16rem;
   display: block;
-  font-size: clamp(1.15rem, 1.8vw, 1.7rem);
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
 }
 
-.completed-deal-hand.dummy-right .card-suit {
-  right: auto;
-  left: 0.2rem;
+/* Side dummy: jangan tampilkan suit di dalam card */
+.completed-deal-left .card-suit,
+.completed-deal-right .card-suit {
+  display: none;
+}
+
+/* Side dummy tetap ramping */
+.completed-deal-left .physical-card,
+.completed-deal-right .physical-card {
+  width: var(--side-dummy-card-width);
+  height: var(--side-dummy-card-height);
+  padding: 0.12rem 0.08rem;
+}
+
+.completed-deal-left .physical-card,
+.completed-deal-right .physical-card {
+  width: var(--side-dummy-card-width);
+  height: var(--side-dummy-card-height);
+  padding: 0.12rem 0.05rem;
+}
+
+.completed-deal-left .card-suit,
+.completed-deal-right .card-suit {
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+}
+
+.completed-deal-left .card-corner strong,
+.completed-deal-right .card-corner strong {
+  font-size: 1.4rem;
+  line-height: 1;
 }
 
 .board-result {
@@ -3921,8 +3931,18 @@ button.physical-card.is-dragging {
 @media (max-width: 48rem) {
   .completed-deal-hand {
     --hand-card-width: clamp(2.15rem, 10.5vw, 2.65rem);
-    --side-dummy-card-exposure: clamp(0.34rem, 1.75vw, 0.6rem);
-    --side-dummy-suit-gap: 0.28rem;
+
+    --side-dummy-card-width: clamp(1.25rem, 1.7vw, 1.55rem);
+
+
+    /* Tetap tinggi */
+    --side-dummy-card-height: calc(var(--hand-card-width) * 1.42);
+
+    /* Jangan terlalu menumpuk di mobile */
+    --side-dummy-card-exposure: clamp(1rem, 2.3vw, 1.5rem);
+
+    /* Jarak antar suit */
+    --side-dummy-suit-gap: clamp(0.3rem, 1vh, 0.5rem);
   }
 
   .completed-deal-top,
@@ -3936,22 +3956,50 @@ button.physical-card.is-dragging {
     max-width: calc(50% - 3.25rem);
   }
 
-  .completed-deal-hand .card-corner,
-  .completed-deal-left .hand-card-group[data-density="tight"] .card-corner,
-  .completed-deal-right .hand-card-group[data-density="tight"] .card-corner {
-    font-size: 0.66rem;
+  /* Rank kartu normal */
+  .completed-deal-hand .card-corner {
+    font-size: clamp(0.85rem, 3.5vw, 1.05rem);
   }
 
+  /* Rank side dummy tetap besar */
+  .completed-deal-left .card-corner strong,
+  .completed-deal-right .card-corner strong,
+  .completed-deal-left .hand-card-group[data-density="tight"] .card-corner strong,
+  .completed-deal-right .hand-card-group[data-density="tight"] .card-corner strong {
+    font-size: clamp(1rem, 4vw, 1.25rem);
+    line-height: 1;
+  }
+
+  /* Suit kartu normal */
   .completed-deal-hand .card-suit {
     right: 0.16rem;
     bottom: 0.12rem;
-    font-size: 1rem;
+    font-size: clamp(1.15rem, 4.5vw, 1.5rem);
   }
 
   .completed-deal-hand.dummy-right .card-suit {
     right: auto;
     left: 0.16rem;
   }
+
+  /* Side dummy tetap tanpa suit */
+  .completed-deal-left .card-suit,
+  .completed-deal-right .card-suit {
+    display: none;
+  }
+
+  .completed-deal-left .physical-card,
+  .completed-deal-right .physical-card {
+    width: var(--side-dummy-card-width);
+    height: var(--side-dummy-card-height);
+    padding: 0.12rem 0.05rem;
+    border: 0.5px solid rgba(0, 0, 0, 0.18);
+  }
+
+  .physical-card {
+    border: 0.5px solid rgba(0, 0, 0, 0.18);
+  }
+
 
   .board-result {
     width: 5.5rem;
