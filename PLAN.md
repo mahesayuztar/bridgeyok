@@ -1486,3 +1486,11 @@ Referensi domain dan technical baseline:
 4. Jangan mulai DDS atau Team Match sebelum four-client persisted/reconnect/privacy gate Phase 3 lulus; integrasikan deal sources/DDS di luar pure engine.
 5. Bangun Team Match dari stable board identity dan paired results, lalu tutup dengan IMP/persisted finalization dan focused closed-beta evidence.
 6. Tolak backlog platform/community/scale-out sampai roadmap baru secara eksplisit mengotorisasinya.
+
+### Persistence follow-up — final board compaction (6 September 2026)
+
+- Preserve per-command private snapshots and active event recovery.
+- Archive chronological history into one validated `board_records` JSON at next-board/finished finality; scored-but-undoable boards retain events.
+- Replay via the existing engine reducer, compare complete final state, then remove only the archived sequence interval atomically.
+- Keep existing reconnect snapshot fallback and commit-before-publish; no retention infrastructure added.
+- Data/rollback/legacy retention policy: ADR 0016.

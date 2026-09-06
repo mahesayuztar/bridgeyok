@@ -198,6 +198,9 @@ func persistAcceptedDecision(
 	if err := upsertPrivateSnapshot(ctx, queries, next, occurredAt); err != nil {
 		return table.CommandResult{}, err
 	}
+	if err := compactFinalBoard(ctx, queries, current, next, occurredAt); err != nil {
+		return table.CommandResult{}, err
+	}
 	return table.CommandResult{
 		Outcome: table.CommandOutcome{
 			RequestID: request.RequestID, CommandName: request.Command.Name, Status: table.CommandStatusAccepted,
