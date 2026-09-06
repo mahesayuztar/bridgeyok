@@ -758,7 +758,7 @@ h2 {
   gap: 0.25rem;
   min-width: 0;
 }
-.trick-history-play > span {
+.trick-history-play > span:first-child {
   color: var(--muted);
   font-size: 0.62rem;
   font-weight: 800;
@@ -4294,13 +4294,14 @@ button.physical-card.is-dragging {
   position: absolute;
   display: flex;
 }
-.trick-history-play > span {
+.trick-history-play > span:first-child {
   position: absolute;
   z-index: 1;
   right: 0.3rem;
   top: 0.3rem;
 }
 .trick-history-play .card-trick {
+  flex: none;
   width: var(--history-card-width);
   height: auto;
   aspect-ratio: var(--card-aspect-ratio);
