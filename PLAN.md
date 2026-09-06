@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01 PASS
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1263,15 +1263,32 @@ ENG-03 **PASS pada 6 September 2026**. Claim/undo tersedia pada empat seat teris
 **Objective of Done:**
 
 - [ ] Setiap WBF law relevan mempunyai klasifikasi, alasan, dan evidence; reviewer bridge berpengalaman menyetujui boundary.
-- [ ] Semua law mekanis dalam matrix mempunyai positive/negative test dan illegal action ditolak tanpa revision change.
-- [ ] Keempat deal source menghasilkan 52 kartu valid dan provenance yang dapat dibaca kembali; prepared/constraint failure bersifat eksplisit dan tidak membuat board parsial.
-- [ ] Board identity, dealer, dan vulnerability tidak berubah ketika deal dipakai ulang pada context yang mengharuskannya.
-- [ ] DDS golden fixtures memverifikasi double-dummy table, makeable contracts, dan par result terhadap output solver yang dipin.
-- [ ] Guard test membuktikan package pure engine tidak mengimpor DDS atau application/infrastructure packages.
+- [x] Semua law mekanis dalam matrix mempunyai positive/negative test dan illegal action ditolak tanpa revision change.
+- [x] Keempat deal source menghasilkan 52 kartu valid dan provenance yang dapat dibaca kembali; prepared/constraint failure bersifat eksplisit dan tidak membuat board parsial.
+- [x] Board identity, dealer, dan vulnerability tidak berubah ketika deal dipakai ulang pada context yang mengharuskannya.
+- [x] DDS golden fixtures memverifikasi double-dummy table, makeable contracts, dan par result terhadap output solver yang dipin.
+- [x] Guard test membuktikan package pure engine tidak mengimpor DDS atau application/infrastructure packages.
 
 **Cheapest appropriate test level:** table-driven/unit test untuk law matrix mapping, validators, IMP-independent deal invariants, dan DDS result mapping; golden/component test terhadap pinned DDS untuk sedikit fixture representatif; PostgreSQL integration test hanya untuk provenance; satu API contract test untuk analysis. Tidak perlu browser E2E kecuali satu smoke display hasil analysis.
 
 **Status implementasi 31 Agustus 2026:** Work 1–2 selesai. Matriks Law 1–93 memakai hanya status `mechanically-enforced`, `director-judgement`, atau `not-applicable`, memuat rationale dan executable evidence, serta mengikuti revisi WBF Laws 73/89 efektif 1 Januari 2024. Mechanical command boundary menolak out-of-turn call/lead, insufficient atau inadmissible call, wrong-hand play, dummy self-play, revoke attempt, dan mixed game payload tanpa mengubah aggregate/revision/sequence. Independent experienced-player approval tetap pending sebagai exit gate. Work 3 (deal-source interface) dan seluruh pekerjaan sesudahnya belum dimulai.
+
+
+**Status implementasi 6 September 2026:** pekerjaan teknis Phase 4 selesai dan terverifikasi; **Phase 4 belum PASS karena independent experienced-player approval atas boundary WBF masih pending**. ADR-015 menetapkan keempat source, immutable original-deal/provenance per board, generation setelah authorization/revision/deduplication, dan DDS terisolasi. Endpoint `GET /v1/boards/{boardId}/analysis` hanya melayani anggota meja aktif untuk board selesai; raw source tidak dikirim ke realtime. Legacy board tanpa provenance mengembalikan 404. Hasil mencakup 20 DD values, maximum makeable levels, dan dealer-aware signed-NS par, tanpa mengubah engine/result. UI analysis belum ditambahkan; tidak diperlukan untuk API boundary ini.
+
+**Evidence:** commits `815f6b5` (sources/ADR), `edf809f` (transactional provenance and authorized reads), `c08aca5` (DDS/API), `ca99c12` (image/CI). API race suite PASS; database/realtime integration uncached PASS; source coverage 93,2%; analysis coverage 93,9%; 3 pinned upstream DDS golden fixtures PASS pada host dan final Debian runtime image; API auth/error/contract/log-privacy tests PASS; contracts 3/3 dan workspace typecheck PASS; generated-source regeneration tanpa diff; Go vet/lint PASS (0 issues); forward/down/up migration 00005 PASS pada PostgreSQL lokal terisolasi setelah reboot. Playwright four-context regression 1/1 PASS (2,4 menit) meliputi persisted play, reconnect/controller recovery, hidden-frame privacy, serta geometry/pointer checks desktop/tablet/mobile. Docker build PASS dengan native runtime `libstdc++6`/`procps`; release drill kini menguji ketiga fixture di image sebelum deployment. Database/container pengujian lokal sudah dihentikan; tidak ada deployment eksternal atau migrasi Supabase yang dilakukan pada pekerjaan ini. Runbook: `docs/operations/phase4-analysis.md`.
+
+**Checkpoint 6 September 2026 — pemulihan sesi setelah reboot perangkat:**
+
+- Preferensi pengguna: ketika sisa kuota rolling 5 jam `<5%`, simpan checkpoint di `PLAN.md`. Pembacaan tersedia lewat event `token_count.rate_limits.primary` pada log sesi Codex lokal yang telah dicocokkan dengan pesan pengguna saat ini; pastikan `window_minutes=300` dan timestamp masih baru. Hitung sisa sebagai `100 - used_percent`. Pemeriksaan 6 September 2026 04:58:16 UTC: terpakai 16%, tersisa 84%. Periksa pada batas pekerjaan; bila metadata tidak tersedia/stale, jangan mengarang persentase dan tetap simpan checkpoint berkala.
+- Selesai dan committed: empat deal source + ADR-015 (`815f6b5`); transaksi source/provenance, authorization-before-generation, board history read boundary, dan PostgreSQL integration (`edf809f`).
+- DDS/API committed pada `c08aca5`; deployment/CI committed pada `ca99c12`. DDS dipin pada upstream 2.9.0 commit `8d75755`; standalone executable menghindari DLL lifecycle finalizer yang memicu crash proses pada eksperimen awal. Kebutuhan runtime `procps` sudah diperbaiki dan ketiga fixture pada final image PASS.
+- Bukti lulus sebelum reboot: API race suite; PostgreSQL database/realtime integration uncached; keempat source + atomic failure/retry/hydration; DDS 3 golden fixtures; source coverage 93,2%, analysis coverage 93,9%; API auth/error/contract/log privacy tests; contracts 3/3; workspace typecheck; four-browser Playwright 1/1 (2,4 menit). Log lokal: `tmp/phase4-{unit,integration,typecheck,browser}.log`.
+- Perangkat reboot setelah log suspend pada 07:11:44 WIB; agent tidak menjalankan perintah reboot/shutdown. Semua handle proses lama hilang. Docker image sudah tercatat; jangan mengklaim runtime smoke atau migration up/down/up terakhir lulus sampai hasilnya diverifikasi kembali.
+- Checkpoint akhir: pemeriksaan berurutan setelah reboot selesai; native runtime/image, migration up/down/up, final lint, dan generated-source consistency PASS. Sisa Phase 4 adalah sign-off reviewer bridge terhadap matriks Law 1–93. Phase 5 belum dimulai. Jika melanjutkan, baca ADR-015 dan runbook analysis; jangan mengulang seluruh test yang sudah lulus tanpa perubahan atau temuan baru.
+- Exit gate eksternal tetap pending: independent experienced-player approval atas boundary WBF. Jangan menandai seluruh Phase 4 PASS sebelum sign-off ini tersedia. Tidak ada perubahan UI analysis; endpoint API adalah scope implementasi saat ini.
+
+**Pemeriksaan kuota checkpoint akhir:** 2026-09-06T05:03:18.943Z — sisa rolling 5 jam 61,0%. Ambang `<5%` belum tercapai; checkpoint tetap disimpan untuk continuity.
 
 ### Phase 5 — Internal Team Match dan closed beta (8–12 hari)
 
