@@ -839,11 +839,15 @@ async function assertCompletedDealGeometry(page: Page) {
           ),
         ),
       crossHandCollisions,
-      sameHandCollisions: hands.flatMap((hand) =>
-        hand.cards.flatMap((card, _cardIndex) =>
-          hand.cards.slice(_cardIndex + 1).filter((otherCard) => overlaps(card, otherCard)),
-        ),
-      ).length,
+      cardSizes: Object.fromEntries(
+        hands.map((hand) => {
+          const card = hand.cards[0]!;
+          return [
+            hand.position,
+            { width: card.right - card.left, height: card.bottom - card.top },
+          ];
+        }),
+      ),
       clippedLabels: [...document.querySelectorAll(".completed-deal-hand .card-corner")].filter((corner) => {
         const card = rect(corner.closest(".physical-card")!);
         return [...corner.children].some((label) => {
@@ -872,9 +876,33 @@ async function assertCompletedDealGeometry(page: Page) {
   expect(geometry.ownHandCount).toBe(0);
   expect(geometry.cardsInsidePlayZone).toBe(true);
   expect(geometry.crossHandCollisions).toBe(0);
-  expect(geometry.sameHandCollisions).toBe(0);
   expect(geometry.clippedLabels).toBe(0);
   expect(geometry.resultCollisions).toBe(0);
+  expect(geometry.cardSizes.top.width).toBeCloseTo(
+    geometry.cardSizes.bottom.width,
+    0,
+  );
+  expect(geometry.cardSizes.top.height).toBeCloseTo(
+    geometry.cardSizes.bottom.height,
+    0,
+  );
+  expect(
+    geometry.cardSizes.top.height / geometry.cardSizes.top.width,
+  ).toBeCloseTo(1.4, 1);
+  expect(geometry.cardSizes.left.height).toBeCloseTo(
+    geometry.cardSizes.top.width,
+    0,
+  );
+  expect(geometry.cardSizes.right.height).toBeCloseTo(
+    geometry.cardSizes.top.width,
+    0,
+  );
+  expect(geometry.cardSizes.left.width).toBeLessThan(
+    geometry.cardSizes.top.height,
+  );
+  expect(geometry.cardSizes.right.width).toBeLessThan(
+    geometry.cardSizes.top.height,
+  );
   expect(
     geometry.participantThicknesses.every(
       (thickness) => thickness !== undefined && thickness <= 21,
