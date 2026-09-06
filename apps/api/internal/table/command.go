@@ -2,7 +2,9 @@ package table
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/deal"
 	"log/slog"
 	"time"
 
@@ -107,11 +109,15 @@ func (processor *CommandProcessor) Process(ctx context.Context, request CommandR
 	result, err := processor.repository.ProcessCommand(ctx, request, startedAt, startedAt.Add(processedCommandLifetime))
 	latency := processor.now().UTC().Sub(startedAt)
 	if err != nil {
+		resultCode := "DB_ERROR"
+		if errors.Is(err, deal.ErrUnavailable) {
+			resultCode = "DEAL_SOURCE_UNAVAILABLE"
+		}
 		processor.logger.ErrorContext(ctx, "table_command_persistence_failed",
 			"request_id", request.RequestID,
 			"table_id", request.TableID,
 			"command_name", request.Command.Name,
-			"result_code", "DB_ERROR",
+			"result_code", resultCode,
 			"latency_ms", latency.Milliseconds(),
 		)
 		return CommandResult{}, fmt.Errorf("persist table command: %w", err)

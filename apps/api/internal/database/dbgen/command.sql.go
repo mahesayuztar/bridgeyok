@@ -44,6 +44,47 @@ func (q *Queries) ExpireTableGuestSessions(ctx context.Context, arg ExpireTableG
 	return err
 }
 
+const findBoardDeal = `-- name: FindBoardDeal :one
+SELECT b.id, b.table_id, b.board_number, b.dealer, b.vulnerability, b.status, d.source_record
+FROM bridgeyok.boards b
+JOIN bridgeyok.board_deals d ON d.board_id = b.id
+WHERE b.id = $1
+  AND EXISTS (
+      SELECT 1 FROM bridgeyok.table_participants p
+      WHERE p.table_id = b.table_id AND p.session_id = $2 AND p.left_at IS NULL
+  )
+`
+
+type FindBoardDealParams struct {
+	BoardID   string `json:"board_id"`
+	SessionID string `json:"session_id"`
+}
+
+type FindBoardDealRow struct {
+	ID            string `json:"id"`
+	TableID       string `json:"table_id"`
+	BoardNumber   int32  `json:"board_number"`
+	Dealer        string `json:"dealer"`
+	Vulnerability string `json:"vulnerability"`
+	Status        string `json:"status"`
+	SourceRecord  []byte `json:"source_record"`
+}
+
+func (q *Queries) FindBoardDeal(ctx context.Context, arg FindBoardDealParams) (FindBoardDealRow, error) {
+	row := q.db.QueryRow(ctx, findBoardDeal, arg.BoardID, arg.SessionID)
+	var i FindBoardDealRow
+	err := row.Scan(
+		&i.ID,
+		&i.TableID,
+		&i.BoardNumber,
+		&i.Dealer,
+		&i.Vulnerability,
+		&i.Status,
+		&i.SourceRecord,
+	)
+	return i, err
+}
+
 const findProcessedCommand = `-- name: FindProcessedCommand :one
 SELECT outcome
 FROM bridgeyok.processed_commands
@@ -63,6 +104,21 @@ func (q *Queries) FindProcessedCommand(ctx context.Context, arg FindProcessedCom
 	var outcome []byte
 	err := row.Scan(&outcome)
 	return outcome, err
+}
+
+const insertBoardDeal = `-- name: InsertBoardDeal :exec
+INSERT INTO bridgeyok.board_deals (board_id, source_record)
+VALUES ($1, $2)
+`
+
+type InsertBoardDealParams struct {
+	BoardID      string `json:"board_id"`
+	SourceRecord []byte `json:"source_record"`
+}
+
+func (q *Queries) InsertBoardDeal(ctx context.Context, arg InsertBoardDealParams) error {
+	_, err := q.db.Exec(ctx, insertBoardDeal, arg.BoardID, arg.SourceRecord)
+	return err
 }
 
 const insertBoardSeatAttribution = `-- name: InsertBoardSeatAttribution :exec

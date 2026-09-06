@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/database/dbgen"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/deal"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
 )
 
@@ -57,6 +58,23 @@ func (postgres *Postgres) ProcessCommand(ctx context.Context, request table.Comm
 			return insertProcessedOutcome(ctx, queries, request, result.Outcome, processedAt, expiresAt)
 		}
 		decision, domainError := table.Decide(aggregate, request.Command)
+		if domainError != nil && domainError.Code == table.ErrorDealRequired {
+			source := postgres.dealSource
+			if source == nil {
+				source = deal.SecureRandom{}
+			}
+			produced, err := source.Generate(ctx)
+			if err != nil {
+				return deal.ErrUnavailable
+			}
+			if err := produced.Validate(); err != nil {
+				return deal.ErrUnavailable
+			}
+			request.Command.Deal = &produced.Deal
+			request.Command.DealProvenance = &produced.Provenance
+			request.Command.BoardID = uuid.NewString()
+			decision, domainError = table.Decide(aggregate, request.Command)
+		}
 		if domainError != nil {
 			result = rejectedResult(request, aggregate, domainError.Code)
 			return insertProcessedOutcome(ctx, queries, request, result.Outcome, processedAt, expiresAt)
@@ -133,6 +151,23 @@ func persistAcceptedDecision(
 	}
 	if err := syncRelationalAggregate(ctx, queries, next, occurredAt); err != nil {
 		return table.CommandResult{}, err
+	}
+	if request.Command.Name == table.CommandStartGame || request.Command.Name == table.CommandRequestNextBoard {
+		provenance := deal.Provenance{Type: "prepared", Version: "internal-v1", Reference: next.BoardID}
+		if request.Command.DealProvenance != nil {
+			provenance = *request.Command.DealProvenance
+		}
+		produced := deal.Result{Deal: *request.Command.Deal, Provenance: provenance}
+		if err := produced.Validate(); err != nil {
+			return table.CommandResult{}, deal.ErrUnavailable
+		}
+		encoded, err := json.Marshal(produced)
+		if err != nil {
+			return table.CommandResult{}, fmt.Errorf("encode board source")
+		}
+		if err := queries.InsertBoardDeal(ctx, dbgen.InsertBoardDealParams{BoardID: next.BoardID, SourceRecord: encoded}); err != nil {
+			return table.CommandResult{}, fmt.Errorf("persist board source: %w", err)
+		}
 	}
 	if request.Command.Name == table.CommandExpireTable {
 		if err := queries.ExpireTableGuestSessions(ctx, dbgen.ExpireTableGuestSessionsParams{

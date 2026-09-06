@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/deal"
 )
 
 // State identifies the durable table lifecycle.
@@ -57,6 +58,8 @@ const (
 
 // ErrorCode is a stable table rejection reason.
 type ErrorCode string
+
+const ErrorDealRequired ErrorCode = "DEAL_REQUIRED"
 
 const (
 	ErrorInvalidState       ErrorCode = "INVALID_STATE"
@@ -170,6 +173,7 @@ type Command struct {
 	ClaimTricks              int
 	Accepted                 bool
 	Deal                     *bridge.Deal
+	DealProvenance           *deal.Provenance
 	BoardID                  string
 	ControllerEpoch          int64
 	ReplacementParticipantID string
@@ -452,7 +456,7 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 			}
 		}
 		if command.Deal == nil || command.BoardID == "" {
-			return Decision{}, reject(ErrorInvalidCommand, "start requires a deal and board id")
+			return Decision{}, reject(ErrorDealRequired, "start requires a deal and board id")
 		}
 		game, err := bridge.NewBoard(1, *command.Deal)
 		if err != nil {
@@ -612,8 +616,14 @@ func Decide(aggregate Aggregate, command Command) (Decision, *DomainError) {
 		if participant.Role != RoleOwner {
 			return Decision{}, reject(ErrorOwnerRequired, "only the owner can start the next board")
 		}
-		if next.State != StateBetweenBoards || command.Deal == nil || command.BoardID == "" || next.ActionRequest != nil {
+		if next.State != StateBetweenBoards || next.ActionRequest != nil {
 			return Decision{}, reject(ErrorInvalidState, "next board requires a completed board and new deal")
+		}
+		if _, err := next.captureBoardLineup(); err != nil {
+			return Decision{}, reject(ErrorNotReady, err.Error())
+		}
+		if command.Deal == nil || command.BoardID == "" {
+			return Decision{}, reject(ErrorDealRequired, "next board requires a deal and board id")
 		}
 		game, err := bridge.NewBoard(next.BoardNumber+1, *command.Deal)
 		if err != nil {

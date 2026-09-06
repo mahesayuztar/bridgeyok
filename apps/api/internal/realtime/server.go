@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/coder/websocket"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/deal"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
 )
@@ -530,6 +531,9 @@ func (connection *connection) handleMutation(envelope ClientEnvelope) {
 	})
 	if err != nil {
 		code := "INTERNAL_ERROR"
+		if errors.Is(err, deal.ErrUnavailable) {
+			code = "DEAL_SOURCE_UNAVAILABLE"
+		}
 		retryable := true
 		if errors.Is(err, table.ErrActorQueueFull) || errors.Is(err, table.ErrActorRegistryDraining) {
 			code = "SERVER_BUSY"

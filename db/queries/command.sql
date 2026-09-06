@@ -208,3 +208,17 @@ INSERT INTO bridgeyok.board_seat_attributions (
     sqlc.arg(is_bot)
 )
 ON CONFLICT (board_id, seat) DO NOTHING;
+
+-- name: InsertBoardDeal :exec
+INSERT INTO bridgeyok.board_deals (board_id, source_record)
+VALUES (sqlc.arg(board_id), sqlc.arg(source_record));
+
+-- name: FindBoardDeal :one
+SELECT b.id, b.table_id, b.board_number, b.dealer, b.vulnerability, b.status, d.source_record
+FROM bridgeyok.boards b
+JOIN bridgeyok.board_deals d ON d.board_id = b.id
+WHERE b.id = sqlc.arg(board_id)
+  AND EXISTS (
+      SELECT 1 FROM bridgeyok.table_participants p
+      WHERE p.table_id = b.table_id AND p.session_id = sqlc.arg(session_id) AND p.left_at IS NULL
+  );

@@ -42,6 +42,11 @@ type BridgeyokBoard struct {
 	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
 }
 
+type BridgeyokBoardDeal struct {
+	BoardID      string `json:"board_id"`
+	SourceRecord []byte `json:"source_record"`
+}
+
 type BridgeyokBoardSeatAttribution struct {
 	TableID    string `json:"table_id"`
 	BoardID    string `json:"board_id"`

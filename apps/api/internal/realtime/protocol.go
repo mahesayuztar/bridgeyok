@@ -343,15 +343,6 @@ func tableCommand(envelope ClientEnvelope, random io.Reader, now time.Time) (tab
 		}
 		command.Name, command.Seat = table.CommandRemoveBot, payload.Seat
 	case nameStartGame, nameNextBoard:
-		deal, err := bridge.GenerateDeal(random)
-		if err != nil {
-			return table.Command{}, fmt.Errorf("generate board deal: %w", err)
-		}
-		boardID, err := uuid.NewRandomFromReader(random)
-		if err != nil {
-			return table.Command{}, fmt.Errorf("generate board id: %w", err)
-		}
-		command.Deal, command.BoardID = &deal, boardID.String()
 		if envelope.Name == nameStartGame {
 			command.Name = table.CommandStartGame
 		} else {

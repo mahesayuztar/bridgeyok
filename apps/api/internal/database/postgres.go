@@ -8,14 +8,26 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/database/dbgen"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/deal"
 )
 
 type Postgres struct {
-	pool    *pgxpool.Pool
-	queries *dbgen.Queries
+	pool       *pgxpool.Pool
+	queries    *dbgen.Queries
+	dealSource deal.Source
 }
 
-func Open(ctx context.Context, databaseURL string, maxConns int32) (*Postgres, error) {
+func Open(ctx context.Context, databaseURL string, maxConns int32, sources ...deal.Source) (*Postgres, error) {
+	var source deal.Source = deal.SecureRandom{}
+	if len(sources) > 1 {
+		return nil, fmt.Errorf("only one deal source is supported")
+	}
+	if len(sources) == 1 {
+		if sources[0] == nil {
+			return nil, fmt.Errorf("deal source is required")
+		}
+		source = sources[0]
+	}
 	poolConfig, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse PostgreSQL configuration")
@@ -34,7 +46,7 @@ func Open(ctx context.Context, databaseURL string, maxConns int32) (*Postgres, e
 		pool.Close()
 		return nil, fmt.Errorf("connect to PostgreSQL: %w", err)
 	}
-	return &Postgres{pool: pool, queries: dbgen.New(pool)}, nil
+	return &Postgres{pool: pool, queries: dbgen.New(pool), dealSource: source}, nil
 }
 
 func (postgres *Postgres) Ping(ctx context.Context) error {
