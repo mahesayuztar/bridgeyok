@@ -236,10 +236,116 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/boards/{boardId}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Replay a completed board for an active table participant
+         * @description Returns the original deal and final authoritative engine state. Archived records are replayed and hash-validated. A scored current board uses its consistent private snapshot. Old boards without an archive or matching snapshot return 404. Undo-reversed actions are excluded; claims never synthesize tricks.
+         */
+        get: operations["getCompletedBoardReplay"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ReplayCard: {
+            /** @enum {string} */
+            suit: "C" | "D" | "H" | "S";
+            /** @enum {string} */
+            rank: "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "T" | "J" | "Q" | "K" | "A";
+        };
+        ReplayCall: {
+            /** @enum {string} */
+            kind: "PASS" | "BID" | "DOUBLE" | "REDOUBLE";
+            level?: number;
+            /** @enum {string} */
+            strain?: "C" | "D" | "H" | "S" | "NT";
+        };
+        ReplayContract: {
+            level: number;
+            /** @enum {string} */
+            strain: "C" | "D" | "H" | "S" | "NT";
+            /** @enum {string} */
+            doubling: "UNDOUBLED" | "DOUBLED" | "REDOUBLED";
+            /** @enum {string} */
+            declarer: "N" | "E" | "S" | "W";
+        };
+        ReplayResult: {
+            rulesetVersion: string;
+            passedOut: boolean;
+            contract?: components["schemas"]["ReplayContract"];
+            tricksDeclarer: number;
+            tricksNS: number;
+            tricksEW: number;
+            /** @enum {string} */
+            vulnerability: "NONE" | "NS" | "EW" | "BOTH";
+            scoreNS: number;
+        };
+        ReplayDeal: {
+            north: components["schemas"]["ReplayCard"][] | null;
+            east: components["schemas"]["ReplayCard"][] | null;
+            south: components["schemas"]["ReplayCard"][] | null;
+            west: components["schemas"]["ReplayCard"][] | null;
+        };
+        ReplayTrick: {
+            /** @enum {string} */
+            leader: "" | "N" | "E" | "S" | "W";
+            plays: {
+                seat: components["schemas"]["TableSeat"];
+                card: components["schemas"]["ReplayCard"];
+            }[] | null;
+            winner?: components["schemas"]["TableSeat"];
+        };
+        ReplayAuction: {
+            dealer: components["schemas"]["TableSeat"];
+            turn?: components["schemas"]["TableSeat"];
+            calls: {
+                seat: components["schemas"]["TableSeat"];
+                call: components["schemas"]["ReplayCall"];
+            }[];
+            complete: boolean;
+            passedOut: boolean;
+            contract?: components["schemas"]["ReplayContract"];
+        };
+        ReplayGame: {
+            rulesetVersion: string;
+            board: {
+                number: number;
+                dealer: components["schemas"]["TableSeat"];
+                /** @enum {string} */
+                vulnerability: "NONE" | "NS" | "EW" | "BOTH";
+            };
+            /** @enum {string} */
+            phase: "BOARD_SCORED";
+            deal: components["schemas"]["ReplayDeal"];
+            auction: components["schemas"]["ReplayAuction"];
+            turn?: components["schemas"]["TableSeat"];
+            dummyRevealed: boolean;
+            currentTrick: components["schemas"]["ReplayTrick"];
+            completedTricks: components["schemas"]["ReplayTrick"][] | null;
+            tricksNS: components["schemas"]["AnalysisTricks"];
+            tricksEW: components["schemas"]["AnalysisTricks"];
+            result: components["schemas"]["ReplayResult"];
+            claimed: boolean;
+        };
+        BoardReplay: {
+            /** Format: uuid */
+            boardId: string;
+            fullDeal: components["schemas"]["ReplayDeal"];
+            game: components["schemas"]["ReplayGame"];
+        };
         /** @enum {string} */
         AnalysisStrain: "C" | "D" | "H" | "S" | "NT";
         AnalysisTricks: number;
@@ -746,6 +852,33 @@ export interface operations {
             409: components["responses"]["ProblemResponse"];
             503: components["responses"]["ProblemResponse"];
             504: components["responses"]["ProblemResponse"];
+        };
+    };
+    getCompletedBoardReplay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Completed board replay */
+            200: {
+                headers: {
+                    "Cache-Control"?: "private, no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardReplay"];
+                };
+            };
+            401: components["responses"]["ProblemResponse"];
+            404: components["responses"]["ProblemResponse"];
+            409: components["responses"]["ProblemResponse"];
+            503: components["responses"]["ProblemResponse"];
         };
     };
 }

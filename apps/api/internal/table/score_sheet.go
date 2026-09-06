@@ -41,6 +41,13 @@ type PairScoreTotal struct {
 	Score int       `json:"score"`
 }
 
+// BoardReplay exposes a completed engine state with the original deal to authorized participants.
+type BoardReplay struct {
+	BoardID  string       `json:"boardId"`
+	FullDeal bridge.Deal  `json:"fullDeal"`
+	Game     bridge.State `json:"game"`
+}
+
 func (aggregate Aggregate) captureBoardLineup() (BoardLineup, error) {
 	seats := make(map[bridge.Seat]ScoreParticipant, 4)
 	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {

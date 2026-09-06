@@ -32,6 +32,7 @@ type Options struct {
 	Table          TableService
 	Realtime       RealtimeService
 	Analysis       AnalysisService
+	Replay         BoardReplayService
 }
 
 type RealtimeService interface {
@@ -91,6 +92,8 @@ func NewRouter(options Options) http.Handler {
 	}
 	analysisHandler := analysisHTTPHandler{service: options.Analysis, identity: identityHandler, logger: options.Logger}
 	router.Get("/v1/boards/{boardId}/analysis", analysisHandler.analyze)
+	replayHandler := boardReplayHTTPHandler{service: options.Replay, identity: identityHandler, logger: options.Logger}
+	router.Get("/v1/boards/{boardId}/replay", replayHandler.get)
 	router.Post("/v1/tables", tableHandler.createTable)
 	router.Get("/v1/tables/{inviteCode}/preview", tableHandler.previewTable)
 	router.Post("/v1/tables/{inviteCode}/join", tableHandler.joinTable)

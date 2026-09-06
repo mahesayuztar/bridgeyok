@@ -53,22 +53,22 @@ func (e AnalysisStrain) Valid() bool {
 
 // Defines values for BoardAnalysisMetadataVulnerability.
 const (
-	BOTH BoardAnalysisMetadataVulnerability = "BOTH"
-	EW   BoardAnalysisMetadataVulnerability = "EW"
-	NONE BoardAnalysisMetadataVulnerability = "NONE"
-	NS   BoardAnalysisMetadataVulnerability = "NS"
+	BoardAnalysisMetadataVulnerabilityBOTH BoardAnalysisMetadataVulnerability = "BOTH"
+	BoardAnalysisMetadataVulnerabilityEW   BoardAnalysisMetadataVulnerability = "EW"
+	BoardAnalysisMetadataVulnerabilityNONE BoardAnalysisMetadataVulnerability = "NONE"
+	BoardAnalysisMetadataVulnerabilityNS   BoardAnalysisMetadataVulnerability = "NS"
 )
 
 // Valid indicates whether the value is a known member of the BoardAnalysisMetadataVulnerability enum.
 func (e BoardAnalysisMetadataVulnerability) Valid() bool {
 	switch e {
-	case BOTH:
+	case BoardAnalysisMetadataVulnerabilityBOTH:
 		return true
-	case EW:
+	case BoardAnalysisMetadataVulnerabilityEW:
 		return true
-	case NONE:
+	case BoardAnalysisMetadataVulnerabilityNONE:
 		return true
-	case NS:
+	case BoardAnalysisMetadataVulnerabilityNS:
 		return true
 	default:
 		return false
@@ -114,6 +114,294 @@ func (e HealthResponseStatus) Valid() bool {
 	case Ready:
 		return true
 	case Unavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayCallKind.
+const (
+	BID      ReplayCallKind = "BID"
+	DOUBLE   ReplayCallKind = "DOUBLE"
+	PASS     ReplayCallKind = "PASS"
+	REDOUBLE ReplayCallKind = "REDOUBLE"
+)
+
+// Valid indicates whether the value is a known member of the ReplayCallKind enum.
+func (e ReplayCallKind) Valid() bool {
+	switch e {
+	case BID:
+		return true
+	case DOUBLE:
+		return true
+	case PASS:
+		return true
+	case REDOUBLE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayCallStrain.
+const (
+	ReplayCallStrainC  ReplayCallStrain = "C"
+	ReplayCallStrainD  ReplayCallStrain = "D"
+	ReplayCallStrainH  ReplayCallStrain = "H"
+	ReplayCallStrainNT ReplayCallStrain = "NT"
+	ReplayCallStrainS  ReplayCallStrain = "S"
+)
+
+// Valid indicates whether the value is a known member of the ReplayCallStrain enum.
+func (e ReplayCallStrain) Valid() bool {
+	switch e {
+	case ReplayCallStrainC:
+		return true
+	case ReplayCallStrainD:
+		return true
+	case ReplayCallStrainH:
+		return true
+	case ReplayCallStrainNT:
+		return true
+	case ReplayCallStrainS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayCardRank.
+const (
+	A  ReplayCardRank = "A"
+	J  ReplayCardRank = "J"
+	K  ReplayCardRank = "K"
+	N2 ReplayCardRank = "2"
+	N3 ReplayCardRank = "3"
+	N4 ReplayCardRank = "4"
+	N5 ReplayCardRank = "5"
+	N6 ReplayCardRank = "6"
+	N7 ReplayCardRank = "7"
+	N8 ReplayCardRank = "8"
+	N9 ReplayCardRank = "9"
+	Q  ReplayCardRank = "Q"
+	T  ReplayCardRank = "T"
+)
+
+// Valid indicates whether the value is a known member of the ReplayCardRank enum.
+func (e ReplayCardRank) Valid() bool {
+	switch e {
+	case A:
+		return true
+	case J:
+		return true
+	case K:
+		return true
+	case N2:
+		return true
+	case N3:
+		return true
+	case N4:
+		return true
+	case N5:
+		return true
+	case N6:
+		return true
+	case N7:
+		return true
+	case N8:
+		return true
+	case N9:
+		return true
+	case Q:
+		return true
+	case T:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayCardSuit.
+const (
+	ReplayCardSuitC ReplayCardSuit = "C"
+	ReplayCardSuitD ReplayCardSuit = "D"
+	ReplayCardSuitH ReplayCardSuit = "H"
+	ReplayCardSuitS ReplayCardSuit = "S"
+)
+
+// Valid indicates whether the value is a known member of the ReplayCardSuit enum.
+func (e ReplayCardSuit) Valid() bool {
+	switch e {
+	case ReplayCardSuitC:
+		return true
+	case ReplayCardSuitD:
+		return true
+	case ReplayCardSuitH:
+		return true
+	case ReplayCardSuitS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayContractDeclarer.
+const (
+	ReplayContractDeclarerE ReplayContractDeclarer = "E"
+	ReplayContractDeclarerN ReplayContractDeclarer = "N"
+	ReplayContractDeclarerS ReplayContractDeclarer = "S"
+	ReplayContractDeclarerW ReplayContractDeclarer = "W"
+)
+
+// Valid indicates whether the value is a known member of the ReplayContractDeclarer enum.
+func (e ReplayContractDeclarer) Valid() bool {
+	switch e {
+	case ReplayContractDeclarerE:
+		return true
+	case ReplayContractDeclarerN:
+		return true
+	case ReplayContractDeclarerS:
+		return true
+	case ReplayContractDeclarerW:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayContractDoubling.
+const (
+	DOUBLED   ReplayContractDoubling = "DOUBLED"
+	REDOUBLED ReplayContractDoubling = "REDOUBLED"
+	UNDOUBLED ReplayContractDoubling = "UNDOUBLED"
+)
+
+// Valid indicates whether the value is a known member of the ReplayContractDoubling enum.
+func (e ReplayContractDoubling) Valid() bool {
+	switch e {
+	case DOUBLED:
+		return true
+	case REDOUBLED:
+		return true
+	case UNDOUBLED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayContractStrain.
+const (
+	ReplayContractStrainC  ReplayContractStrain = "C"
+	ReplayContractStrainD  ReplayContractStrain = "D"
+	ReplayContractStrainH  ReplayContractStrain = "H"
+	ReplayContractStrainNT ReplayContractStrain = "NT"
+	ReplayContractStrainS  ReplayContractStrain = "S"
+)
+
+// Valid indicates whether the value is a known member of the ReplayContractStrain enum.
+func (e ReplayContractStrain) Valid() bool {
+	switch e {
+	case ReplayContractStrainC:
+		return true
+	case ReplayContractStrainD:
+		return true
+	case ReplayContractStrainH:
+		return true
+	case ReplayContractStrainNT:
+		return true
+	case ReplayContractStrainS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayGameBoardVulnerability.
+const (
+	ReplayGameBoardVulnerabilityBOTH ReplayGameBoardVulnerability = "BOTH"
+	ReplayGameBoardVulnerabilityEW   ReplayGameBoardVulnerability = "EW"
+	ReplayGameBoardVulnerabilityNONE ReplayGameBoardVulnerability = "NONE"
+	ReplayGameBoardVulnerabilityNS   ReplayGameBoardVulnerability = "NS"
+)
+
+// Valid indicates whether the value is a known member of the ReplayGameBoardVulnerability enum.
+func (e ReplayGameBoardVulnerability) Valid() bool {
+	switch e {
+	case ReplayGameBoardVulnerabilityBOTH:
+		return true
+	case ReplayGameBoardVulnerabilityEW:
+		return true
+	case ReplayGameBoardVulnerabilityNONE:
+		return true
+	case ReplayGameBoardVulnerabilityNS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayGamePhase.
+const (
+	BOARDSCORED ReplayGamePhase = "BOARD_SCORED"
+)
+
+// Valid indicates whether the value is a known member of the ReplayGamePhase enum.
+func (e ReplayGamePhase) Valid() bool {
+	switch e {
+	case BOARDSCORED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayResultVulnerability.
+const (
+	ReplayResultVulnerabilityBOTH ReplayResultVulnerability = "BOTH"
+	ReplayResultVulnerabilityEW   ReplayResultVulnerability = "EW"
+	ReplayResultVulnerabilityNONE ReplayResultVulnerability = "NONE"
+	ReplayResultVulnerabilityNS   ReplayResultVulnerability = "NS"
+)
+
+// Valid indicates whether the value is a known member of the ReplayResultVulnerability enum.
+func (e ReplayResultVulnerability) Valid() bool {
+	switch e {
+	case ReplayResultVulnerabilityBOTH:
+		return true
+	case ReplayResultVulnerabilityEW:
+		return true
+	case ReplayResultVulnerabilityNONE:
+		return true
+	case ReplayResultVulnerabilityNS:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReplayTrickLeader.
+const (
+	ReplayTrickLeaderE     ReplayTrickLeader = "E"
+	ReplayTrickLeaderEmpty ReplayTrickLeader = ""
+	ReplayTrickLeaderN     ReplayTrickLeader = "N"
+	ReplayTrickLeaderS     ReplayTrickLeader = "S"
+	ReplayTrickLeaderW     ReplayTrickLeader = "W"
+)
+
+// Valid indicates whether the value is a known member of the ReplayTrickLeader enum.
+func (e ReplayTrickLeader) Valid() bool {
+	switch e {
+	case ReplayTrickLeaderE:
+		return true
+	case ReplayTrickLeaderEmpty:
+		return true
+	case ReplayTrickLeaderN:
+		return true
+	case ReplayTrickLeaderS:
+		return true
+	case ReplayTrickLeaderW:
 		return true
 	default:
 		return false
@@ -258,6 +546,13 @@ type BoardAnalysisMetadataVulnerability string
 // BoardAnalysisProvenanceType defines model for BoardAnalysis.Provenance.Type.
 type BoardAnalysisProvenanceType string
 
+// BoardReplay defines model for BoardReplay.
+type BoardReplay struct {
+	BoardId  openapi_types.UUID `json:"boardId"`
+	FullDeal ReplayDeal         `json:"fullDeal"`
+	Game     ReplayGame         `json:"game"`
+}
+
 // CreateGuestSessionRequest defines model for CreateGuestSessionRequest.
 type CreateGuestSessionRequest struct {
 	Nickname string `json:"nickname"`
@@ -308,6 +603,124 @@ type RealtimeTicket struct {
 type RefreshGuestSessionRequest struct {
 	DeviceCredential string `json:"deviceCredential"`
 }
+
+// ReplayAuction defines model for ReplayAuction.
+type ReplayAuction struct {
+	Calls []struct {
+		Call ReplayCall `json:"call"`
+		Seat TableSeat  `json:"seat"`
+	} `json:"calls"`
+	Complete  bool            `json:"complete"`
+	Contract  *ReplayContract `json:"contract,omitempty"`
+	Dealer    TableSeat       `json:"dealer"`
+	PassedOut bool            `json:"passedOut"`
+	Turn      *TableSeat      `json:"turn,omitempty"`
+}
+
+// ReplayCall defines model for ReplayCall.
+type ReplayCall struct {
+	Kind   ReplayCallKind    `json:"kind"`
+	Level  *int              `json:"level,omitempty"`
+	Strain *ReplayCallStrain `json:"strain,omitempty"`
+}
+
+// ReplayCallKind defines model for ReplayCall.Kind.
+type ReplayCallKind string
+
+// ReplayCallStrain defines model for ReplayCall.Strain.
+type ReplayCallStrain string
+
+// ReplayCard defines model for ReplayCard.
+type ReplayCard struct {
+	Rank ReplayCardRank `json:"rank"`
+	Suit ReplayCardSuit `json:"suit"`
+}
+
+// ReplayCardRank defines model for ReplayCard.Rank.
+type ReplayCardRank string
+
+// ReplayCardSuit defines model for ReplayCard.Suit.
+type ReplayCardSuit string
+
+// ReplayContract defines model for ReplayContract.
+type ReplayContract struct {
+	Declarer ReplayContractDeclarer `json:"declarer"`
+	Doubling ReplayContractDoubling `json:"doubling"`
+	Level    int                    `json:"level"`
+	Strain   ReplayContractStrain   `json:"strain"`
+}
+
+// ReplayContractDeclarer defines model for ReplayContract.Declarer.
+type ReplayContractDeclarer string
+
+// ReplayContractDoubling defines model for ReplayContract.Doubling.
+type ReplayContractDoubling string
+
+// ReplayContractStrain defines model for ReplayContract.Strain.
+type ReplayContractStrain string
+
+// ReplayDeal defines model for ReplayDeal.
+type ReplayDeal struct {
+	East  *[]ReplayCard `json:"east"`
+	North *[]ReplayCard `json:"north"`
+	South *[]ReplayCard `json:"south"`
+	West  *[]ReplayCard `json:"west"`
+}
+
+// ReplayGame defines model for ReplayGame.
+type ReplayGame struct {
+	Auction ReplayAuction `json:"auction"`
+	Board   struct {
+		Dealer        TableSeat                    `json:"dealer"`
+		Number        int                          `json:"number"`
+		Vulnerability ReplayGameBoardVulnerability `json:"vulnerability"`
+	} `json:"board"`
+	Claimed         bool            `json:"claimed"`
+	CompletedTricks *[]ReplayTrick  `json:"completedTricks"`
+	CurrentTrick    ReplayTrick     `json:"currentTrick"`
+	Deal            ReplayDeal      `json:"deal"`
+	DummyRevealed   bool            `json:"dummyRevealed"`
+	Phase           ReplayGamePhase `json:"phase"`
+	Result          ReplayResult    `json:"result"`
+	RulesetVersion  string          `json:"rulesetVersion"`
+	TricksEW        AnalysisTricks  `json:"tricksEW"`
+	TricksNS        AnalysisTricks  `json:"tricksNS"`
+	Turn            *TableSeat      `json:"turn,omitempty"`
+}
+
+// ReplayGameBoardVulnerability defines model for ReplayGame.Board.Vulnerability.
+type ReplayGameBoardVulnerability string
+
+// ReplayGamePhase defines model for ReplayGame.Phase.
+type ReplayGamePhase string
+
+// ReplayResult defines model for ReplayResult.
+type ReplayResult struct {
+	Contract       *ReplayContract           `json:"contract,omitempty"`
+	PassedOut      bool                      `json:"passedOut"`
+	RulesetVersion string                    `json:"rulesetVersion"`
+	ScoreNS        int                       `json:"scoreNS"`
+	TricksDeclarer int                       `json:"tricksDeclarer"`
+	TricksEW       int                       `json:"tricksEW"`
+	TricksNS       int                       `json:"tricksNS"`
+	Vulnerability  ReplayResultVulnerability `json:"vulnerability"`
+}
+
+// ReplayResultVulnerability defines model for ReplayResult.Vulnerability.
+type ReplayResultVulnerability string
+
+// ReplayTrick defines model for ReplayTrick.
+type ReplayTrick struct {
+	Leader ReplayTrickLeader `json:"leader"`
+	Plays  *[]struct {
+		Card ReplayCard `json:"card"`
+		Seat TableSeat  `json:"seat"`
+	} `json:"plays"`
+	Winner *TableSeat `json:"winner,omitempty"`
+}
+
+// ReplayTrickLeader defines model for ReplayTrick.Leader.
+type ReplayTrickLeader string
 
 // TableParticipant defines model for TableParticipant.
 type TableParticipant struct {

@@ -114,6 +114,7 @@ func main() {
 		Table:          tableService,
 		Realtime:       realtimeServer,
 		Analysis:       analysisService,
+		Replay:         postgres,
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

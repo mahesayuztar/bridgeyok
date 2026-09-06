@@ -285,6 +285,44 @@ paths:
         "504":
           $ref: "#/components/responses/ProblemResponse"
 
+  /v1/boards/{boardId}/replay:
+    get:
+      operationId: getCompletedBoardReplay
+      summary: Replay a completed board for an active table participant
+      description: Returns the original deal and final authoritative engine state. Archived
+        records are replayed and hash-validated. A scored current board uses its consistent
+        private snapshot. Old boards without an archive or matching snapshot return
+        404. Undo-reversed actions are excluded; claims never synthesize tricks.
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: boardId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Completed board replay
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardReplay'
+        '401':
+          $ref: '#/components/responses/ProblemResponse'
+        '404':
+          $ref: '#/components/responses/ProblemResponse'
+        '409':
+          $ref: '#/components/responses/ProblemResponse'
+        '503':
+          $ref: '#/components/responses/ProblemResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -328,6 +366,313 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    ReplayCard:
+      type: object
+      additionalProperties: false
+      required:
+      - suit
+      - rank
+      properties:
+        suit:
+          enum:
+          - C
+          - D
+          - H
+          - S
+          type: string
+        rank:
+          enum:
+          - '2'
+          - '3'
+          - '4'
+          - '5'
+          - '6'
+          - '7'
+          - '8'
+          - '9'
+          - T
+          - J
+          - Q
+          - K
+          - A
+          type: string
+    ReplayCall:
+      type: object
+      additionalProperties: false
+      required:
+      - kind
+      properties:
+        kind:
+          type: string
+          enum:
+          - PASS
+          - BID
+          - DOUBLE
+          - REDOUBLE
+        level:
+          type: integer
+          minimum: 1
+          maximum: 7
+        strain:
+          type: string
+          enum:
+          - C
+          - D
+          - H
+          - S
+          - NT
+    ReplayContract:
+      type: object
+      additionalProperties: false
+      required:
+      - level
+      - strain
+      - doubling
+      - declarer
+      properties:
+        level:
+          type: integer
+          minimum: 1
+          maximum: 7
+        strain:
+          enum:
+          - C
+          - D
+          - H
+          - S
+          - NT
+          type: string
+        doubling:
+          enum:
+          - UNDOUBLED
+          - DOUBLED
+          - REDOUBLED
+          type: string
+        declarer:
+          enum:
+          - N
+          - E
+          - S
+          - W
+          type: string
+    ReplayResult:
+      type: object
+      additionalProperties: false
+      required:
+      - rulesetVersion
+      - passedOut
+      - tricksDeclarer
+      - tricksNS
+      - tricksEW
+      - vulnerability
+      - scoreNS
+      properties:
+        rulesetVersion:
+          type: string
+          minLength: 1
+        passedOut:
+          type: boolean
+        contract:
+          $ref: '#/components/schemas/ReplayContract'
+        tricksDeclarer:
+          type: integer
+          minimum: 0
+          maximum: 13
+        tricksNS:
+          type: integer
+          minimum: 0
+          maximum: 13
+        tricksEW:
+          type: integer
+          minimum: 0
+          maximum: 13
+        vulnerability:
+          enum:
+          - NONE
+          - NS
+          - EW
+          - BOTH
+          type: string
+        scoreNS:
+          type: integer
+    ReplayDeal:
+      type: object
+      additionalProperties: false
+      required:
+      - north
+      - east
+      - south
+      - west
+      properties:
+        north:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ReplayCard'
+        east:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ReplayCard'
+        south:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ReplayCard'
+        west:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ReplayCard'
+    ReplayTrick:
+      type: object
+      additionalProperties: false
+      required:
+      - leader
+      - plays
+      properties:
+        leader:
+          type: string
+          enum:
+          - ''
+          - N
+          - E
+          - S
+          - W
+        plays:
+          type:
+          - array
+          - 'null'
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - seat
+            - card
+            properties:
+              seat:
+                $ref: '#/components/schemas/TableSeat'
+              card:
+                $ref: '#/components/schemas/ReplayCard'
+        winner:
+          $ref: '#/components/schemas/TableSeat'
+    ReplayAuction:
+      type: object
+      additionalProperties: false
+      required:
+      - dealer
+      - calls
+      - complete
+      - passedOut
+      properties:
+        dealer:
+          $ref: '#/components/schemas/TableSeat'
+        turn:
+          $ref: '#/components/schemas/TableSeat'
+        calls:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - seat
+            - call
+            properties:
+              seat:
+                $ref: '#/components/schemas/TableSeat'
+              call:
+                $ref: '#/components/schemas/ReplayCall'
+        complete:
+          type: boolean
+        passedOut:
+          type: boolean
+        contract:
+          $ref: '#/components/schemas/ReplayContract'
+    ReplayGame:
+      type: object
+      additionalProperties: false
+      required:
+      - rulesetVersion
+      - board
+      - phase
+      - deal
+      - auction
+      - dummyRevealed
+      - currentTrick
+      - completedTricks
+      - tricksNS
+      - tricksEW
+      - result
+      - claimed
+      properties:
+        rulesetVersion:
+          type: string
+        board:
+          type: object
+          additionalProperties: false
+          required:
+          - number
+          - dealer
+          - vulnerability
+          properties:
+            number:
+              type: integer
+            dealer:
+              $ref: '#/components/schemas/TableSeat'
+            vulnerability:
+              type: string
+              enum:
+              - NONE
+              - NS
+              - EW
+              - BOTH
+        phase:
+          type: string
+          enum:
+          - BOARD_SCORED
+        deal:
+          $ref: '#/components/schemas/ReplayDeal'
+        auction:
+          $ref: '#/components/schemas/ReplayAuction'
+        turn:
+          $ref: '#/components/schemas/TableSeat'
+        dummyRevealed:
+          type: boolean
+        currentTrick:
+          $ref: '#/components/schemas/ReplayTrick'
+        completedTricks:
+          type:
+          - array
+          - 'null'
+          items:
+            $ref: '#/components/schemas/ReplayTrick'
+        tricksNS:
+          $ref: '#/components/schemas/AnalysisTricks'
+        tricksEW:
+          $ref: '#/components/schemas/AnalysisTricks'
+        result:
+          $ref: '#/components/schemas/ReplayResult'
+        claimed:
+          type: boolean
+    BoardReplay:
+      type: object
+      additionalProperties: false
+      required:
+      - boardId
+      - fullDeal
+      - game
+      properties:
+        boardId:
+          type: string
+          format: uuid
+        fullDeal:
+          $ref: '#/components/schemas/ReplayDeal'
+        game:
+          $ref: '#/components/schemas/ReplayGame'
     AnalysisStrain:
       type: string
       enum: [C, D, H, S, NT]

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/analysis"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/database/dbgen"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/deal"
@@ -211,4 +212,69 @@ func compactFinalBoard(ctx context.Context, queries *dbgen.Queries, current tabl
 		return fmt.Errorf("conflicting permanent board record")
 	}
 	return queries.DeleteCompactedBoardEvents(ctx, current.BoardID)
+}
+
+// CompletedBoardReplay reads a consistent completed snapshot or validates its permanent archive.
+func (postgres *Postgres) CompletedBoardReplay(ctx context.Context, boardID, sessionID string) (table.BoardReplay, error) {
+	tx, err := postgres.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return table.BoardReplay{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := dbgen.New(tx)
+	row, err := queries.FindBoardDeal(ctx, dbgen.FindBoardDealParams{BoardID: boardID, SessionID: sessionID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return table.BoardReplay{}, analysis.ErrNotFound
+	}
+	if err != nil {
+		return table.BoardReplay{}, err
+	}
+	if row.Status != "SCORED" && row.Status != "PASSED_OUT" {
+		return table.BoardReplay{}, analysis.ErrNotCompleted
+	}
+	archived, err := queries.FindBoardRecord(ctx, dbgen.FindBoardRecordParams{BoardID: boardID, SessionID: sessionID})
+	var state bridge.State
+	var source deal.Result
+	if err == nil {
+		var record BoardRecord
+		if err := json.Unmarshal(archived, &record); err != nil {
+			return table.BoardReplay{}, err
+		}
+		if record.BoardID != boardID || record.BoardNumber != int(row.BoardNumber) {
+			return table.BoardReplay{}, fmt.Errorf("board replay identity mismatch")
+		}
+		state, err = record.Replay()
+		if err != nil {
+			return table.BoardReplay{}, err
+		}
+		source = record.Source
+	} else if errors.Is(err, pgx.ErrNoRows) {
+		snapshot, err := queries.LoadGameSnapshot(ctx, row.TableID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return table.BoardReplay{}, analysis.ErrNotFound
+		}
+		if err != nil {
+			return table.BoardReplay{}, err
+		}
+		var aggregate table.Aggregate
+		if err := json.Unmarshal(snapshot.PrivateState, &aggregate); err != nil {
+			return table.BoardReplay{}, err
+		}
+		if aggregate.BoardID != boardID || aggregate.Game == nil {
+			return table.BoardReplay{}, analysis.ErrNotFound
+		}
+		state = *aggregate.Game
+		if err := json.Unmarshal(row.SourceRecord, &source); err != nil {
+			return table.BoardReplay{}, err
+		}
+		if err := source.Validate(); err != nil {
+			return table.BoardReplay{}, err
+		}
+	} else {
+		return table.BoardReplay{}, err
+	}
+	if state.Phase != bridge.PhaseBoardScored || state.Result == nil {
+		return table.BoardReplay{}, analysis.ErrNotCompleted
+	}
+	return table.BoardReplay{BoardID: boardID, FullDeal: source.Deal, Game: state}, nil
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/analysis"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/database/dbgen"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
@@ -45,6 +46,9 @@ func TestBoardRecordFinalityAndRecovery(t *testing.T) {
 			}
 			started := process(aggregate.OwnerSessionID, table.Command{Name: table.CommandStartGame})
 			firstSeq := started.Events[0].Seq
+			if _, err := environment.postgres.CompletedBoardReplay(environment.ctx, aggregate.BoardID, aggregate.OwnerSessionID); !errors.Is(err, analysis.ErrNotCompleted) {
+				t.Fatalf("unfinished replay: %v", err)
+			}
 			boardID := aggregate.BoardID
 			pass := bridge.Pass()
 			if !test.passedOut {
@@ -114,6 +118,16 @@ func TestBoardRecordFinalityAndRecovery(t *testing.T) {
 				}
 			}
 			before := aggregate
+			snapshotReplay, err := environment.postgres.CompletedBoardReplay(environment.ctx, boardID, aggregate.OwnerSessionID)
+			if err != nil || !reflect.DeepEqual(snapshotReplay.Game, *aggregate.Game) {
+				t.Fatalf("scored snapshot replay: %v", err)
+			}
+			if err := snapshotReplay.FullDeal.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := environment.postgres.CompletedBoardReplay(environment.ctx, boardID, uuid.NewString()); !errors.Is(err, analysis.ErrNotFound) {
+				t.Fatalf("outsider replay: %v", err)
+			}
 			if _, err := environment.postgres.queries.LoadBoardRecord(environment.ctx, boardID); !errors.Is(err, pgx.ErrNoRows) {
 				t.Fatalf("premature compaction: %v", err)
 			}
@@ -133,6 +147,10 @@ func TestBoardRecordFinalityAndRecovery(t *testing.T) {
 			record, err := environment.postgres.CompletedBoardRecord(environment.ctx, boardID, aggregate.OwnerSessionID)
 			if err != nil {
 				t.Fatal(err)
+			}
+			archiveReplay, err := environment.postgres.CompletedBoardReplay(environment.ctx, boardID, aggregate.OwnerSessionID)
+			if err != nil || !reflect.DeepEqual(archiveReplay, snapshotReplay) {
+				t.Fatalf("archived replay changed: %v", err)
 			}
 			replayed, err := record.Replay()
 			if err != nil || !reflect.DeepEqual(replayed, *before.Game) {
