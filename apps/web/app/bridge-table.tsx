@@ -77,6 +77,7 @@ export default function BridgeTable({
   useEffect(() => {
     function handleAuctionKeyboard(event: KeyboardEvent) {
       if (
+        document.querySelector("dialog[open]") !== null ||
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLSelectElement ||
         event.target instanceof HTMLTextAreaElement ||

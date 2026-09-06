@@ -1,11 +1,17 @@
-import { oppositeSeat, type LiveTableProjection } from "../table-state";
+import { useState } from "react";
 import {
-  cardKey,
-  viewerTrickCounts,
-} from "./gameplay-presentation";
+  oppositeSeat,
+  tableOrientation,
+  visualPositionForSeat,
+  type LiveTableProjection,
+} from "../table-state";
+import { cardKey, viewerTrickCounts } from "./gameplay-presentation";
 import { PlayingCard } from "./playing-card";
 
 export function TrickIndicator({ table }: { table: LiveTableProjection }) {
+  const [selectedTrickNumber, setSelectedTrickNumber] = useState<number | null>(
+    null,
+  );
   const counts = viewerTrickCounts(table);
   if (counts === null) return <span>—</span>;
   if (counts.viewerPartnership === null) {
@@ -50,6 +56,15 @@ export function TrickIndicator({ table }: { table: LiveTableProjection }) {
     table.viewerSeat === oppositeSeat(game.auction.contract.declarer);
   const firstVisibleTrickNumber =
     game.completedTrickCount - game.completedTricks.length + 1;
+  const trickNumber = Math.min(
+    game.completedTrickCount,
+    Math.max(
+      firstVisibleTrickNumber,
+      selectedTrickNumber ?? game.completedTrickCount,
+    ),
+  );
+  const trick = game.completedTricks[trickNumber - firstVisibleTrickNumber]!;
+  const orientation = tableOrientation(table.viewerSeat);
 
   return (
     <>
@@ -59,6 +74,7 @@ export function TrickIndicator({ table }: { table: LiveTableProjection }) {
         popoverTarget={historyId}
         aria-label={`Trick partnership Anda: ${counts.won} menang, ${counts.lost} kalah. Buka riwayat trick`}
         data-history-available="true"
+        onClick={() => setSelectedTrickNumber(null)}
       >
         {indicator}
       </button>
@@ -71,10 +87,7 @@ export function TrickIndicator({ table }: { table: LiveTableProjection }) {
         data-history-policy={viewerIsDummy ? "full" : "latest"}
       >
         <header className="trick-history-header">
-          <div>
-            <p className="eyebrow">Permainan kartu</p>
-            <h2 id={historyTitleId}>Riwayat trick</h2>
-          </div>
+          <h2 id={historyTitleId}>Trick {trickNumber}</h2>
           <button
             className="trick-history-close"
             type="button"
@@ -85,35 +98,39 @@ export function TrickIndicator({ table }: { table: LiveTableProjection }) {
             ×
           </button>
         </header>
-        <p className="trick-history-policy">
-          {viewerIsDummy
-            ? `Semua ${game.completedTrickCount} trick selesai tersedia untuk Dummy.`
-            : "Hanya trick terakhir yang tersedia untuk posisi Anda."}
-        </p>
         <ol className="trick-history-list">
-          {game.completedTricks.map((trick, _trickIndex) => {
-            const trickNumber = firstVisibleTrickNumber + _trickIndex;
-            return (
-              <li className="trick-history-item" key={trickNumber}>
-                <div className="trick-history-summary">
-                  <strong>Trick {trickNumber}</strong>
-                  <span>Pemenang {trick.winner ?? "—"}</span>
+          <li className="trick-history-item" key={trickNumber}>
+            <div className="trick-history-cards">
+              {trick.plays.map((play) => (
+                <div
+                  className={`trick-history-play history-${visualPositionForSeat(orientation, play.seat)}`}
+                  key={`${play.seat}-${cardKey(play.card)}`}
+                >
+                  <span>{play.seat}</span>
+                  <PlayingCard card={play.card} variant="trick" />
                 </div>
-                <div className="trick-history-cards">
-                  {trick.plays.map((play) => (
-                    <div
-                      className="trick-history-play"
-                      key={`${play.seat}-${cardKey(play.card)}`}
-                    >
-                      <span>{play.seat}</span>
-                      <PlayingCard card={play.card} variant="trick" />
-                    </div>
-                  ))}
-                </div>
-              </li>
-            );
-          })}
+              ))}
+            </div>
+          </li>
         </ol>
+        <nav className="trick-history-navigation" aria-label="Navigasi trick">
+          <button
+            type="button"
+            aria-label="Trick sebelumnya"
+            disabled={trickNumber === firstVisibleTrickNumber}
+            onClick={() => setSelectedTrickNumber(trickNumber - 1)}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            aria-label="Trick berikutnya"
+            disabled={trickNumber === game.completedTrickCount}
+            onClick={() => setSelectedTrickNumber(trickNumber + 1)}
+          >
+            ›
+          </button>
+        </nav>
       </section>
     </>
   );

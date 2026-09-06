@@ -1,7 +1,9 @@
+import { useRef } from "react";
 import type { LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
 import { ConsensusControls } from "./consensus-controls";
-import { contractSummaryLabel } from "./gameplay-presentation";
+import { AuctionTable } from "./auction-controls";
+import { contractLabel } from "./gameplay-presentation";
 import { ScoreSheet } from "./score-sheet";
 import { TrickIndicator } from "./trick-indicator";
 
@@ -66,45 +68,128 @@ export function ActiveTableStatusBar({
   onSoundMutedChange: (muted: boolean) => void;
   onLeaveTable: () => void;
 }) {
+  const leaveDialogRef = useRef<HTMLDialogElement>(null);
   const game = table.game;
   const contract = game?.auction.contract;
   return (
-    <header className="table-status-bar">
-      <span className="table-wordmark">BY</span>
-      <dl className="table-facts">
+    <header className="table-status-bar play-status-bar">
+      <button
+        className="table-leave-button"
+        type="button"
+        aria-label="Keluar dari meja"
+        onClick={() => leaveDialogRef.current?.showModal()}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9" />
+        </svg>
+      </button>
+      <dialog
+        ref={leaveDialogRef}
+        className="leave-table-dialog"
+        aria-labelledby="leave-table-title"
+        aria-describedby="leave-table-description"
+      >
+        <h2 id="leave-table-title">Keluar dari meja?</h2>
+        <p id="leave-table-description">
+          Kursi Anda akan dilepas.
+          {table.viewerRole === "OWNER" && table.participants.length === 1
+            ? " Meja akan ditutup."
+            : ""}
+        </p>
         <div>
-          <dt>Board</dt>
-          <dd>{game?.board.number ?? table.boardNumber}</dd>
+          <button
+            type="button"
+            autoFocus
+            onClick={() => leaveDialogRef.current?.close()}
+          >
+            Batal
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => {
+              leaveDialogRef.current?.close();
+              onLeaveTable();
+            }}
+          >
+            Keluar
+          </button>
         </div>
-        <div>
-          <dt>Dealer</dt>
-          <dd>{game?.board.dealer ?? "—"}</dd>
+      </dialog>
+      <div className="play-status-facts">
+        <ScoreSheet table={table} compact />
+        <div
+          className="board-marker"
+          role="img"
+          aria-label={`Board ${game?.board.number ?? table.boardNumber}, dealer ${game?.board.dealer ?? "—"}, vulnerability ${game === undefined ? "—" : vulnerabilityLabels[game.board.vulnerability]}`}
+        >
+          <strong>{game?.board.number ?? table.boardNumber}</strong>
+          {(["N", "E", "S", "W"] as const).map((seat) => (
+            <span
+              key={seat}
+              className={`board-edge board-edge-${seat.toLowerCase()}`}
+              data-vulnerable={
+                game?.board.vulnerability === "BOTH" ||
+                game?.board.vulnerability ===
+                  (seat === "N" || seat === "S" ? "NS" : "EW")
+              }
+            >
+              {game?.board.dealer === seat ? "D" : ""}
+            </span>
+          ))}
         </div>
-        <div>
-          <dt>Vul</dt>
-          <dd>
-            {game === undefined
-              ? "—"
-              : vulnerabilityLabels[game.board.vulnerability]}
-          </dd>
+        <div className="contract-tricks">
+          <button
+            className="present-contract"
+            type="button"
+            popoverTarget={`auction-history-${table.tableId}`}
+            aria-label="Buka riwayat auction"
+            aria-description={
+              contract === undefined
+                ? "Belum ada kontrak"
+                : `${contractLabel(contract)} ${contract.declarer}`
+            }
+            aria-haspopup="dialog"
+            disabled={game === undefined}
+          >
+            <strong data-strain={contract?.strain}>
+              {contract === undefined ? "—" : contractLabel(contract)}
+            </strong>
+            <span>
+              {contract?.declarer ??
+                (game?.phase === "AUCTION" ? "Auction" : "—")}
+            </span>
+          </button>
+          <TrickIndicator table={table} />
         </div>
-        <div>
-          <dt>Kontrak</dt>
-          <dd className="contract-fact">
-            {game === undefined ? "—" : contractSummaryLabel(contract)}
-          </dd>
-        </div>
-        <div>
-          <dt>Trick</dt>
-          <dd><TrickIndicator table={table} /></dd>
-        </div>
-      </dl>
+      </div>
+      {game === undefined ? null : (
+        <section
+          className="auction-history-popover"
+          id={`auction-history-${table.tableId}`}
+          popover="auto"
+          role="dialog"
+          aria-labelledby="auction-history-title"
+        >
+          <header>
+            <h2 id="auction-history-title">Auction</h2>
+            <button
+              type="button"
+              popoverTarget={`auction-history-${table.tableId}`}
+              popoverTargetAction="hide"
+              aria-label="Tutup riwayat auction"
+            >
+              ×
+            </button>
+          </header>
+          <AuctionTable game={game} />
+        </section>
+      )}
       <ConsensusControls
         table={table}
         canSendCommand={canSendCommand}
         onCommand={onCommand}
       />
-      <ScoreSheet table={table} />
       <div className="status-actions">
         <div
           className="connection-status"
@@ -112,14 +197,13 @@ export function ActiveTableStatusBar({
           role="status"
         >
           <span className="status-mark" />
-          <span className="connection-label">{connectionLabels[connectionState]}</span>
+          <span className="connection-label">
+            {connectionLabels[connectionState]}
+          </span>
         </div>
         <details className="table-menu">
           <summary aria-label="Buka menu meja">•••</summary>
           <div>
-            <button type="button" onClick={onLeaveTable}>
-              Keluar dari meja
-            </button>
             {table.viewerRole === "OWNER" &&
             table.state === "BETWEEN_BOARDS" ? (
               <button
@@ -147,7 +231,6 @@ export function ActiveTableStatusBar({
               />
               Suara giliran
             </label>
-            <span>Rev {table.revision}</span>
           </div>
         </details>
       </div>

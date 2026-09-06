@@ -1,34 +1,46 @@
 import { boardResultLabel, type LiveTableProjection } from "../table-state";
 import { compactContractLabel } from "./gameplay-presentation";
 
-function scoreLabel(score: number) {
-  return score > 0 ? `+${score}` : String(score);
-}
-
-function pairLabel(pair: LiveTableProjection["pairScoreTotals"][number]["pair"]) {
-  return pair.members.map((member) => member.nickname).join(" & ");
-}
-
-export function ScoreSheet({ table }: { table: LiveTableProjection }) {
+export function ScoreSheet({
+  table,
+  compact = false,
+}: {
+  table: LiveTableProjection;
+  compact?: boolean;
+}) {
   const scoreSheetId = `score-sheet-${table.tableId}`;
   const scoreSheetTitleId = `${scoreSheetId}-title`;
-  const viewerTotals = table.pairScoreTotals.filter((total) =>
-    total.pair.members.some((member) => member.id === table.viewerParticipantId),
+  const scoreNS = table.scoreSheet.reduce(
+    (total, entry) => total + entry.result.scoreNS,
+    0,
   );
-  const viewerTotal = viewerTotals.length === 1 ? viewerTotals[0] : undefined;
 
   return (
     <>
       <button
-        className="score-sheet-trigger"
+        className={
+          compact ? "score-sheet-trigger score-summary" : "score-sheet-trigger"
+        }
         type="button"
         popoverTarget={scoreSheetId}
         aria-label="Buka skor meja"
+        aria-description={
+          compact ? `Poin NS ${scoreNS}, EW ${-scoreNS || 0}` : undefined
+        }
         aria-haspopup="dialog"
       >
-        <span>Skor</span>
-        {viewerTotal === undefined ? null : (
-          <strong>{scoreLabel(viewerTotal.score)}</strong>
+        {compact ? (
+          <>
+            <span>Poin</span>
+            <span>
+              NS <strong>{scoreNS}</strong>
+            </span>
+            <span>
+              EW <strong>{-scoreNS || 0}</strong>
+            </span>
+          </>
+        ) : (
+          "History"
         )}
       </button>
       <div
@@ -39,10 +51,7 @@ export function ScoreSheet({ table }: { table: LiveTableProjection }) {
         aria-labelledby={scoreSheetTitleId}
       >
         <header className="score-sheet-header">
-          <div>
-            <p className="eyebrow">Duplicate points · bukan IMP</p>
-            <h2 id={scoreSheetTitleId}>Skor meja</h2>
-          </div>
+          <h2 id={scoreSheetTitleId}>History</h2>
           <button
             className="score-sheet-close"
             type="button"
@@ -54,24 +63,15 @@ export function ScoreSheet({ table }: { table: LiveTableProjection }) {
           </button>
         </header>
 
-        {table.pairScoreTotals.length === 0 ? null : (
-          <section className="score-sheet-totals" aria-labelledby={`${scoreSheetId}-totals`}>
-            <h3 id={`${scoreSheetId}-totals`}>Total pasangan</h3>
-            <dl>
-              {table.pairScoreTotals.map((total) => (
-                <div key={total.pair.id} data-viewer-pair={total.pair.members.some((member) => member.id === table.viewerParticipantId)}>
-                  <dt>{pairLabel(total.pair)}</dt>
-                  <dd>{scoreLabel(total.score)}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        )}
-
         {table.scoreSheet.length === 0 ? (
           <p className="score-sheet-empty">Belum ada hasil board.</p>
         ) : (
-          <div className="score-sheet-table-wrap" role="region" aria-label="Hasil board meja ini" tabIndex={0}>
+          <div
+            className="score-sheet-table-wrap"
+            role="region"
+            aria-label="Hasil board meja ini"
+            tabIndex={0}
+          >
             <table className="score-sheet-table">
               <caption>Hasil board meja ini</caption>
               <thead>
@@ -86,17 +86,17 @@ export function ScoreSheet({ table }: { table: LiveTableProjection }) {
                 {table.scoreSheet.map((entry) => (
                   <tr key={entry.boardId}>
                     <th scope="row">{entry.boardNumber}</th>
-                    <td>
-                      <strong>{compactContractLabel(entry.result.contract)}</strong>
-                      <span>{boardResultLabel(entry.result)}</span>
+                    <td data-strain={entry.result.contract?.strain}>
+                      {compactContractLabel(entry.result.contract)}
+                      {entry.result.contract === undefined
+                        ? ""
+                        : boardResultLabel(entry.result)}
                     </td>
                     <td>
-                      <strong>{scoreLabel(entry.result.scoreNS)}</strong>
-                      <span>{pairLabel(entry.lineup.northSouth)}</span>
+                      {entry.result.scoreNS >= 0 ? entry.result.scoreNS : ""}
                     </td>
                     <td>
-                      <strong>{scoreLabel(-entry.result.scoreNS)}</strong>
-                      <span>{pairLabel(entry.lineup.eastWest)}</span>
+                      {entry.result.scoreNS < 0 ? -entry.result.scoreNS : ""}
                     </td>
                   </tr>
                 ))}

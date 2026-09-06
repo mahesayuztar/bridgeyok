@@ -62,7 +62,7 @@ export function AuctionTable({
         <thead>
           <tr>
             {auctionSeats.map((seat) => (
-              <th key={seat} scope="col" data-turn={game.turn === seat}>
+              <th key={seat} scope="col" data-turn={game.turn === seat} data-vulnerable={game.board.vulnerability === "BOTH" || game.board.vulnerability === (seat === "N" || seat === "S" ? "NS" : "EW")}>
                 {seat}
               </th>
             ))}
