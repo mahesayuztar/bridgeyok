@@ -99,7 +99,7 @@ async function makeBid(page: Page, level: number, strain: string) {
   const button = page.locator(".bid-strains button").filter({ hasText: strain });
   await expect(button).toBeEnabled();
   await button.click();
-  await expect(page.locator(".auction-table tbody")).toContainText(`${level}${strain}`, { timeout: 250 });
+  await expect(page.locator(".auction-workspace .auction-table tbody")).toContainText(`${level}${strain}`, { timeout: 250 });
 }
 
 async function playNextCard(pages: Page[]) {
@@ -1060,7 +1060,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
 
   const emptyScoreTrigger = replacementTab.getByRole("button", { name: "Buka skor meja" });
   await emptyScoreTrigger.click();
-  const scoreSheet = replacementTab.getByRole("dialog", { name: "Skor meja" });
+  const scoreSheet = replacementTab.getByRole("dialog", { name: "History" });
   await expect(scoreSheet).toBeVisible();
   await expect(scoreSheet).toContainText("Belum ada hasil board.");
   const emptyScoreBox = await scoreSheet.boundingBox();
@@ -1088,7 +1088,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await expect(replacementTab.getByRole("button", { name: "Mulai board" })).toBeEnabled();
   await replacementTab.getByRole("button", { name: "Mulai board" }).click();
   await expect(
-    replacementTab.locator('.auction-table th[data-turn="true"]'),
+    replacementTab.locator('.auction-workspace .auction-table th[data-turn="true"]'),
   ).toHaveText("N");
   await replacementTab.getByLabel("Buka menu meja").click();
   const activeInviteCode = replacementTab.locator(".table-menu .invite-code");
@@ -1117,7 +1117,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await east.page.getByLabel("Buka menu meja").click();
   await makeCall(east.page, /^Pass/);
   await makeCall(south.page, /^Pass/);
-  const auctionBeforeClose = await west.page.locator(".auction-table tbody").textContent();
+  const auctionBeforeClose = await west.page.locator(".auction-workspace .auction-table tbody").textContent();
   const revisionBeforeClose = maxFrameRevision(west.frames);
   const receivedFrameCountBeforeClose = west.frames.length;
   const westStorage = await west.context.storageState();
@@ -1139,7 +1139,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await waitForConnection(west.page);
   activePages[3] = west.page;
   await expect(west.page.getByRole("button", { name: /^Buka menu Wira, kursi W$/ })).toBeVisible();
-  await expect(west.page.locator(".auction-table tbody")).toContainText(auctionBeforeClose ?? "");
+  await expect(west.page.locator(".auction-workspace .auction-table tbody")).toContainText(auctionBeforeClose ?? "");
   await expect.poll(() => maxFrameRevision(west.frames.slice(receivedFrameCountBeforeClose))).toBeGreaterThanOrEqual(revisionBeforeClose);
   await expect.poll(() => west.sentFrames.some((encoded) => {
     const envelope = JSON.parse(encoded) as Record<string, unknown>;
@@ -1308,12 +1308,37 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
       page.getByRole("button", { name: /Buka riwayat trick/ }),
     ).toBeVisible();
   }
+  for (const player of [replacementTab, east.page, south.page, west.page]) {
+    const contractTrigger = player.getByRole("button", { name: "Buka riwayat auction" });
+    if (player === west.page) await contractTrigger.tap();
+    else await contractTrigger.click();
+    const auctionHistory = player.getByRole("dialog", { name: "Auction", exact: true });
+    await expect(auctionHistory).toBeVisible();
+    await expect(auctionHistory.locator("tbody")).toContainText("Pass");
+    const auctionBox = (await auctionHistory.boundingBox())!;
+    expect(auctionBox.x).toBeGreaterThanOrEqual(0);
+    expect(auctionBox.x + auctionBox.width).toBeLessThanOrEqual(player.viewportSize()!.width);
+    await player.screenshot({ path: testInfo.outputPath(`auction-history-${player.viewportSize()!.width}.png`) });
+    await player.keyboard.press("Escape");
+    await expect(contractTrigger).toBeFocused();
+    const leaveTrigger = player.getByRole("button", { name: "Keluar dari meja", exact: true });
+    await leaveTrigger.click();
+    const leaveDialog = player.getByRole("dialog", { name: "Keluar dari meja?" });
+    await expect(leaveDialog.getByRole("button", { name: "Batal" })).toBeFocused();
+    await player.keyboard.press("Escape");
+    await expect(leaveTrigger).toBeFocused();
+    await leaveTrigger.click();
+    await leaveDialog.getByRole("button", { name: "Batal" }).click();
+    await expect(leaveDialog).toBeHidden();
+    await expect(player).toHaveURL(/\/table\//);
+    await player.screenshot({ path: testInfo.outputPath(`play-navbar-${player.viewportSize()!.width}.png`) });
+  }
   const latestHistoryTrigger = east.page.getByRole("button", {
     name: /Buka riwayat trick/,
   });
-  await latestHistoryTrigger.click();
+  await latestHistoryTrigger.click({ timeout: 10_000 });
   const latestHistory = east.page.getByRole("dialog", {
-    name: "Riwayat trick",
+    name: /^Trick \d+$/,
   });
   await expect(latestHistory).toBeVisible();
   await expect(latestHistory).toHaveAttribute("data-history-policy", "latest");
@@ -1323,7 +1348,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await east.page.keyboard.press("Escape");
   await expect(latestHistory).toBeHidden();
   await expect(latestHistoryTrigger).toBeFocused();
-  await latestHistoryTrigger.click();
+  await latestHistoryTrigger.locator(".trick-lost").click({ timeout: 10_000 });
   await expect(latestHistory).toBeVisible();
   await east.page.mouse.click(1020, 764);
   await expect(latestHistory).toBeHidden();
@@ -1333,7 +1358,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   });
   await fullHistoryTrigger.click();
   const fullHistory = south.page.getByRole("dialog", {
-    name: "Riwayat trick",
+    name: /^Trick \d+$/,
   });
   await expect(fullHistory).toBeVisible();
   await expect(fullHistory).toHaveAttribute("data-history-policy", "full");
@@ -1353,7 +1378,10 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await expect(
     replacementTab.getByRole("button", { name: /^Claim \d+ trick$/ }).first(),
   ).toBeEnabled();
-  await claimTrigger.click();
+  const claimMenuBox = (await replacementTab.getByRole("group", { name: "Jumlah trick yang diklaim" }).boundingBox())!;
+  const claimTriggerBox = (await claimTrigger.boundingBox())!;
+  expect(claimMenuBox.y).toBeGreaterThanOrEqual(claimTriggerBox.y + claimTriggerBox.height);
+  await claimTrigger.click({ timeout: 10_000 });
   await expect(claimTrigger).toBeFocused();
   await expect.poll(async () => {
     const availableUndo = await Promise.all(
@@ -1387,7 +1415,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
 
   await replacementTab.getByRole("button", { name: "Buka skor meja" }).click();
   const durableScoreText = await scoreSheet.locator("tbody").textContent();
-  const durableTotalsText = await scoreSheet.locator("dl").textContent();
+  const durableTotalsText = await replacementTab.locator(".score-summary").textContent();
   await replacementTab.getByRole("button", { name: "Tutup skor meja" }).click();
   const originalScoreViewport = replacementTab.viewportSize()!;
   for (const viewport of [...profiles.map((profile) => profile.viewport), originalScoreViewport]) {
@@ -1396,24 +1424,16 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     const scoredSheetTrigger = replacementTab.getByRole("button", { name: "Buka skor meja" });
     await scoredSheetTrigger.click();
     await expect(scoreSheet).toBeVisible();
-    await expect(scoreSheet).toContainText("Duplicate points · bukan IMP");
-    await expect(scoreSheet.locator(".score-sheet-totals dl > div")).toHaveCount(2);
+    await expect(scoreSheet.locator("thead th")).toHaveText(["Board", "Kontrak", "NS", "EW"]);
     await expect(scoreSheet.locator(".score-sheet-table tbody tr")).toHaveCount(1);
-    for (const profile of profiles) {
-      await expect(scoreSheet.locator(".score-sheet-table tbody")).toContainText(profile.nickname);
-    }
+    await expect(scoreSheet.locator("tbody tr td")).toHaveCount(3);
     const sheetBox = (await scoreSheet.boundingBox())!;
     expect(sheetBox.x).toBeGreaterThanOrEqual(0);
     expect(sheetBox.y).toBeGreaterThanOrEqual(0);
     expect(sheetBox.x + sheetBox.width).toBeLessThanOrEqual(viewport.width);
     expect(sheetBox.y + sheetBox.height).toBeLessThanOrEqual(viewport.height);
     const scoreRegion = scoreSheet.getByRole("region", { name: "Hasil board meja ini" });
-    if (viewport.width <= 390) {
-      await scoreRegion.focus();
-      await replacementTab.keyboard.press("ArrowRight");
-      await expect.poll(() => scoreRegion.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-      await scoreSheet.locator("tbody td").last().scrollIntoViewIfNeeded();
-    }
+    expect(await scoreRegion.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await replacementTab.screenshot({
       path: testInfo.outputPath(`score-sheet-${viewport.width}x${viewport.height}.png`),
       fullPage: false,
@@ -1425,20 +1445,18 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
 
   await fullHistoryTrigger.click();
   await expect(fullHistory).toBeVisible();
-  await expect(fullHistory.locator(".trick-history-item")).toHaveCount(13);
-  await expect(fullHistory.locator(".trick-history-play")).toHaveCount(52);
-  await expect(fullHistory.locator(".card-trick").first()).toBeVisible();
-  await expect(fullHistory.locator(".trick-history-item").first()).toContainText(
-    "Trick 1",
-  );
-  const finalHistoryItem = fullHistory.locator(".trick-history-item").last();
-  await expect(finalHistoryItem).toContainText("Trick 13");
-  await south.page.screenshot({
-    path: testInfo.outputPath("trick-history-full-768x1024.png"),
-    fullPage: false,
-  });
-  await finalHistoryItem.scrollIntoViewIfNeeded();
-  await expect(finalHistoryItem).toBeVisible();
+  await expect(fullHistory.locator(".trick-history-item")).toHaveCount(1);
+  await expect(fullHistory.locator(".trick-history-play")).toHaveCount(4);
+  await expect(fullHistory.getByRole("heading")).toHaveText("Trick 13");
+  await expect(fullHistory.getByRole("button", { name: "Trick berikutnya" })).toBeDisabled();
+  for (let _trickIndex = 12; _trickIndex >= 1; _trickIndex--) {
+    await fullHistory.getByRole("button", { name: "Trick sebelumnya" }).click();
+    await expect(fullHistory.getByRole("heading")).toHaveText(`Trick ${_trickIndex}`);
+  }
+  await expect(fullHistory.getByRole("button", { name: "Trick sebelumnya" })).toBeDisabled();
+  await fullHistory.getByRole("button", { name: "Trick berikutnya" }).click();
+  await expect(fullHistory.getByRole("heading")).toHaveText("Trick 2");
+  await south.page.screenshot({ path: testInfo.outputPath("trick-history-full-768x1024.png"), fullPage: false });
   await south.page.getByRole("button", { name: "Tutup riwayat trick" }).click();
 
   const compactHistoryTrigger = replacementTab.getByRole("button", {
@@ -1446,14 +1464,14 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   });
   await compactHistoryTrigger.click();
   const compactHistory = replacementTab.getByRole("dialog", {
-    name: "Riwayat trick",
+    name: /^Trick \d+$/,
   });
   await expect(compactHistory).toBeVisible();
   await expect(compactHistory).toHaveAttribute("data-history-policy", "latest");
   await expect(compactHistory.locator(".trick-history-item")).toHaveCount(1);
   await expect(compactHistory.locator(".trick-history-play")).toHaveCount(4);
   await expect(compactHistory.locator(".card-trick").first()).toBeVisible();
-  await expect(compactHistory.locator(".trick-history-item")).toContainText(
+  await expect(compactHistory.getByRole("heading")).toContainText(
     "Trick 13",
   );
   const compactHistoryBox = await compactHistory.boundingBox();
@@ -1490,16 +1508,16 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     replacementTab.getByRole("button", { name: "Board berikutnya" }),
   ).toHaveCount(0);
   await expect(
-    replacementTab.locator('.auction-table th[data-turn="true"]'),
+    replacementTab.locator('.auction-workspace .auction-table th[data-turn="true"]'),
   ).toHaveText("E");
   await east.page.reload();
   await waitForConnection(east.page);
   const reconnectedScoreTrigger = east.page.getByRole("button", { name: "Buka skor meja" });
   await reconnectedScoreTrigger.click();
-  const reconnectedScoreSheet = east.page.getByRole("dialog", { name: "Skor meja" });
+  const reconnectedScoreSheet = east.page.getByRole("dialog", { name: "History" });
   await expect(reconnectedScoreSheet.locator(".score-sheet-table tbody tr")).toHaveCount(1);
   await expect(reconnectedScoreSheet.locator("tbody")).toHaveText(durableScoreText!);
-  await expect(reconnectedScoreSheet.locator("dl")).toHaveText(durableTotalsText!);
+  await expect(east.page.locator(".score-summary")).toHaveText(durableTotalsText!);
   await east.page.keyboard.press("Escape");
   await expect(reconnectedScoreSheet).toBeHidden();
   await expect(reconnectedScoreTrigger).toBeFocused();
@@ -1511,12 +1529,11 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await replacementTab.getByRole("button", { name: "Buka skor meja" }).click();
   await expect(scoreSheet.locator(".score-sheet-table tbody tr")).toHaveCount(2);
   await expect(scoreSheet.locator(".score-sheet-table tbody tr").last()).toContainText("Passed out");
-  await expect(scoreSheet.locator("dl")).toHaveText(durableTotalsText!);
+  await expect(replacementTab.locator(".score-summary")).toHaveText(durableTotalsText!);
   await replacementTab.setViewportSize({ width: 320, height: 300 });
   const shortScoreRegion = scoreSheet.getByRole("region", { name: "Hasil board meja ini" });
   await shortScoreRegion.focus();
-  await replacementTab.keyboard.press("ArrowDown");
-  await expect.poll(() => shortScoreRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  expect(await shortScoreRegion.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await replacementTab.setViewportSize(originalScoreViewport);
   await replacementTab.getByRole("button", { name: "Tutup skor meja" }).click();
   await replacementTab.getByLabel("Buka menu meja").click();
@@ -1581,12 +1598,12 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
     await guest.screenshot({ path: testInfo.outputPath("bot-undo-pending-320x700.png") });
     await guest.getByRole("button", { name: "Tolak", exact: true }).click();
     await expect(owner.locator(".consensus-request")).toHaveCount(0);
-    await expect(owner.locator(".auction-table tbody")).toContainText("1NT");
+    await expect(owner.locator(".auction-workspace .auction-table tbody")).toContainText("1NT");
     await owner.getByLabel("Minta undo", { exact: true }).click();
     await expect(guest.locator(".consensus-request")).toContainText("1 setuju");
     await guest.getByRole("button", { name: "Terima", exact: true }).click();
     await expect(owner.locator(".consensus-request")).toHaveCount(0);
-    await expect(owner.locator(".auction-table tbody")).not.toContainText("1NT");
+    await expect(owner.locator(".auction-workspace .auction-table tbody")).not.toContainText("1NT");
     await expect(owner.getByRole("button", { name: /^Pass/ })).toBeEnabled();
     await makeBid(owner, 1, "NT");
     await makeCall(guest, /^Pass/);
@@ -1647,7 +1664,7 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
     await expect(owner.locator(".board-result")).toBeVisible();
     await expect(owner.locator(".consensus-request")).toHaveCount(0);
     await owner.getByRole("button", { name: "Buka skor meja" }).click();
-    await expect(owner.getByRole("dialog", { name: "Skor meja" }).locator("tbody tr")).toHaveCount(1);
+    await expect(owner.getByRole("dialog", { name: "History" }).locator("tbody tr")).toHaveCount(1);
     await owner.getByRole("button", { name: "Tutup skor meja" }).click();
     const encodedFrames = receivedFrames.join("\n");
     for (const eventType of ["UNDO_REJECTED", "UNDO_ACCEPTED", "CLAIM_REJECTED", "CLAIM_ACCEPTED"]) expect(encodedFrames).toContain(eventType);

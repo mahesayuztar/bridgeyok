@@ -963,3 +963,13 @@ Known risks discovered in the current repository:
 6. Resolved by ENG-03/OD-22: ADR-007/ADR-008 explicitly supersede the global bot-disable rule. Bot votes use durable human partner consent, requester consent for undo, and deterministic bot-bot rejection through the existing actor/repository boundary.
 7. Four-browser Playwright baseline is now committed and passing; the local `.playwright` configuration remains unrelated user work and is intentionally excluded from UX commits.
 8. UX-06 replaced the unbounded orientation offsets with shared card scales and explicit player/play zones; motion may now consume those stable anchors.
+
+## Navbar dan history ringkas — 6 September 2026
+
+Referensi: tiga screenshot pengguna pada 6 September 2026. Perubahan ini menggantikan detail presentasi navbar/history sebelumnya.
+
+- Status aktif mengelompokkan poin NS/EW, nomor board dengan vulnerability pada empat sisi dan penanda dealer, kontrak/declarer, serta trick. Semua informasi tetap terlihat pada mobile.
+- Klik kontrak membuka kembali `AuctionTable`; klik skor membuka History dengan kolom board, kontrak/hasil, NS, dan EW. Total NS/EW merupakan akumulasi duplicate points per sisi meja dari hasil board; tidak diberi label IMP.
+- Riwayat kartu memakai `PlayingCard` yang sama dengan meja, orientasi terhadap viewer, satu trick per tampilan, dan navigasi sebelumnya/berikutnya. Batas proyeksi full/latest tetap berlaku; membuka ulang history menampilkan trick terbaru.
+- Tombol keluar menggantikan BY pada navbar aktif. Dialog native meminta konfirmasi, mengembalikan fokus ketika dibatalkan, dan mencegah shortcut auction berjalan selama dialog terbuka.
+- Validasi: TypeScript, ESLint, dan 49 unit test lulus. Pengujian browser dengan API lokal dan `DATABASE_URL` env sedang berjalan untuk desktop, tablet, mobile 320–400 px, history, serta keluar dari meja.
