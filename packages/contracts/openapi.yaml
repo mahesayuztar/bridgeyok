@@ -251,8 +251,8 @@ paths:
   /v1/boards/{boardId}/analysis:
     get:
       operationId: analyzeCompletedBoard
-      summary: Analyze a completed board for an active table participant
-      description: Read-only DDS analysis. Historical boards created before source persistence return 404. No client-supplied deal is accepted.
+      summary: Analyze a deal or a legal card position for a table participant
+      description: Read-only DDS. Without positionKey, analyzes a completed original deal. With positionKey, analyzes the live revision or historical card count selected by step. Results count total tricks for the side to play. No client-supplied deal is accepted.
       security:
         - bearerAuth: []
       parameters:
@@ -262,6 +262,18 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: positionKey
+          in: query
+          description: Live table revision as a decimal string, or replay request identity when step is present.
+          schema:
+            type: string
+        - name: step
+          in: query
+          description: Number of played cards in a completed board, requires positionKey.
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 52
       responses:
         "200":
           description: Dealer-aware double-dummy analysis
@@ -273,7 +285,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BoardAnalysis"
+                oneOf:
+                  - $ref: "#/components/schemas/BoardAnalysis"
+                  - $ref: "#/components/schemas/PositionAnalysis"
+        "400":
+          $ref: "#/components/responses/ProblemResponse"
         "401":
           $ref: "#/components/responses/ProblemResponse"
         "404":
@@ -773,6 +789,30 @@ components:
                     maximum: 13
                   doubled:
                     type: boolean
+    PositionAnalysis:
+      type: object
+      required: [boardId, positionKey, turn, cards]
+      properties:
+        boardId:
+          type: string
+          format: uuid
+        positionKey:
+          type: string
+        turn:
+          $ref: "#/components/schemas/TableSeat"
+        cards:
+          type: array
+          maxItems: 13
+          items:
+            type: object
+            required: [card, tricks]
+            properties:
+              card:
+                $ref: "#/components/schemas/ReplayCard"
+              tricks:
+                type: integer
+                minimum: 0
+                maximum: 13
     BoardAnalysis:
       type: object
       additionalProperties: false

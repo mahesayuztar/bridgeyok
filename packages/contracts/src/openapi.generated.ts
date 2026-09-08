@@ -224,8 +224,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Analyze a completed board for an active table participant
-         * @description Read-only DDS analysis. Historical boards created before source persistence return 404. No client-supplied deal is accepted.
+         * Analyze a deal or a legal card position for a table participant
+         * @description Read-only DDS. Without positionKey, analyzes a completed original deal. With positionKey, analyzes the live revision or historical card count selected by step. Results count total tricks for the side to play. No client-supplied deal is accepted.
          */
         get: operations["analyzeCompletedBoard"];
         put?: never;
@@ -382,6 +382,16 @@ export interface components {
                     doubled: boolean;
                 }[];
             };
+        };
+        PositionAnalysis: {
+            /** Format: uuid */
+            boardId: string;
+            positionKey: string;
+            turn: components["schemas"]["TableSeat"];
+            cards: {
+                card: components["schemas"]["ReplayCard"];
+                tricks: number;
+            }[];
         };
         BoardAnalysis: {
             /** Format: uuid */
@@ -828,7 +838,12 @@ export interface operations {
     };
     analyzeCompletedBoard: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Live table revision as a decimal string, or replay request identity when step is present. */
+                positionKey?: string;
+                /** @description Number of played cards in a completed board, requires positionKey. */
+                step?: number;
+            };
             header?: never;
             path: {
                 boardId: string;
@@ -844,9 +859,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BoardAnalysis"];
+                    "application/json": components["schemas"]["BoardAnalysis"] | components["schemas"]["PositionAnalysis"];
                 };
             };
+            400: components["responses"]["ProblemResponse"];
             401: components["responses"]["ProblemResponse"];
             404: components["responses"]["ProblemResponse"];
             409: components["responses"]["ProblemResponse"];

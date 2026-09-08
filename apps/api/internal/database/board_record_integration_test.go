@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -46,6 +47,21 @@ func TestBoardRecordFinalityAndRecovery(t *testing.T) {
 			}
 			started := process(aggregate.OwnerSessionID, table.Command{Name: table.CommandStartGame})
 			firstSeq := started.Events[0].Seq
+			if _, err := environment.postgres.AnalysisPosition(environment.ctx, aggregate.BoardID, commandSessionForSeat(t, aggregate, bridge.East), strconv.FormatInt(aggregate.Revision, 10), nil); !errors.Is(err, analysis.ErrNotFound) {
+				t.Fatalf("opponent hand exposed: %v", err)
+			}
+
+			livePosition, positionError := environment.postgres.AnalysisPosition(environment.ctx, aggregate.BoardID, aggregate.OwnerSessionID, strconv.FormatInt(aggregate.Revision, 10), nil)
+			if positionError != nil || !reflect.DeepEqual(livePosition, *aggregate.Game) {
+				t.Fatalf("live analysis position: %v", positionError)
+			}
+			if _, err := environment.postgres.AnalysisPosition(environment.ctx, aggregate.BoardID, aggregate.OwnerSessionID, "0", nil); !errors.Is(err, analysis.ErrPositionChanged) {
+				t.Fatalf("stale revision accepted: %v", err)
+			}
+			if _, err := environment.postgres.AnalysisPosition(environment.ctx, aggregate.BoardID, uuid.NewString(), strconv.FormatInt(aggregate.Revision, 10), nil); !errors.Is(err, analysis.ErrNotFound) {
+				t.Fatalf("outsider position: %v", err)
+			}
+
 			if _, err := environment.postgres.CompletedBoardReplay(environment.ctx, aggregate.BoardID, aggregate.OwnerSessionID); !errors.Is(err, analysis.ErrNotCompleted) {
 				t.Fatalf("unfinished replay: %v", err)
 			}
@@ -121,6 +137,12 @@ func TestBoardRecordFinalityAndRecovery(t *testing.T) {
 			snapshotReplay, err := environment.postgres.CompletedBoardReplay(environment.ctx, boardID, aggregate.OwnerSessionID)
 			if err != nil || !reflect.DeepEqual(snapshotReplay.Game, *aggregate.Game) {
 				t.Fatalf("scored snapshot replay: %v", err)
+			}
+			step := 0
+			historicalPosition, positionError := environment.postgres.AnalysisPosition(environment.ctx, boardID, aggregate.OwnerSessionID, "0", &step)
+			expectedPosition, replayError := analysis.ReplayPosition(snapshotReplay.Game, snapshotReplay.FullDeal, step)
+			if positionError != nil || replayError != nil || !reflect.DeepEqual(historicalPosition, expectedPosition) {
+				t.Fatalf("historical analysis position: %v, %v", positionError, replayError)
 			}
 			if err := snapshotReplay.FullDeal.Validate(); err != nil {
 				t.Fatal(err)

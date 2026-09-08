@@ -106,3 +106,62 @@ func TestAnalysisHTTPContractAuthorizationAndFailures(t *testing.T) {
 		})
 	}
 }
+
+type positionServiceFake struct {
+	key       string
+	step      *int
+	sessionID string
+	err       error
+}
+
+func (service *positionServiceFake) Analyze(context.Context, string, string) (analysis.Response, error) {
+	return analysis.Response{}, errors.New("unexpected deal analysis")
+}
+
+func (service *positionServiceFake) AnalyzePosition(_ context.Context, boardID, sessionID, key string, step *int) (analysis.PositionResponse, error) {
+	service.key, service.step, service.sessionID = key, step, sessionID
+	return analysis.PositionResponse{BoardID: boardID, PositionKey: key, Turn: bridge.East, Cards: []analysis.CardPrediction{{Card: bridge.Card{Suit: bridge.Spades, Rank: bridge.Rank("A")}, Tricks: 9}}}, service.err
+}
+
+func TestPositionAnalysisHTTP(t *testing.T) {
+	for _, test := range []struct {
+		name, query, token string
+		err                error
+		status             int
+	}{
+		{name: "live revision", query: "?positionKey=12", token: "valid-access", status: 200},
+		{name: "opening lead", query: "?positionKey=0&step=0", token: "valid-access", status: 200},
+		{name: "partial trick", query: "?positionKey=3&step=3", token: "valid-access", status: 200},
+		{name: "invalid cursor", query: "?positionKey=53&step=53", token: "valid-access", status: 400},
+		{name: "unauthenticated", query: "?positionKey=12", token: "invalid", status: 401},
+		{name: "outsider", query: "?positionKey=12", token: "valid-access", err: analysis.ErrNotFound, status: 404},
+		{name: "revision changed", query: "?positionKey=12", token: "valid-access", err: analysis.ErrPositionChanged, status: 409},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service := &positionServiceFake{err: test.err}
+			router := NewRouter(Options{Logger: observability.NewLoggerWithWriter(slog.LevelDebug, &bytes.Buffer{}), Identity: &identityServiceFake{}, Analysis: service})
+			request := httptest.NewRequest(http.MethodGet, "/v1/boards/"+uuid.NewString()+"/analysis"+test.query, nil)
+			request.Header.Set("Authorization", "Bearer "+test.token)
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			if response.Code != test.status {
+				t.Fatalf("status %d want %d: %s", response.Code, test.status, response.Body)
+			}
+			if response.Header().Get("Cache-Control") != "private, no-store" {
+				t.Fatal("position can be cached")
+			}
+			if test.status == 200 {
+				var result apigen.PositionAnalysis
+				if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+					t.Fatal(err)
+				}
+				if result.PositionKey != service.key || service.sessionID != testSessionID || len(result.Cards) != 1 || result.Cards[0].Tricks != 9 {
+					t.Fatal("position identity or predictions lost")
+				}
+				if strings.Contains(test.query, "step=") != (service.step != nil) {
+					t.Fatal("history cursor lost")
+				}
+			}
+		})
+	}
+}

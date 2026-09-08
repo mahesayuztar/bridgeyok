@@ -161,3 +161,84 @@ func mapSolverOutput(raw solverOutput) (Result, error) {
 	}
 	return result, nil
 }
+
+func (solver *DDS) SolvePosition(ctx context.Context, state bridge.State) ([]CardPrediction, error) {
+	if err := state.ValidateInvariants(); err != nil {
+		return nil, ErrUnavailable
+	}
+	if state.Auction.Contract == nil {
+		return nil, ErrPositionChanged
+	}
+	actor := state.Turn
+	if actor == state.Auction.Contract.Dummy() {
+		actor = state.Auction.Contract.Declarer
+	}
+	legal, domainError := state.LegalCards(actor)
+	if domainError != nil {
+		return nil, ErrPositionChanged
+	}
+	select {
+	case solver.slots <- struct{}{}:
+	default:
+		return nil, ErrBusy
+	}
+	defer func() { <-solver.slots }()
+	ctx, cancel := context.WithTimeout(ctx, solver.timeout)
+	defer cancel()
+	var input strings.Builder
+	trump := strings.Index("SHDC", string(state.Auction.Contract.Strain))
+	if state.Auction.Contract.Strain == bridge.StrainNoTrump {
+		trump = 4
+	}
+	fmt.Fprintf(&input, "%d %d %d", trump, strings.Index("NESW", string(state.CurrentTrick.Leader)), len(state.CurrentTrick.Plays))
+	for _, play := range state.CurrentTrick.Plays {
+		fmt.Fprintf(&input, " %d %d", strings.Index("SHDC", string(play.Card.Suit)), strings.Index("23456789TJQKA", string(play.Card.Rank))+2)
+	}
+	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+		for _, suit := range []bridge.Suit{bridge.Spades, bridge.Hearts, bridge.Diamonds, bridge.Clubs} {
+			holding := 0
+			for _, card := range state.Deal.Hand(seat) {
+				if card.Suit == suit {
+					holding |= 1 << (strings.Index("23456789TJQKA", string(card.Rank)) + 2)
+				}
+			}
+			fmt.Fprintf(&input, " %d", holding)
+		}
+	}
+	command := exec.CommandContext(ctx, solver.executable, "position")
+	command.Stdin = strings.NewReader(input.String())
+	var output boundedOutput
+	command.Stdout, command.Stderr, command.WaitDelay = &output, io.Discard, time.Second
+	if err := command.Run(); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, ErrUnavailable
+	}
+	var cards []CardPrediction
+	decoder := json.NewDecoder(&output)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&cards); err != nil || len(cards) != len(legal) {
+		return nil, ErrUnavailable
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		return nil, ErrUnavailable
+	}
+	allowed := make(map[bridge.Card]bool, len(legal))
+	for _, card := range legal {
+		allowed[card] = true
+	}
+	won := state.TricksNS
+	if state.Turn.Partnership() == bridge.EastWest {
+		won = state.TricksEW
+	}
+	for _index, prediction := range cards {
+		if !allowed[prediction.Card] || prediction.Tricks < 0 || prediction.Tricks > 13-len(state.CompletedTricks) {
+			return nil, ErrUnavailable
+		}
+		delete(allowed, prediction.Card)
+		cards[_index].Tricks += won
+	}
+	return cards, nil
+}

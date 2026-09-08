@@ -4,8 +4,10 @@
 package apigen
 
 import (
+	"encoding/json"
 	"time"
 
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -582,6 +584,17 @@ type HealthResponse struct {
 // HealthResponseStatus defines model for HealthResponse.Status.
 type HealthResponseStatus string
 
+// PositionAnalysis defines model for PositionAnalysis.
+type PositionAnalysis struct {
+	BoardId openapi_types.UUID `json:"boardId"`
+	Cards   []struct {
+		Card   ReplayCard `json:"card"`
+		Tricks int        `json:"tricks"`
+	} `json:"cards"`
+	PositionKey string    `json:"positionKey"`
+	Turn        TableSeat `json:"turn"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Code       *string `json:"code,omitempty"`
@@ -780,8 +793,84 @@ type TableId = openapi_types.UUID
 // ProblemResponse defines model for ProblemResponse.
 type ProblemResponse = Problem
 
+// AnalyzeCompletedBoardParams defines parameters for AnalyzeCompletedBoard.
+type AnalyzeCompletedBoardParams struct {
+	// PositionKey Live table revision as a decimal string, or replay request identity when step is present.
+	PositionKey *string `form:"positionKey,omitempty" json:"positionKey,omitempty"`
+
+	// Step Number of played cards in a completed board, requires positionKey.
+	Step *int `form:"step,omitempty" json:"step,omitempty"`
+}
+
+// AnalyzeCompletedBoard200JSONResponseBody defines parameters for AnalyzeCompletedBoard.
+type AnalyzeCompletedBoard200JSONResponseBody struct {
+	union json.RawMessage
+}
+
 // CreateGuestSessionJSONRequestBody defines body for CreateGuestSession for application/json ContentType.
 type CreateGuestSessionJSONRequestBody = CreateGuestSessionRequest
 
 // RefreshGuestSessionJSONRequestBody defines body for RefreshGuestSession for application/json ContentType.
 type RefreshGuestSessionJSONRequestBody = RefreshGuestSessionRequest
+
+// AsBoardAnalysis returns the union data inside the AnalyzeCompletedBoard200JSONResponseBody as a BoardAnalysis
+func (t AnalyzeCompletedBoard200JSONResponseBody) AsBoardAnalysis() (BoardAnalysis, error) {
+	var body BoardAnalysis
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromBoardAnalysis overwrites any union data inside the AnalyzeCompletedBoard200JSONResponseBody as the provided BoardAnalysis
+func (t *AnalyzeCompletedBoard200JSONResponseBody) FromBoardAnalysis(v BoardAnalysis) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeBoardAnalysis performs a merge with any union data inside the AnalyzeCompletedBoard200JSONResponseBody, using the provided BoardAnalysis
+func (t *AnalyzeCompletedBoard200JSONResponseBody) MergeBoardAnalysis(v BoardAnalysis) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPositionAnalysis returns the union data inside the AnalyzeCompletedBoard200JSONResponseBody as a PositionAnalysis
+func (t AnalyzeCompletedBoard200JSONResponseBody) AsPositionAnalysis() (PositionAnalysis, error) {
+	var body PositionAnalysis
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPositionAnalysis overwrites any union data inside the AnalyzeCompletedBoard200JSONResponseBody as the provided PositionAnalysis
+func (t *AnalyzeCompletedBoard200JSONResponseBody) FromPositionAnalysis(v PositionAnalysis) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePositionAnalysis performs a merge with any union data inside the AnalyzeCompletedBoard200JSONResponseBody, using the provided PositionAnalysis
+func (t *AnalyzeCompletedBoard200JSONResponseBody) MergePositionAnalysis(v PositionAnalysis) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AnalyzeCompletedBoard200JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AnalyzeCompletedBoard200JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}

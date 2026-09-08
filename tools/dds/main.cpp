@@ -1,7 +1,40 @@
 #include <iostream>
 #include "dll.h"
 
-int main() {
+int solvePosition() {
+    deal position{};
+    int count;
+    if (!(std::cin >> position.trump >> position.first >> count) || position.trump < 0 || position.trump > 4 || position.first < 0 || position.first > 3 || count < 0 || count > 3) return 2;
+    for (int _index = 0; _index < count; ++_index) {
+        if (!(std::cin >> position.currentTrickSuit[_index] >> position.currentTrickRank[_index])) return 2;
+    }
+    for (int _seatIndex = 0; _seatIndex < 4; ++_seatIndex)
+        for (int _suitIndex = 0; _suitIndex < 4; ++_suitIndex)
+            if (!(std::cin >> position.remainCards[_seatIndex][_suitIndex])) return 2;
+    std::cin >> std::ws;
+    if (!std::cin.eof()) return 2;
+    SetResources(64, 1);
+    futureTricks result{};
+    if (SolveBoard(position, -1, 3, 1, &result, 0) != RETURN_NO_FAULT) return 3;
+    std::cout << "[";
+    bool first = true;
+    for (int _index = 0; _index < result.cards; ++_index) {
+        for (int rank = 2; rank <= 14; ++rank) {
+            if (rank != result.rank[_index] && !(result.equals[_index] & (1 << rank))) continue;
+            if (!first) std::cout << ',';
+            first = false;
+            std::cout << "{\"card\":{\"suit\":\"" << "SHDC"[result.suit[_index]]
+                << "\",\"rank\":\"" << "23456789TJQKA"[rank - 2]
+                << "\"},\"tricks\":" << result.score[_index] << '}';
+        }
+    }
+    std::cout << "]" << std::endl;
+    FreeMemory();
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    if (argc == 2 && std::string(argv[1]) == "position") return solvePosition();
     int dealer, vulnerability;
     ddTableDeal deal{};
     if (!(std::cin >> dealer >> vulnerability) || dealer < 0 || dealer > 3 || vulnerability < 0 || vulnerability > 3) return 2;
