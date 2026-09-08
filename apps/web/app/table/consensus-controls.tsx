@@ -1,15 +1,21 @@
+import { useDialogDrag } from "./use-dialog-drag";
+import type { ReactNode } from "react";
 import { oppositeSeat, type LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
 
 export function ConsensusControls({
+  analysisControl,
   table,
   canSendCommand,
   onCommand,
 }: {
+  analysisControl?: ReactNode;
   table: LiveTableProjection;
   canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
 }) {
+  const claimDrag = useDialogDrag();
+  const requestDrag = useDialogDrag();
   const game = table.game;
   const request = table.actionRequest;
   const dummy =
@@ -30,6 +36,7 @@ export function ConsensusControls({
 
   return (
     <div className="consensus-navigation">
+      {analysisControl}
       <details className="claim-menu">
         <summary
           aria-label={
@@ -48,10 +55,10 @@ export function ConsensusControls({
         {claimAvailable ? (
           <div
             className="claim-selector"
-            role="group"
+            role="dialog"
             aria-label="Jumlah trick yang diklaim"
           >
-            <strong>Claim trick</strong>
+            <strong {...claimDrag}>Claim trick</strong>
             <div>
               {Array.from(
                 { length: remainingTricks + 1 },
@@ -93,8 +100,8 @@ export function ConsensusControls({
         <span>Undo</span>
       </button>
       {request === undefined ? null : (
-        <section className="consensus-request" aria-live="polite">
-          <strong>
+        <section className="consensus-request" role="dialog" aria-label={request.kind === "CLAIM" ? "Permintaan claim" : "Permintaan undo"} aria-live="polite">
+          <strong {...requestDrag}>
             {request.kind === "CLAIM"
               ? `${request.requesterSeat} · claim ${request.claimTricks}`
               : `${request.requesterSeat} · undo`}

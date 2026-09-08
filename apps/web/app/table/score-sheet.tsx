@@ -9,10 +9,12 @@ export function ScoreSheet({
   table,
   compact = false,
   loadBoardReplay,
+  loadPositionAnalysis,
 }: {
   table: LiveTableProjection;
   compact?: boolean;
   loadBoardReplay: TableSession["loadBoardReplay"];
+  loadPositionAnalysis: TableSession["loadPositionAnalysis"];
 }) {
   const dialogDrag = useDialogDrag();
   const selectedTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -101,6 +103,7 @@ export function ScoreSheet({
                       selectedTriggerRef.current =
                         event.currentTarget.querySelector("button");
                       selectedTriggerRef.current?.focus();
+                      document.getElementById(scoreSheetId)?.hidePopover();
                       setSelectedEntry(entry);
                     }}
                   >
@@ -137,7 +140,7 @@ export function ScoreSheet({
           key={selectedEntry.boardId}
           table={table}
           entry={selectedEntry}
-          loadBoardReplay={loadBoardReplay}
+          loadBoardReplay={loadBoardReplay} loadPositionAnalysis={loadPositionAnalysis}
           onClose={() => {
             setSelectedEntry(null);
             document.getElementById(scoreSheetId)?.showPopover();

@@ -15,7 +15,9 @@ export function PlayingCard({
   disabled = false,
   playable = false,
   onPlay,
+  prediction,
 }: {
+  prediction?: number | "pending" | undefined;
   card: Card;
   variant: "hand" | "dummy" | "trick";
   disabled?: boolean;
@@ -27,6 +29,11 @@ export function PlayingCard({
   const rank = card.rank === "T" ? "10" : card.rank;
   const content = (
     <>
+      {prediction === undefined ? null : (
+        <span className="card-prediction" aria-label={prediction === "pending" ? "Menghitung trick" : `${prediction} predicted tricks`}>
+          {prediction === "pending" ? <span className="dds-spinner" role="status" /> : prediction}
+        </span>
+      )}
       <span className="card-corner">
         <strong>{rank}</strong>
         <span>{suitLabels[card.suit]}</span>
@@ -102,7 +109,13 @@ export function BridgeHand({
   className = "",
   contractStrain,
   position,
+  predictions,
+  analysisPending = false,
+  analysisCards,
 }: {
+  predictions?: Array<{ card: Card; tricks: number }> | undefined;
+  analysisPending?: boolean;
+  analysisCards?: Card[] | undefined;
   cards: Card[];
   title: string;
   variant?: "hand" | "dummy";
@@ -114,6 +127,7 @@ export function BridgeHand({
   position?: VisualPosition;
 }) {
   const playableKeys = new Set(playableCards.map(cardKey));
+  const analysisKeys = new Set((analysisCards ?? playableCards).map(cardKey));
   const organizedCards = organizeCardsForContract(cards, contractStrain);
   const sideDummy =
     variant === "dummy" && (position === "left" || position === "right");
@@ -164,6 +178,7 @@ export function BridgeHand({
                 <PlayingCard
                   card={card}
                   variant={variant}
+                  prediction={analysisKeys.has(cardKey(card)) ? predictions?.find((entry) => cardKey(entry.card) === cardKey(card))?.tricks ?? (analysisPending ? "pending" : undefined) : undefined}
                   disabled={disabled}
                   playable={playableKeys.has(cardKey(card))}
                   {...(onPlay === undefined ? {} : { onPlay })}

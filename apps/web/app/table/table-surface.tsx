@@ -34,8 +34,11 @@ export function TableSurface({
       {(Object.entries(orientation) as Array<[VisualPosition, Seat]>).map(
         ([position, seat]) =>
           seatLabels !== undefined ? (
-            <div key={seat} className={`player-position player-${position}`}>
-              {seat} · {seatLabels[seat] ?? seat}
+            <div key={seat} className={`player-position player-${position}`} data-turn={table.game?.turn === seat}>
+              <div className="player-trigger">
+                <span className="player-seat">{seat}</span>
+                <span className="player-copy"><strong><span className="participant-identity"><span className="participant-name">{seatLabels[seat] ?? seat}</span></span></strong></span>
+              </div>
             </div>
           ) : (
             <ParticipantPosition

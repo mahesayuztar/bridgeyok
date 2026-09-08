@@ -1705,7 +1705,7 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
   }
 });
 
-test("completed board replay shows four hands and navigates recorded tricks", async ({
+test("completed board replay shows four hands and navigates recorded cards", async ({
   browser,
 }, testInfo) => {
   test.setTimeout(240_000);
@@ -1758,11 +1758,11 @@ test("completed board replay shows four hands and navigates recorded tricks", as
     });
     await expect(replayModal.locator(".table-surface")).toHaveCount(1);
     await expect(
-      replayModal.locator(".replay-hand .physical-card"),
+      replayModal.locator(".completed-deal .physical-card"),
     ).toHaveCount(52);
     await expect(replayModal.locator(".auction-table")).toHaveCount(1);
     await expect(
-      replayModal.getByRole("button", { name: "Trick sebelumnya" }),
+      replayModal.getByRole("button", { name: "Kartu sebelumnya" }),
     ).toBeDisabled();
     for (const viewport of [
       { width: 1920, height: 1080 },
@@ -1777,7 +1777,7 @@ test("completed board replay shows four hands and navigates recorded tricks", as
           .querySelector(".board-play-zone")!
           .getBoundingClientRect();
         const cards = [
-          ...dialog.querySelectorAll(".replay-hand .physical-card"),
+          ...dialog.querySelectorAll(".completed-deal .physical-card"),
         ].map((card) => card.getBoundingClientRect());
         return {
           overflow: dialog.scrollWidth > dialog.clientWidth,
@@ -1797,13 +1797,37 @@ test("completed board replay shows four hands and navigates recorded tricks", as
         ),
       });
     }
-    await replayModal.getByRole("button", { name: "Trick berikutnya" }).click();
+    let releaseOld: () => void = () => {};
+    const oldResponse = new Promise<void>((resolve) => { releaseOld = resolve; });
+    let oldRequested = false;
+    await north.page.route("**/analysis?*", async (route) => {
+      const url = new URL(route.request().url());
+      const positionKey = url.searchParams.get("positionKey")!;
+      const step = Number(url.searchParams.get("step"));
+      const cards = await replayModal.locator(`[aria-label="Kartu ${step === 0 ? "E" : "S"}"] .physical-card`).evaluateAll((elements, step) => elements.map((element) => {
+        const rank = element.querySelector(".card-corner strong")!.textContent!;
+        const suit = element.className.match(/suit-([shdc])/)![1]!.toUpperCase();
+        return { card: { suit, rank: rank === "10" ? "T" : rank }, tricks: step === 0 ? 2 : 11 };
+      }), step);
+      if (step === 0) { oldRequested = true; await oldResponse; }
+      await route.fulfill({ json: { boardId: url.pathname.split("/")[3], positionKey, turn: step === 0 ? "E" : "S", cards } });
+    });
+    await replayModal.getByRole("button", { name: "DD OFF", exact: true }).click();
+    await expect.poll(() => oldRequested).toBe(true);
+    await expect(replayModal.locator(".dds-spinner").first()).toBeVisible();
+    await replayModal.getByRole("button", { name: "Kartu berikutnya" }).click();
+    await expect(replayModal.locator(".card-prediction").first()).toHaveText("11");
+    releaseOld();
+    await expect(replayModal.locator(".card-prediction").first()).toHaveText("11");
+    await expect(replayModal.getByLabel("2 predicted tricks", { exact: true })).toHaveCount(0);
+    await replayModal.getByRole("button", { name: "DD ON", exact: true }).click();
+    await north.page.unroute("**/analysis?*");
     await expect(replayModal.locator(".auction-table")).toHaveCount(0);
     await expect(
-      replayModal.locator(".replay-hand .physical-card"),
-    ).toHaveCount(48);
+      replayModal.locator(".completed-deal .physical-card"),
+    ).toHaveCount(51);
     await expect(replayModal.locator(".trick-slot .physical-card")).toHaveCount(
-      4,
+      1,
     );
     await north.page.screenshot({
       path: testInfo.outputPath("board-replay-trick-320x700.png"),
@@ -1811,19 +1835,19 @@ test("completed board replay shows four hands and navigates recorded tricks", as
     await north.page.keyboard.press("ArrowLeft");
     await expect(replayModal.locator(".auction-table")).toHaveCount(1);
     await expect(
-      replayModal.locator(".replay-hand .physical-card"),
+      replayModal.locator(".completed-deal .physical-card"),
     ).toHaveCount(52);
-    for (let _step = 0; _step < 14; _step++)
+    for (let _step = 0; _step < 53; _step++)
       await replayModal
-        .getByRole("button", { name: "Trick berikutnya" })
+        .getByRole("button", { name: "Kartu berikutnya" })
         .click();
     await expect(replayModal.locator(".board-result")).toBeVisible();
     await expect(replayModal.locator(".auction-table")).toHaveCount(0);
     await expect(
-      replayModal.locator(".replay-hand .physical-card"),
+      replayModal.locator(".completed-deal .physical-card"),
     ).toHaveCount(52);
     await expect(
-      replayModal.getByRole("button", { name: "Trick berikutnya" }),
+      replayModal.getByRole("button", { name: "Kartu berikutnya" }),
     ).toBeDisabled();
     await north.page.screenshot({
       path: testInfo.outputPath("board-replay-result-320x700.png"),
@@ -1840,7 +1864,7 @@ test("completed board replay shows four hands and navigates recorded tricks", as
     await expect(
       north.page
         .getByRole("dialog", { name: "Replay board 1", exact: true })
-        .locator(".replay-hand .physical-card"),
+        .locator(".completed-deal .physical-card"),
     ).toHaveCount(52);
     await north.page.getByRole("button", { name: "Tutup replay" }).click();
   } finally {

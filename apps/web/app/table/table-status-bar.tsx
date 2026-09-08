@@ -1,5 +1,5 @@
 import { useDialogDrag } from "./use-dialog-drag";
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import type { LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
 import { ConsensusControls } from "./consensus-controls";
@@ -28,18 +28,20 @@ export function WaitingTableStatusBar({
   connectionState,
   onLeaveTable,
   loadBoardReplay,
+  loadPositionAnalysis,
 }: {
   table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
   onLeaveTable: () => void;
   loadBoardReplay: TableSession["loadBoardReplay"];
+  loadPositionAnalysis: TableSession["loadPositionAnalysis"];
 }) {
   return (
     <header className="table-status-bar">
       <span className="table-wordmark">BridgeYok</span>
       <span>Meja tunggu</span>
       <div className="status-actions">
-        <ScoreSheet loadBoardReplay={loadBoardReplay} table={table} />
+        <ScoreSheet loadBoardReplay={loadBoardReplay} loadPositionAnalysis={loadPositionAnalysis} table={table} />
         <div className="connection-status" data-state={connectionState}>
           <span className="status-mark" />
           {connectionLabels[connectionState]}
@@ -58,20 +60,24 @@ export function ActiveTableStatusBar({
   inviteCode,
   canSendCommand,
   onCommand,
+  analysisControl,
   soundMuted,
   onSoundMutedChange,
   onLeaveTable,
   loadBoardReplay,
+  loadPositionAnalysis,
 }: {
   table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
   inviteCode: string | null;
   canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
+  analysisControl: ReactNode;
   soundMuted: boolean;
   onSoundMutedChange: (muted: boolean) => void;
   onLeaveTable: () => void;
   loadBoardReplay: TableSession["loadBoardReplay"];
+  loadPositionAnalysis: TableSession["loadPositionAnalysis"];
 }) {
   const leaveDrag = useDialogDrag();
   const auctionDrag = useDialogDrag();
@@ -124,7 +130,7 @@ export function ActiveTableStatusBar({
         </div>
       </dialog>
       <div className="play-status-facts">
-        <ScoreSheet loadBoardReplay={loadBoardReplay} table={table} compact />
+        <ScoreSheet loadBoardReplay={loadBoardReplay} loadPositionAnalysis={loadPositionAnalysis} table={table} compact />
         <div
           className="board-marker"
           role="img"
@@ -193,6 +199,7 @@ export function ActiveTableStatusBar({
         </section>
       )}
       <ConsensusControls
+        analysisControl={analysisControl}
         table={table}
         canSendCommand={canSendCommand}
         onCommand={onCommand}

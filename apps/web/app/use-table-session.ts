@@ -1,4 +1,5 @@
 "use client";
+import type { LoadPositionAnalysis, PositionAnalysis } from "./use-position-analysis";
 
 import type { components } from "@bridgeyok/contracts/openapi";
 import type { MutationCommandEnvelope } from "@bridgeyok/contracts/realtime";
@@ -146,6 +147,7 @@ function isSessionFailure(error: unknown) {
 }
 
 export type TableSession = {
+  loadPositionAnalysis: LoadPositionAnalysis;
   loadBoardReplay: (boardId: string, signal: AbortSignal) => Promise<BoardReplay>;
   initializing: boolean;
   recoveryState: TableRecoveryState;
@@ -259,6 +261,17 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
       return (await response.json()) as T;
     },
     [ensureAccessToken, refreshCredentials]
+  );
+
+  const loadPositionAnalysis = useCallback<LoadPositionAnalysis>(
+    (boardId, positionKey, step, signal) => {
+      const query = new URLSearchParams({ positionKey });
+      if (step !== undefined) query.set("step", String(step));
+      return authenticatedRequest<PositionAnalysis>(
+        `/v1/boards/${encodeURIComponent(boardId)}/analysis?${query}`,
+        { signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]) }
+      );
+    }, [authenticatedRequest]
   );
 
   const loadBoardReplay = useCallback(
@@ -865,6 +878,7 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     dismissNotice,
     canSendCommand,
     sendCommand,
-    loadBoardReplay
+    loadBoardReplay,
+    loadPositionAnalysis
   };
 }

@@ -27,12 +27,12 @@ const replay = {
 test("replay navigation removes played cards and restores all hands when rewound", () => {
   const original = structuredClone(replay);
   assert.equal(replayFrame(replay, 0).hands.N.length, 1);
-  const trick = replayFrame(replay, 1);
+  const trick = replayFrame(replay, 4);
   assert.equal(trick.trick.winner, "N");
   assert.equal(Object.values(trick.hands).flat().length, 0);
   assert.equal(trick.showResult, false);
-  assert.equal(replayFrame(replay, 2).showResult, true);
-  assert.equal(Object.values(replayFrame(replay, 2).hands).flat().length, 4);
+  assert.equal(replayFrame(replay, 5).showResult, true);
+  assert.equal(Object.values(replayFrame(replay, 5).hands).flat().length, 4);
   assert.equal(replayFrame(replay, 100).showResult, true);
   assert.equal(Object.values(replayFrame(replay, -1).hands).flat().length, 4);
   assert.deepEqual(replay, original);
@@ -118,4 +118,18 @@ test("replay input uses shared game normalization and rejects incomplete deals",
   assert.throws(() =>
     normalizeBoardReplay({ ...raw, game: { ...raw.game, phase: "PLAY" } }),
   );
+});
+
+
+test("every played card reconstructs partial trick, hand, turn and dummy visibility", () => {
+  for (let _step = 0; _step <= 4; _step++) {
+    const frame = replayFrame(replay, _step);
+    assert.equal(Object.values(frame.hands).flat().length, 4 - _step);
+    assert.equal(frame.currentTrick.plays.length, _step % 4);
+    assert.equal(frame.turn, ["N", "E", "S", "W", "N"][_step]);
+    assert.equal(frame.dummyRevealed, _step > 0);
+    if (_step > 0) assert.equal(frame.trick.plays.length, _step);
+  }
+  assert.equal(replayFrame(replay, 3).hands.W.length, 1);
+  assert.equal(replayFrame(replay, 2).hands.S.length, 1);
 });

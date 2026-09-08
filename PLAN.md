@@ -1499,3 +1499,7 @@ Referensi domain dan technical baseline:
 ## Completed board replay — 7 September 2026
 
 Implemented participant-only `GET /v1/boards/{boardId}/replay` from validated board records, with consistent current-scored snapshot fallback (ADR 0017). Score History rows open one TableSurface with all four hands. Auction appears only at trick 0; subsequent steps show centered recorded tricks. Numeric previous/next navigation ends in the existing result presentation with the full deal restored. Reconciliation and game authority remain unchanged. Validation and the unrelated existing browser geometry failure are recorded in `apps/web/PLAN.md`.
+
+## DDS current-position analysis — 8 September 2026
+
+Extend the existing analysis boundary with remaining-position `SolveBoard` output per legal card, keyed by live revision or completed-board card cursor. Reuse the pure engine for historical reconstruction, preserve recipient hidden-hand boundaries, and share one fenced loading/result mechanism between live play and replay. Replay navigation now counts cards rather than tricks. Audit and validation: `docs/dds-position-audit.md`. Concurrent dialog layout/drag work remains owned by its separate task.
