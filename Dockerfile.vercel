@@ -2,6 +2,14 @@ FROM golang:1.27.0-bookworm AS builder
 
 WORKDIR /workspace
 
+# Dependency untuk build DDS
+RUN apt-get update && \
+    apt-get install --yes --no-install-recommends \
+        g++ \
+        curl \
+        ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY go.work go.work.sum ./
 
 COPY apps/api/go.mod apps/api/go.sum ./apps/api/
@@ -10,6 +18,18 @@ RUN cd apps/api && go mod download
 
 COPY apps/api ./apps/api
 
+# Dibutuhkan oleh build-dds.sh
+COPY tools ./tools
+COPY scripts ./scripts
+
+# Build DDS
+RUN chmod +x ./scripts/build-dds.sh && \
+    ./scripts/build-dds.sh && \
+    ls -lah ./bin && \
+    file ./bin/bridgeyok-dds && \
+    ldd ./bin/bridgeyok-dds
+
+# Build API
 RUN CGO_ENABLED=0 \
     GOOS=linux \
     go build \
@@ -24,7 +44,8 @@ FROM debian:bookworm-slim AS runtime
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends \
         ca-certificates \
-        tzdata && \
+        tzdata \
+        libstdc++6 && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd --system bridgeyok && \
     useradd \
@@ -35,10 +56,23 @@ RUN apt-get update && \
 
 WORKDIR /workspace
 
+# API
 COPY --from=builder \
     --chown=bridgeyok:bridgeyok \
     /out/bridgeyok-api \
     /workspace/bridgeyok-api
+
+# DDS executable
+COPY --from=builder \
+    --chown=bridgeyok:bridgeyok \
+    /workspace/bin/bridgeyok-dds \
+    /workspace/bin/bridgeyok-dds
+
+# DDS license
+COPY --from=builder \
+    --chown=bridgeyok:bridgeyok \
+    /workspace/bin/dds-LICENSE \
+    /workspace/bin/dds-LICENSE
 
 USER bridgeyok
 
