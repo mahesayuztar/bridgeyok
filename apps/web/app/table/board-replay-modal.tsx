@@ -42,7 +42,7 @@ export function BoardReplayModal({
   useEffect(() => {
     const dialog = dialogRef.current;
     const previousFocus = document.activeElement;
-    const media = window.matchMedia("(max-width: 48rem)");
+    const media = window.matchMedia("(max-width: 48rem), (pointer: coarse)");
     function showDialog() {
       dialog?.close();
       if (media.matches) dialog?.show();

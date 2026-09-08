@@ -116,12 +116,17 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       ["Receive claim", "Permintaan claim", "Tolak"],
       [/Buka menu South/, /South/, "Tutup menu pemain"],
     ] as const) {
-      await page.getByRole("button", { name: triggerName }).click();
+      const trigger = triggerName === "Ajukan claim"
+        ? page.getByLabel("Ajukan claim", { exact: true })
+        : page.getByRole("button", { name: triggerName });
+      await trigger.click();
       const dialog = page.getByRole("dialog", { name: title });
       await expect(dialog).toBeVisible();
       const handle = dialog.locator("[data-dialog-drag-handle]");
       const before = (await dialog.boundingBox())!;
       const header = (await handle.boundingBox())!;
+      expect(before.x).toBeGreaterThanOrEqual(0);
+      expect(before.x + before.width).toBeLessThanOrEqual(viewport.width);
       await page.mouse.move(header.x + 20, header.y + 12);
       await page.mouse.down();
       await page.mouse.move(header.x + 20, header.y - 28, { steps: 4 });
@@ -183,3 +188,27 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     await page.screenshot({ path: testInfo.outputPath("mini-preview.png") });
   });
 }
+
+test("landscape touch devices can play behind replay and rotate after dragging", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><style>${stylesheet}</style><div id="root"></div>`);
+  await page.addScriptTag({ content: bundle });
+  const dialog = page.getByRole("dialog", { name: "Replay board 1", exact: true });
+  await expect(dialog.locator(".physical-card")).toHaveCount(52);
+  expect(await dialog.evaluate((element) => element.matches(":modal"))).toBe(false);
+  await page.getByRole("button", { name: "Bid on table" }).tap();
+  await expect(page.getByRole("button", { name: "Bid on table" })).toHaveText("Bid on table 1");
+  const bounds = (await dialog.boundingBox())!;
+  expect(bounds.width).toBeGreaterThan(bounds.height);
+  const handle = dialog.locator("[data-dialog-drag-handle]");
+  await handle.focus();
+  await page.keyboard.press("Shift+ArrowRight");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => {
+    const rotated = (await dialog.boundingBox())!;
+    return rotated.x >= 0 && rotated.x + rotated.width <= 390 && rotated.y + rotated.height <= 844;
+  }).toBe(true);
+  await expect(dialog).toBeVisible();
+  await context.close();
+});

@@ -4420,9 +4420,9 @@ button.physical-card.is-dragging {
   }
   .play-status-bar .claim-selector,
   .play-status-bar .consensus-request {
-    position: absolute;
-    top: calc(100% + 0.5rem);
-    right: 0;
+    position: fixed;
+    top: 5.8rem;
+    right: 0.5rem;
   }
   .score-sheet-popover {
     inset: 0;
@@ -4522,7 +4522,7 @@ button.physical-card.is-dragging {
   min-height: 2.75rem;
   padding: 0.2rem;
 }
-@media (max-width: 48rem) {
+@media (max-width: 48rem), (pointer: coarse) {
   .board-replay-modal {
     inset: 3rem 0.4rem auto auto;
     width: min(25rem, calc(100vw - 0.8rem), calc((48dvh - 6rem) / 0.65));
@@ -4530,7 +4530,7 @@ button.physical-card.is-dragging {
   }
 }
 
-@media (max-width: 48rem) and (orientation: landscape) {
+@media (max-width: 48rem) and (orientation: landscape), (pointer: coarse) and (orientation: landscape) {
   .board-replay-modal {
     inset: 0.4rem 0.4rem auto auto;
     width: min(25rem, calc((100dvh - 7rem) / 0.65));
