@@ -140,6 +140,7 @@ export function BoardReplayModal({
         if (event.key === "Escape") { event.preventDefault(); closeReplay(); }
         if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
           event.preventDefault();
+          event.currentTarget.querySelector<HTMLElement>(".replay-navigation")?.focus();
           if (frame !== null)
             setStep((current) =>
               Math.max(
@@ -221,12 +222,15 @@ export function BoardReplayModal({
                 ) : null}
             </TableSurface>
           </div>
-          <nav className="replay-navigation" aria-label="Navigasi replay">
+          <nav className="replay-navigation" aria-label="Navigasi replay" tabIndex={-1}>
             <button
               type="button"
               aria-label="Kartu sebelumnya"
               disabled={step === 0}
-              onClick={() => setStep((current) => current - 1)}
+              onClick={(event) => {
+                if (step === 1) event.currentTarget.closest("nav")?.focus();
+                setStep((current) => current - 1);
+              }}
             >
               ←
             </button>
@@ -240,7 +244,10 @@ export function BoardReplayModal({
               type="button"
               aria-label="Kartu berikutnya"
               disabled={frame.showResult}
-              onClick={() => setStep((current) => current + 1)}
+              onClick={(event) => {
+                if (step + 1 === frame.lastStep) event.currentTarget.closest("nav")?.focus();
+                setStep((current) => current + 1);
+              }}
             >
               →
             </button>

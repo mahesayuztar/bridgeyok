@@ -93,7 +93,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024
     await dialog.getByRole("button", { name: "Kartu berikutnya" }).click();
     await expect(dialog.locator(".completed-deal .physical-card")).toHaveCount(52);
     await expect(dialog.getByLabel("Hasil board 1")).toBeVisible();
-    await dialog.getByRole("button", { name: "Tutup replay" }).click();
+    await expect(dialog.getByRole("button", { name: "Kartu berikutnya" })).toBeDisabled();
+    await expect(dialog.getByRole("navigation", { name: "Navigasi replay" })).toBeFocused();
+    await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
   });
 }
