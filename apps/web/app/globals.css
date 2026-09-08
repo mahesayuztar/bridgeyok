@@ -4765,3 +4765,16 @@ button.physical-card.is-dragging {
 .replay-center .physical-card .card-suit {
   font-size: 1.25rem;
 }
+
+[data-dialog-drag-handle] {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+[data-dialog-drag-handle][data-dragging] {
+  cursor: grabbing;
+}
+[data-dialog-drag-handle]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}

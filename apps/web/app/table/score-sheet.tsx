@@ -1,3 +1,4 @@
+import { useDialogDrag } from "./use-dialog-drag";
 import { useRef, useState } from "react";
 import type { TableSession } from "../use-table-session";
 import { BoardReplayModal } from "./board-replay-modal";
@@ -13,6 +14,7 @@ export function ScoreSheet({
   compact?: boolean;
   loadBoardReplay: TableSession["loadBoardReplay"];
 }) {
+  const dialogDrag = useDialogDrag();
   const selectedTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<
     LiveTableProjection["scoreSheet"][number] | null
@@ -59,7 +61,7 @@ export function ScoreSheet({
         role="dialog"
         aria-labelledby={scoreSheetTitleId}
       >
-        <header className="score-sheet-header">
+        <header {...dialogDrag} className="score-sheet-header">
           <h2 id={scoreSheetTitleId}>History</h2>
           <button
             className="score-sheet-close"

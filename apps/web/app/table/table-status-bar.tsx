@@ -1,3 +1,4 @@
+import { useDialogDrag } from "./use-dialog-drag";
 import { useRef } from "react";
 import type { LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
@@ -72,6 +73,8 @@ export function ActiveTableStatusBar({
   onLeaveTable: () => void;
   loadBoardReplay: TableSession["loadBoardReplay"];
 }) {
+  const leaveDrag = useDialogDrag();
+  const auctionDrag = useDialogDrag();
   const leaveDialogRef = useRef<HTMLDialogElement>(null);
   const game = table.game;
   const contract = game?.auction.contract;
@@ -93,7 +96,7 @@ export function ActiveTableStatusBar({
         aria-labelledby="leave-table-title"
         aria-describedby="leave-table-description"
       >
-        <h2 id="leave-table-title">Keluar dari meja?</h2>
+        <h2 {...leaveDrag} id="leave-table-title">Keluar dari meja?</h2>
         <p id="leave-table-description">
           Kursi Anda akan dilepas.
           {table.viewerRole === "OWNER" && table.participants.length === 1
@@ -175,7 +178,7 @@ export function ActiveTableStatusBar({
           role="dialog"
           aria-labelledby="auction-history-title"
         >
-          <header>
+          <header {...auctionDrag}>
             <h2 id="auction-history-title">Auction</h2>
             <button
               type="button"

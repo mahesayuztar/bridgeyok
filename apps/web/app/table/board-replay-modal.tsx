@@ -1,3 +1,4 @@
+import { useDialogDrag } from "./use-dialog-drag";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { replayFrame, type BoardReplay } from "../board-replay";
@@ -31,6 +32,7 @@ export function BoardReplayModal({
   loadBoardReplay: TableSession["loadBoardReplay"];
   onClose: () => void;
 }) {
+  const dialogDrag = useDialogDrag();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [replay, setReplay] = useState<BoardReplay | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +117,7 @@ export function BoardReplayModal({
         }
       }}
     >
-      <header className="score-sheet-header">
+      <header {...dialogDrag} className="score-sheet-header">
         <h2 id="board-replay-title">Replay board {entry.boardNumber}</h2>
         <button
           type="button"

@@ -1,3 +1,4 @@
+import { useDialogDrag } from "./use-dialog-drag";
 import { useState } from "react";
 import {
   oppositeSeat,
@@ -9,6 +10,7 @@ import { cardKey, viewerTrickCounts } from "./gameplay-presentation";
 import { PlayingCard } from "./playing-card";
 
 export function TrickIndicator({ table }: { table: LiveTableProjection }) {
+  const dialogDrag = useDialogDrag();
   const [selectedTrickNumber, setSelectedTrickNumber] = useState<number | null>(
     null,
   );
@@ -86,7 +88,7 @@ export function TrickIndicator({ table }: { table: LiveTableProjection }) {
         aria-labelledby={historyTitleId}
         data-history-policy={viewerIsDummy ? "full" : "latest"}
       >
-        <header className="trick-history-header">
+        <header {...dialogDrag} className="trick-history-header">
           <h2 id={historyTitleId}>Trick {trickNumber}</h2>
           <button
             className="trick-history-close"

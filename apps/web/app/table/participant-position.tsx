@@ -1,3 +1,4 @@
+import { useDialogDrag } from "./use-dialog-drag";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -80,6 +81,7 @@ export function ParticipantPosition({
   onRemove?: (participantId: string) => void;
   onLeaveTable?: () => void;
 }) {
+  const dialogDrag = useDialogDrag();
   const dialogTitleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -155,7 +157,7 @@ export function ParticipantPosition({
               aria-labelledby={dialogTitleId}
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <header>
+              <header {...dialogDrag}>
                 <span className="participant-portal-seat">{seat}</span>
                 <div>
                   <h2 id={dialogTitleId}>
