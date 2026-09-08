@@ -26,7 +26,6 @@ COPY scripts ./scripts
 RUN chmod +x ./scripts/build-dds.sh && \
     ./scripts/build-dds.sh && \
     ls -lah ./bin && \
-    file ./bin/bridgeyok-dds && \
     ldd ./bin/bridgeyok-dds
 
 # Build API
