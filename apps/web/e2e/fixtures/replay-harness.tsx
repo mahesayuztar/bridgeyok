@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { usePositionAnalysis } from "../../app/use-position-analysis";
 import { BridgeHand } from "../../app/table/playing-card";
+import { ScoreSheet } from "../../app/table/score-sheet";
 import { BoardReplayModal } from "../../app/table/board-replay-modal";
 import type { BoardReplay } from "../../app/board-replay";
 import type { LiveTableProjection, Seat, Suit } from "../../app/table-state";
@@ -43,3 +44,11 @@ function Harness() {
   return <main className="table-client active-table-client"><BridgeHand className="own-hand" title="Live hand" cards={fullDeal.north.slice(liveStep)} playableCards={fullDeal.north.slice(liveStep)} contractStrain="NT" predictions={liveAnalysis.result?.cards} analysisPending={liveAnalysis.pending} onPlay={() => setLiveStep((step) => step + 1)} /><button style={{ position: "fixed", bottom: 130, left: 20 }} onClick={() => setBids((count) => count + 1)}>Bid on table {bids}</button>{open ? <BoardReplayModal table={{ boardId: entry.boardId } as LiveTableProjection} entry={entry} loadBoardReplay={loadBoardReplay} loadPositionAnalysis={loadPositionAnalysis} onClose={() => setOpen(false)} /> : null}</main>;
 }
 createRoot(document.getElementById("root")!).render(<Harness />);
+
+
+export function renderHistory() {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const table = { tableId: "history-table", scoreSheet: [{ ...entry, result: replay.game.result }] } as LiveTableProjection;
+  createRoot(container).render(<ScoreSheet table={table} loadBoardReplay={loadBoardReplay} loadPositionAnalysis={loadPositionAnalysis} />);
+}

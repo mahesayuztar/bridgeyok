@@ -41,7 +41,6 @@ export function BoardReplayModal({
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    const previousFocus = document.activeElement;
     const media = window.matchMedia("(max-width: 48rem), (pointer: coarse)");
     function showDialog() {
       dialog?.close();
@@ -53,8 +52,6 @@ export function BoardReplayModal({
     return () => {
       media.removeEventListener("change", showDialog);
       dialog?.close();
-      if (previousFocus instanceof HTMLElement && previousFocus.isConnected)
-        previousFocus.focus();
     };
   }, []);
 

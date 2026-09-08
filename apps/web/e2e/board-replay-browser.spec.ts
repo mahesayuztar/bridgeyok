@@ -82,6 +82,14 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024
     await page.evaluate(() => (window as unknown as { replayTest: { resolvePosition: (step: number, tricks: number) => void } }).replayTest.resolvePosition(0, 2));
     await expect(dialog.locator(".card-prediction").first()).toHaveText("11");
     await expect(dialog.getByLabel("2 predicted tricks", { exact: true })).toHaveCount(0);
+    await expect(dialog.locator(".card-prediction")).toHaveCount(3);
+    await expect(dialog.locator(".suit-h .card-prediction, .suit-d .card-prediction, .suit-c .card-prediction")).toHaveCount(0);
+    await dialog.getByRole("button", { name: "DD ON", exact: true }).click();
+    await expect(dialog.locator(".card-prediction")).toHaveCount(0);
+    await dialog.getByRole("button", { name: "DD OFF", exact: true }).click();
+    await expect(dialog.locator(".dds-spinner")).toHaveCount(3);
+    await page.evaluate(() => (window as unknown as { replayTest: { resolvePosition: (step: number, tricks: number) => void } }).replayTest.resolvePosition(1, 9));
+    await expect(dialog.locator(".card-prediction").first()).toHaveText("9");
     for (let _step = 2; _step <= 4; _step++) {
       await dialog.getByRole("button", { name: "Kartu berikutnya" }).click();
       await expect(dialog.locator(".completed-deal .physical-card")).toHaveCount(52 - _step);
@@ -97,6 +105,15 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024
     await expect(dialog.getByRole("navigation", { name: "Navigasi replay" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
+    await page.evaluate(() => (window as unknown as { replayTest: { renderHistory: () => void } }).replayTest.renderHistory());
+    await page.getByRole("button", { name: "Buka skor meja" }).click();
+    const scoreHistory = page.getByRole("dialog", { name: "History", exact: true });
+    const replayTrigger = scoreHistory.getByRole("button", { name: "Replay board 1", exact: true });
+    await replayTrigger.click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Tutup replay" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(replayTrigger).toBeFocused();
   });
 }
 
