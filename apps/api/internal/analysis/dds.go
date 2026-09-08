@@ -47,7 +47,19 @@ func NewDDS(executable string, timeout time.Duration, concurrency int) (*DDS, er
 	if executable == "" || timeout <= 0 || timeout > time.Minute || concurrency < 1 || concurrency > 4 {
 		return nil, fmt.Errorf("invalid DDS configuration")
 	}
-	return &DDS{executable: executable, timeout: timeout, slots: make(chan struct{}, concurrency)}, nil
+
+	fmt.Printf(
+		"DDS initialized executable=%q timeout=%s concurrency=%d\n",
+		executable,
+		timeout,
+		concurrency,
+	)
+
+	return &DDS{
+		executable: executable,
+		timeout:    timeout,
+		slots:      make(chan struct{}, concurrency),
+	}, nil
 }
 
 func (solver *DDS) Solve(ctx context.Context, cards bridge.Deal, metadata bridge.BoardMetadata) (Result, error) {
@@ -93,14 +105,26 @@ func (solver *DDS) Solve(ctx context.Context, cards bridge.Deal, metadata bridge
 	}
 	command := exec.CommandContext(ctx, solver.executable)
 	command.Stdin = strings.NewReader(input.String())
+
 	var output boundedOutput
+	var stderr bytes.Buffer
+
 	command.Stdout = &output
-	command.Stderr = io.Discard
+	command.Stderr = &stderr
 	command.WaitDelay = time.Second
+
 	if err := command.Run(); err != nil {
+		fmt.Printf(
+			"DDS Solve failed executable=%q err=%v stderr=%q\n",
+			solver.executable,
+			err,
+			stderr.String(),
+		)
+
 		if ctx.Err() != nil {
 			return Result{}, ctx.Err()
 		}
+
 		return Result{}, ErrUnavailable
 	}
 	decoder := json.NewDecoder(&output)
@@ -207,12 +231,26 @@ func (solver *DDS) SolvePosition(ctx context.Context, state bridge.State) ([]Car
 	}
 	command := exec.CommandContext(ctx, solver.executable, "position")
 	command.Stdin = strings.NewReader(input.String())
+
 	var output boundedOutput
-	command.Stdout, command.Stderr, command.WaitDelay = &output, io.Discard, time.Second
+	var stderr bytes.Buffer
+
+	command.Stdout = &output
+	command.Stderr = &stderr
+	command.WaitDelay = time.Second
+
 	if err := command.Run(); err != nil {
+		fmt.Printf(
+			"DDS SolvePosition failed executable=%q err=%v stderr=%q\n",
+			solver.executable,
+			err,
+			stderr.String(),
+		)
+
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+
 		return nil, ErrUnavailable
 	}
 	var cards []CardPrediction
