@@ -327,7 +327,7 @@ func (q *Queries) LockTableByInvite(ctx context.Context, inviteCodeHash []byte) 
 }
 
 const previewTable = `-- name: PreviewTable :one
-SELECT tables.state,
+SELECT tables.id, tables.state,
        tables.locked,
        count(table_participants.id) FILTER (WHERE table_participants.left_at IS NULL)::integer AS participant_count
 FROM bridgeyok.tables AS tables
@@ -338,6 +338,7 @@ GROUP BY tables.id
 `
 
 type PreviewTableRow struct {
+	ID               string `json:"id"`
 	State            string `json:"state"`
 	Locked           bool   `json:"locked"`
 	ParticipantCount int32  `json:"participant_count"`
@@ -346,6 +347,11 @@ type PreviewTableRow struct {
 func (q *Queries) PreviewTable(ctx context.Context, inviteCodeHash []byte) (PreviewTableRow, error) {
 	row := q.db.QueryRow(ctx, previewTable, inviteCodeHash)
 	var i PreviewTableRow
-	err := row.Scan(&i.State, &i.Locked, &i.ParticipantCount)
+	err := row.Scan(
+		&i.ID,
+		&i.State,
+		&i.Locked,
+		&i.ParticipantCount,
+	)
 	return i, err
 }

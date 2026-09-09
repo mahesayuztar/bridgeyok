@@ -73,6 +73,7 @@ func (postgres *Postgres) PreviewTable(ctx context.Context, inviteCodeHash []byt
 		return table.Preview{}, fmt.Errorf("select table preview: %w", err)
 	}
 	return table.Preview{
+		TableID:          row.ID,
 		State:            table.State(row.State),
 		Locked:           row.Locked,
 		ParticipantCount: int(row.ParticipantCount),

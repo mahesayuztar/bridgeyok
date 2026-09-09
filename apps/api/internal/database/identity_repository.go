@@ -89,7 +89,7 @@ func (postgres *Postgres) ConsumeTicket(ctx context.Context, ticketHash []byte, 
 	if err != nil {
 		return identity.Session{}, fmt.Errorf("consume realtime ticket: %w", err)
 	}
-	return identity.Session{ID: row.ID, Nickname: row.Nickname, Status: row.Status, ExpiresAt: row.ExpiresAt.Time}, nil
+	return identity.Session{AccountTokenHash: row.AccountTokenHash, ID: row.ID, Nickname: row.Nickname, Status: row.Status, ExpiresAt: row.ExpiresAt.Time}, nil
 }
 
 func timestamptz(value time.Time) pgtype.Timestamptz {

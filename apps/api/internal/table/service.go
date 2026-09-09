@@ -25,6 +25,7 @@ var (
 
 // Preview is the public, non-joining view of an invite destination.
 type Preview struct {
+	TableID          string
 	State            State
 	Locked           bool
 	ParticipantCount int

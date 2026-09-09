@@ -60,14 +60,15 @@ WITH consumed AS (
     WHERE ticket_hash = sqlc.arg(ticket_hash)
       AND used_at IS NULL
       AND expires_at > sqlc.arg(now)
-    RETURNING session_id
+    RETURNING session_id, account_token_hash
 )
 SELECT guest_sessions.id,
        guest_sessions.nickname,
        guest_sessions.status,
-       guest_sessions.expires_at
+       guest_sessions.expires_at, consumed.account_token_hash
 FROM consumed
 JOIN bridgeyok.guest_sessions
   ON guest_sessions.id = consumed.session_id
 WHERE guest_sessions.status = 'ACTIVE'
-  AND guest_sessions.expires_at > sqlc.arg(now);
+  AND guest_sessions.expires_at > sqlc.arg(now)
+  AND (consumed.account_token_hash IS NULL OR EXISTS(SELECT 1 FROM bridgeyok.account_sessions WHERE token_hash = consumed.account_token_hash AND expires_at > sqlc.arg(now)));

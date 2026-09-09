@@ -37,7 +37,7 @@ INSERT INTO bridgeyok.table_participants (
 );
 
 -- name: PreviewTable :one
-SELECT tables.state,
+SELECT tables.id, tables.state,
        tables.locked,
        count(table_participants.id) FILTER (WHERE table_participants.left_at IS NULL)::integer AS participant_count
 FROM bridgeyok.tables AS tables

@@ -11,6 +11,96 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AccountProfileAvatar.
+const (
+	AccountProfileAvatarClub    AccountProfileAvatar = "club"
+	AccountProfileAvatarDiamond AccountProfileAvatar = "diamond"
+	AccountProfileAvatarFox     AccountProfileAvatar = "fox"
+	AccountProfileAvatarHeart   AccountProfileAvatar = "heart"
+	AccountProfileAvatarOwl     AccountProfileAvatar = "owl"
+	AccountProfileAvatarSpade   AccountProfileAvatar = "spade"
+)
+
+// Valid indicates whether the value is a known member of the AccountProfileAvatar enum.
+func (e AccountProfileAvatar) Valid() bool {
+	switch e {
+	case AccountProfileAvatarClub:
+		return true
+	case AccountProfileAvatarDiamond:
+		return true
+	case AccountProfileAvatarFox:
+		return true
+	case AccountProfileAvatarHeart:
+		return true
+	case AccountProfileAvatarOwl:
+		return true
+	case AccountProfileAvatarSpade:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountProfileUpdateAvatar.
+const (
+	AccountProfileUpdateAvatarClub    AccountProfileUpdateAvatar = "club"
+	AccountProfileUpdateAvatarDiamond AccountProfileUpdateAvatar = "diamond"
+	AccountProfileUpdateAvatarFox     AccountProfileUpdateAvatar = "fox"
+	AccountProfileUpdateAvatarHeart   AccountProfileUpdateAvatar = "heart"
+	AccountProfileUpdateAvatarOwl     AccountProfileUpdateAvatar = "owl"
+	AccountProfileUpdateAvatarSpade   AccountProfileUpdateAvatar = "spade"
+)
+
+// Valid indicates whether the value is a known member of the AccountProfileUpdateAvatar enum.
+func (e AccountProfileUpdateAvatar) Valid() bool {
+	switch e {
+	case AccountProfileUpdateAvatarClub:
+		return true
+	case AccountProfileUpdateAvatarDiamond:
+		return true
+	case AccountProfileUpdateAvatarFox:
+		return true
+	case AccountProfileUpdateAvatarHeart:
+		return true
+	case AccountProfileUpdateAvatarOwl:
+		return true
+	case AccountProfileUpdateAvatarSpade:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountSignupRequestAvatar.
+const (
+	AccountSignupRequestAvatarClub    AccountSignupRequestAvatar = "club"
+	AccountSignupRequestAvatarDiamond AccountSignupRequestAvatar = "diamond"
+	AccountSignupRequestAvatarFox     AccountSignupRequestAvatar = "fox"
+	AccountSignupRequestAvatarHeart   AccountSignupRequestAvatar = "heart"
+	AccountSignupRequestAvatarOwl     AccountSignupRequestAvatar = "owl"
+	AccountSignupRequestAvatarSpade   AccountSignupRequestAvatar = "spade"
+)
+
+// Valid indicates whether the value is a known member of the AccountSignupRequestAvatar enum.
+func (e AccountSignupRequestAvatar) Valid() bool {
+	switch e {
+	case AccountSignupRequestAvatarClub:
+		return true
+	case AccountSignupRequestAvatarDiamond:
+		return true
+	case AccountSignupRequestAvatarFox:
+		return true
+	case AccountSignupRequestAvatarHeart:
+		return true
+	case AccountSignupRequestAvatarOwl:
+		return true
+	case AccountSignupRequestAvatarSpade:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AnalysisResultSolverVersion.
 const (
 	Dds2908d75755 AnalysisResultSolverVersion = "dds-2.9.0-8d75755"
@@ -479,6 +569,55 @@ func (e TableState) Valid() bool {
 	}
 }
 
+// AccountLogin defines model for AccountLogin.
+type AccountLogin struct {
+	ExpiresAt time.Time          `json:"expiresAt"`
+	Profile   AccountProfile     `json:"profile"`
+	SessionId openapi_types.UUID `json:"sessionId"`
+	Token     string             `json:"token"`
+}
+
+// AccountLoginRequest defines model for AccountLoginRequest.
+type AccountLoginRequest struct {
+	Password string `json:"password"`
+	Username string `json:"username"`
+}
+
+// AccountProfile defines model for AccountProfile.
+type AccountProfile struct {
+	Avatar        AccountProfileAvatar `json:"avatar"`
+	DisplayName   string               `json:"displayName"`
+	Following     bool                 `json:"following"`
+	Friends       bool                 `json:"friends"`
+	Id            openapi_types.UUID   `json:"id"`
+	Online        bool                 `json:"online"`
+	ParticipantId *openapi_types.UUID  `json:"participantId,omitempty"`
+	Username      string               `json:"username"`
+}
+
+// AccountProfileAvatar defines model for AccountProfile.Avatar.
+type AccountProfileAvatar string
+
+// AccountProfileUpdate defines model for AccountProfileUpdate.
+type AccountProfileUpdate struct {
+	Avatar      AccountProfileUpdateAvatar `json:"avatar"`
+	DisplayName string                     `json:"displayName"`
+}
+
+// AccountProfileUpdateAvatar defines model for AccountProfileUpdate.Avatar.
+type AccountProfileUpdateAvatar string
+
+// AccountSignupRequest defines model for AccountSignupRequest.
+type AccountSignupRequest struct {
+	Avatar      AccountSignupRequestAvatar `json:"avatar"`
+	DisplayName string                     `json:"displayName"`
+	Password    string                     `json:"password"`
+	Username    string                     `json:"username"`
+}
+
+// AccountSignupRequestAvatar defines model for AccountSignupRequest.Avatar.
+type AccountSignupRequestAvatar string
+
 // AnalysisHand defines model for AnalysisHand.
 type AnalysisHand struct {
 	C  AnalysisTricks `json:"C"`
@@ -583,6 +722,20 @@ type HealthResponse struct {
 
 // HealthResponseStatus defines model for HealthResponse.Status.
 type HealthResponseStatus string
+
+// PlayerInvitation defines model for PlayerInvitation.
+type PlayerInvitation struct {
+	ExpiresAt  time.Time          `json:"expiresAt"`
+	InviteCode string             `json:"inviteCode"`
+	Sender     AccountProfile     `json:"sender"`
+	TableId    openapi_types.UUID `json:"tableId"`
+}
+
+// PlayerInviteRequest defines model for PlayerInviteRequest.
+type PlayerInviteRequest struct {
+	InviteCode string             `json:"inviteCode"`
+	UserId     openapi_types.UUID `json:"userId"`
+}
 
 // PositionAnalysis defines model for PositionAnalysis.
 type PositionAnalysis struct {
@@ -793,6 +946,12 @@ type TableId = openapi_types.UUID
 // ProblemResponse defines model for ProblemResponse.
 type ProblemResponse = Problem
 
+// SearchAccountUsersParams defines parameters for SearchAccountUsers.
+type SearchAccountUsersParams struct {
+	Q       *string `form:"q,omitempty" json:"q,omitempty"`
+	Friends *bool   `form:"friends,omitempty" json:"friends,omitempty"`
+}
+
 // AnalyzeCompletedBoardParams defines parameters for AnalyzeCompletedBoard.
 type AnalyzeCompletedBoardParams struct {
 	// PositionKey Live table revision as a decimal string, or replay request identity when step is present.
@@ -806,6 +965,18 @@ type AnalyzeCompletedBoardParams struct {
 type AnalyzeCompletedBoard200JSONResponseBody struct {
 	union json.RawMessage
 }
+
+// LoginAccountJSONRequestBody defines body for LoginAccount for application/json ContentType.
+type LoginAccountJSONRequestBody = AccountLoginRequest
+
+// UpdateAccountProfileJSONRequestBody defines body for UpdateAccountProfile for application/json ContentType.
+type UpdateAccountProfileJSONRequestBody = AccountProfileUpdate
+
+// RegisterAccountJSONRequestBody defines body for RegisterAccount for application/json ContentType.
+type RegisterAccountJSONRequestBody = AccountSignupRequest
+
+// InviteAccountPlayerJSONRequestBody defines body for InviteAccountPlayer for application/json ContentType.
+type InviteAccountPlayerJSONRequestBody = PlayerInviteRequest
 
 // CreateGuestSessionJSONRequestBody defines body for CreateGuestSession for application/json ContentType.
 type CreateGuestSessionJSONRequestBody = CreateGuestSessionRequest

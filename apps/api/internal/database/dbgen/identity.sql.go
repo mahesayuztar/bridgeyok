@@ -18,17 +18,18 @@ WITH consumed AS (
     WHERE ticket_hash = $2
       AND used_at IS NULL
       AND expires_at > $1
-    RETURNING session_id
+    RETURNING session_id, account_token_hash
 )
 SELECT guest_sessions.id,
        guest_sessions.nickname,
        guest_sessions.status,
-       guest_sessions.expires_at
+       guest_sessions.expires_at, consumed.account_token_hash
 FROM consumed
 JOIN bridgeyok.guest_sessions
   ON guest_sessions.id = consumed.session_id
 WHERE guest_sessions.status = 'ACTIVE'
   AND guest_sessions.expires_at > $1
+  AND (consumed.account_token_hash IS NULL OR EXISTS(SELECT 1 FROM bridgeyok.account_sessions WHERE token_hash = consumed.account_token_hash AND expires_at > $1))
 `
 
 type ConsumeRealtimeTicketParams struct {
@@ -37,10 +38,11 @@ type ConsumeRealtimeTicketParams struct {
 }
 
 type ConsumeRealtimeTicketRow struct {
-	ID        string             `json:"id"`
-	Nickname  string             `json:"nickname"`
-	Status    string             `json:"status"`
-	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	ID               string             `json:"id"`
+	Nickname         string             `json:"nickname"`
+	Status           string             `json:"status"`
+	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
+	AccountTokenHash []byte             `json:"account_token_hash"`
 }
 
 func (q *Queries) ConsumeRealtimeTicket(ctx context.Context, arg ConsumeRealtimeTicketParams) (ConsumeRealtimeTicketRow, error) {
@@ -51,6 +53,7 @@ func (q *Queries) ConsumeRealtimeTicket(ctx context.Context, arg ConsumeRealtime
 		&i.Nickname,
 		&i.Status,
 		&i.ExpiresAt,
+		&i.AccountTokenHash,
 	)
 	return i, err
 }

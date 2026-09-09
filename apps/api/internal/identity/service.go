@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -31,10 +32,11 @@ var (
 
 // Session is one durable guest identity without its secret verifier.
 type Session struct {
-	ID        string
-	Nickname  string
-	Status    string
-	ExpiresAt time.Time
+	AccountTokenHash []byte
+	ID               string
+	Nickname         string
+	Status           string
+	ExpiresAt        time.Time
 }
 
 // CredentialSet contains the secrets returned to a guest client.
@@ -65,10 +67,14 @@ type Repository interface {
 
 // Service issues and validates guest identity credentials.
 type Service struct {
-	repository Repository
-	pepper     []byte
-	random     io.Reader
-	now        func() time.Time
+	accountAuthMu     sync.Mutex
+	accountAuthWindow time.Time
+	accountAuthCount  int
+	accountAuthUsers  map[string]int
+	repository        Repository
+	pepper            []byte
+	random            io.Reader
+	now               func() time.Time
 }
 
 // NewService constructs guest identity operations with explicit security dependencies.
@@ -139,6 +145,15 @@ func (service *Service) Refresh(ctx context.Context, deviceCredential string) (C
 
 // Authenticate validates an access token and the current durable session state.
 func (service *Service) Authenticate(ctx context.Context, accessToken string) (Session, error) {
+	if strings.HasPrefix(accessToken, "acct_") {
+		account, err := service.Account(ctx, accessToken)
+		if err != nil {
+			return Session{}, err
+		}
+		session, err := service.repository.FindActiveSession(ctx, account.SessionID, service.now().UTC())
+		session.AccountTokenHash = service.hash("account", accessToken)
+		return session, err
+	}
 	parts := strings.Split(accessToken, ".")
 	if len(parts) != 2 {
 		return Session{}, ErrInvalidCredential
@@ -185,7 +200,17 @@ func (service *Service) IssueTicket(ctx context.Context, session Session) (strin
 	}
 	now := service.now().UTC()
 	expiresAt := now.Add(ticketLifetime)
-	if err := service.repository.StoreTicket(ctx, service.hash("ticket", ticket), session.ID, now, expiresAt); err != nil {
+	var storeErr error
+	if len(session.AccountTokenHash) > 0 {
+		repository, ok := service.repository.(AccountRepository)
+		if !ok {
+			return "", time.Time{}, ErrInvalidCredential
+		}
+		storeErr = repository.StoreAccountTicket(ctx, service.hash("ticket", ticket), session.ID, session.AccountTokenHash, now, expiresAt)
+	} else {
+		storeErr = service.repository.StoreTicket(ctx, service.hash("ticket", ticket), session.ID, now, expiresAt)
+	}
+	if err := storeErr; err != nil {
 		return "", time.Time{}, fmt.Errorf("store realtime ticket: %w", err)
 	}
 	return ticket, expiresAt, nil

@@ -68,6 +68,10 @@ func (handler identityHTTPHandler) refreshSession(writer http.ResponseWriter, re
 }
 
 func (handler identityHTTPHandler) revokeSession(writer http.ResponseWriter, request *http.Request) {
+	if strings.HasPrefix(request.Header.Get("Authorization"), "Bearer acct_") {
+		handler.writeError(writer, request, http.StatusForbidden, "ACCOUNT_LOGOUT_REQUIRED", "account.error.logout_required", false)
+		return
+	}
 	session, ok := handler.authenticate(writer, request)
 	if !ok {
 		return

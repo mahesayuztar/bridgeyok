@@ -382,7 +382,7 @@ func (connection *connection) readLoop() {
 			connection.closeWith(websocket.StatusServiceRestart, "server draining")
 			return
 		}
-		if _, err := connection.server.options.Identity.ValidateSession(connection.ctx, connection.session.ID); err != nil {
+		if err := connection.validateIdentity(); err != nil {
 			connection.server.options.Logger.WarnContext(connection.ctx, "realtime_message_rejected", "connection_id", connection.id, "result_code", "SESSION_INACTIVE")
 			<-connection.sendErrorAndClose(ClientEnvelope{}, "SESSION_INACTIVE", false, websocket.StatusPolicyViolation, "session inactive")
 			return
@@ -599,6 +599,10 @@ func (connection *connection) writeLoop() {
 				return
 			}
 		case <-pingTicker.C:
+			if err := connection.validateIdentity(); err != nil {
+				connection.closeWith(websocket.StatusPolicyViolation, "session inactive")
+				return
+			}
 			pingCtx, cancel := context.WithTimeout(context.Background(), connection.server.options.PongTimeout)
 			err := connection.socket.Ping(pingCtx)
 			cancel()
@@ -819,4 +823,14 @@ func activeParticipantByID(aggregate table.Aggregate, participantID string) (tab
 		}
 	}
 	return table.Participant{}, false
+}
+
+func (connection *connection) validateIdentity() error {
+	if validator, ok := connection.server.options.Identity.(interface {
+		ValidateConnection(context.Context, identity.Session) error
+	}); ok {
+		return validator.ValidateConnection(connection.ctx, connection.session)
+	}
+	_, err := connection.server.options.Identity.ValidateSession(connection.ctx, connection.session.ID)
+	return err
 }

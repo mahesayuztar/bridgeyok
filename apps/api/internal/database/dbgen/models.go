@@ -18,6 +18,13 @@ type BridgeyokAbuseReport struct {
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }
 
+type BridgeyokAccountSession struct {
+	TokenHash   []byte             `json:"token_hash"`
+	UserID      string             `json:"user_id"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	OnlineUntil pgtype.Timestamptz `json:"online_until"`
+}
+
 type BridgeyokAuditLog struct {
 	ID             int64              `json:"id"`
 	ActorSessionID pgtype.UUID        `json:"actor_session_id"`
@@ -66,6 +73,11 @@ type BridgeyokBoardSeatAttribution struct {
 	IsBot      bool   `json:"is_bot"`
 }
 
+type BridgeyokFollow struct {
+	FollowerID string `json:"follower_id"`
+	FollowedID string `json:"followed_id"`
+}
+
 type BridgeyokGameEvent struct {
 	TableID    string             `json:"table_id"`
 	Seq        int64              `json:"seq"`
@@ -95,6 +107,14 @@ type BridgeyokGuestSession struct {
 	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
 }
 
+type BridgeyokPlayerInvite struct {
+	SenderID    string             `json:"sender_id"`
+	RecipientID string             `json:"recipient_id"`
+	TableID     string             `json:"table_id"`
+	InviteCode  string             `json:"invite_code"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+}
+
 type BridgeyokProcessedCommand struct {
 	TableID     string             `json:"table_id"`
 	SessionID   string             `json:"session_id"`
@@ -108,11 +128,12 @@ type BridgeyokProcessedCommand struct {
 }
 
 type BridgeyokRealtimeTicket struct {
-	TicketHash []byte             `json:"ticket_hash"`
-	SessionID  string             `json:"session_id"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
-	UsedAt     pgtype.Timestamptz `json:"used_at"`
+	TicketHash       []byte             `json:"ticket_hash"`
+	SessionID        string             `json:"session_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
+	UsedAt           pgtype.Timestamptz `json:"used_at"`
+	AccountTokenHash []byte             `json:"account_token_hash"`
 }
 
 type BridgeyokTable struct {
@@ -146,4 +167,15 @@ type BridgeyokTableSeat struct {
 	RecoveryHash    []byte             `json:"recovery_hash"`
 	OfflineSince    pgtype.Timestamptz `json:"offline_since"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BridgeyokUser struct {
+	ID           string             `json:"id"`
+	SessionID    string             `json:"session_id"`
+	Username     string             `json:"username"`
+	DisplayName  string             `json:"display_name"`
+	Avatar       string             `json:"avatar"`
+	PasswordSalt []byte             `json:"password_salt"`
+	PasswordHash []byte             `json:"password_hash"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }

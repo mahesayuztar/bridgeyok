@@ -33,6 +33,7 @@ type Options struct {
 	Realtime       RealtimeService
 	Analysis       AnalysisService
 	Replay         BoardReplayService
+	Accounts       identity.AccountRepository
 }
 
 type RealtimeService interface {
@@ -83,6 +84,21 @@ func NewRouter(options Options) http.Handler {
 	})
 	identityHandler := identityHTTPHandler{service: options.Identity, logger: options.Logger}
 	tableHandler := tableHTTPHandler{service: options.Table, identity: identityHandler, realtime: options.Realtime, logger: options.Logger}
+	if service, ok := options.Identity.(*identity.Service); ok && options.Accounts != nil {
+		accountHandler := accountHTTPHandler{service: service, repository: options.Accounts, tables: options.Table, identity: identityHandler, passwordSlots: make(chan struct{}, 4)}
+		router.Post("/v1/account/signup", accountHandler.credentials)
+		router.Post("/v1/account/login", accountHandler.credentials)
+		router.Get("/v1/account", accountHandler.serve)
+		router.Post("/v1/account/logout", accountHandler.serve)
+		router.Post("/v1/account/heartbeat", accountHandler.serve)
+		router.Put("/v1/account/profile", accountHandler.serve)
+		router.Get("/v1/account/users", accountHandler.serve)
+		router.Get("/v1/account/invitations", accountHandler.serve)
+		router.Put("/v1/account/users/{userId}/follow", accountHandler.serve)
+		router.Delete("/v1/account/users/{userId}/follow", accountHandler.serve)
+		router.Get("/v1/account/tables/{tableId}/participants", accountHandler.serve)
+		router.Post("/v1/account/tables/{tableId}/invites", accountHandler.serve)
+	}
 	router.Post("/v1/guest-sessions", identityHandler.createSession)
 	router.Post("/v1/guest-sessions/refresh", identityHandler.refreshSession)
 	router.Delete("/v1/guest-sessions/current", identityHandler.revokeSession)
@@ -192,7 +208,7 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 				return
 			}
 			writer.Header().Set("Access-Control-Allow-Origin", origin)
-			writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID")
 			if request.Method == http.MethodOptions {
 				writer.WriteHeader(http.StatusNoContent)

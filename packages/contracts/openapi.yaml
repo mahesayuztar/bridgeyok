@@ -7,6 +7,267 @@ servers:
   - url: http://localhost:8080
     description: Local development
 paths:
+  /v1/account/signup:
+    post:
+      operationId: registerAccount
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountLogin'
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountSignupRequest'
+  /v1/account/login:
+    post:
+      operationId: loginAccount
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountLogin'
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountLoginRequest'
+  /v1/account:
+    get:
+      operationId: getCurrentAccount
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountLogin'
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /v1/account/logout:
+    post:
+      operationId: logoutAccount
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: Successful operation
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /v1/account/heartbeat:
+    post:
+      operationId: heartbeatAccount
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: Successful operation
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /v1/account/profile:
+    put:
+      operationId: updateAccountProfile
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountProfile'
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountProfileUpdate'
+  /v1/account/users:
+    get:
+      operationId: searchAccountUsers
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 30
+                items:
+                  $ref: '#/components/schemas/AccountProfile'
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+          maxLength: 96
+      - name: friends
+        in: query
+        schema:
+          type: boolean
+  /v1/account/users/{userId}/follow:
+    put:
+      operationId: followAccountUser
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: Successful operation
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: unfollowAccountUser
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: Successful operation
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /v1/account/tables/{tableId}/participants:
+    get:
+      operationId: getTableAccountProfiles
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccountProfile'
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: tableId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /v1/account/tables/{tableId}/invites:
+    post:
+      operationId: inviteAccountPlayer
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: Successful operation
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerInviteRequest'
+      parameters:
+      - name: tableId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /v1/account/invitations:
+    get:
+      operationId: listPlayerInvitations
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items:
+                  $ref: '#/components/schemas/PlayerInvitation'
+        default:
+          description: Account operation rejected
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /:
     get:
       operationId: getServiceInfo
@@ -382,6 +643,141 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    AccountProfile:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - username
+      - displayName
+      - avatar
+      - online
+      - following
+      - friends
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+          pattern: ^[a-z0-9_]{3,24}$
+        displayName:
+          type: string
+        avatar: &id001
+          type: string
+          enum:
+          - spade
+          - heart
+          - diamond
+          - club
+          - owl
+          - fox
+        online:
+          type: boolean
+        following:
+          type: boolean
+        friends:
+          type: boolean
+        participantId:
+          type: string
+          format: uuid
+    AccountLogin:
+      type: object
+      additionalProperties: false
+      required:
+      - profile
+      - token
+      - expiresAt
+      - sessionId
+      properties:
+        profile:
+          $ref: '#/components/schemas/AccountProfile'
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        sessionId:
+          type: string
+          format: uuid
+    AccountSignupRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - username
+      - password
+      - displayName
+      - avatar
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 24
+        password:
+          type: string
+          minLength: 10
+          maxLength: 128
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 24
+        avatar: *id001
+    AccountLoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - username
+      - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          maxLength: 128
+    AccountProfileUpdate:
+      type: object
+      additionalProperties: false
+      required:
+      - displayName
+      - avatar
+      properties:
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 24
+        avatar: *id001
+    PlayerInviteRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - inviteCode
+      properties:
+        userId:
+          type: string
+          format: uuid
+        inviteCode:
+          type: string
+          pattern: ^[A-Z2-7]{26}$
+    PlayerInvitation:
+      type: object
+      additionalProperties: false
+      required:
+      - sender
+      - tableId
+      - inviteCode
+      - expiresAt
+      properties:
+        sender:
+          $ref: '#/components/schemas/AccountProfile'
+        tableId:
+          type: string
+          format: uuid
+        inviteCode:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
     ReplayCard:
       type: object
       additionalProperties: false
