@@ -14,6 +14,8 @@ For the Vercel container, build `docker build -f Dockerfile.vercel -t bridgeyok-
 
 Verification:
 
+The pinned DDS Linux memory probe originally selected the third line of `free -k`, which is `Swap:` in the Debian runtime. With zero swap it allocates no workers and exits 1 with `Memory::GetPtr: 0 vs. 0` on stdout and empty stderr, even when RAM is available. `scripts/build-dds.sh` patches the probe to select `Mem:` explicitly and read its available-memory column. Keep this patch when rebuilding the pinned solver; increasing `DDS_TIMEOUT` does not address this initialization failure. Verify with `python3 scripts/smoke-dds-image.py IMAGE --zero-swap` as well as the normal image smoke test.
+
 ```sh
 make test-deal-sources
 make test-analysis
