@@ -44,7 +44,8 @@ RUN apt-get update && \
     apt-get install --yes --no-install-recommends \
         ca-certificates \
         tzdata \
-        libstdc++6 && \
+        libstdc++6 \
+        procps && \
     rm -rf /var/lib/apt/lists/* && \
     groupadd --system bridgeyok && \
     useradd \
