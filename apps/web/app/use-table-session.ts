@@ -114,19 +114,6 @@ async function readProblem(response: Response): Promise<ApiError> {
   }
 }
 
-async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(new URL(path, API_BASE_URL), { ...init, signal: init.signal ?? AbortSignal.timeout(8000) });
-  } catch (error) {
-    throw new ApiError(issueFromFailure(error, "rest"));
-  }
-  if (!response.ok) {
-    throw await readProblem(response);
-  }
-  return (await response.json()) as T;
-}
-
 function socketUrl(ticket: string) {
   const url = new URL("/v1/ws", API_BASE_URL);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -135,6 +122,7 @@ function socketUrl(ticket: string) {
 }
 
 function issueForError(error: unknown): ClientIssue {
+  if (error instanceof AccountRequestError) return issueFromServer({ status: error.status, source: "rest", ...(error.status === 401 ? { code: "SESSION_INVALID" } : {}) });
   return error instanceof ApiError ? error.issue : issueFromFailure(error, "rest");
 }
 
@@ -194,16 +182,11 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     tableStateRef.current = tableState;
   }, [tableState]);
 
-  const refreshCredentials = useCallback(async (identity?: StoredIdentity) => {
+  const refreshCredentials = useCallback(async () => {
     if (refreshPromiseRef.current !== null) {
       return refreshPromiseRef.current;
     }
-    const promise = (identity?.deviceCredential === "registered" || identity === undefined)
-      ? accountRequest<{ credentials: GuestCredentials }>().then(result => result.credentials)
-      : requestJson<GuestCredentials>("/v1/guest-sessions/refresh", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ deviceCredential: identity.deviceCredential })
-        });
+    const promise = accountRequest<{ credentials: GuestCredentials }>().then(result => result.credentials);
     refreshPromiseRef.current = promise;
     try {
       const credentials = await promise;

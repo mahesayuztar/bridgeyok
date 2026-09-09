@@ -11,7 +11,12 @@ export function safeReturnPath(value: string | null | undefined) {
 }
 
 export class AccountRequestError extends Error {
-  constructor(message: string, public status: number) { super(message); }
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
 }
 
 export async function accountRequest<T>(path = "", init: RequestInit = {}): Promise<T> {
