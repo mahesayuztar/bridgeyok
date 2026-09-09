@@ -27,7 +27,10 @@ def main():
             input=" ".join(map(str, values)), text=True, capture_output=True, timeout=30,
         )
         if result.returncode:
-            raise SystemExit(f"DDS image failed fixture {fixture['name']} (exit {result.returncode})")
+            raise SystemExit(
+                f"DDS image failed fixture {fixture['name']} (exit {result.returncode})\n"
+                f"stdout: {result.stdout.strip()}\nstderr: {result.stderr.strip()}"
+            )
         output = json.loads(result.stdout)
         expected = fixture["expected"]
         expectedTable = [

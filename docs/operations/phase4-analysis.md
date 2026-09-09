@@ -10,6 +10,8 @@ Use `board_analysis_processed` with `request_id` to distinguish `BOARD_NOT_FOUND
 
 For unavailable analysis, check executable path/permission and the installed C++ runtime, then run `make test-analysis`. For busy responses, retry after two seconds; raise concurrency only after checking memory. Investigate repeated timeouts using nonprivate fixtures. Solver failure cannot change the committed result or block gameplay.
 
+For the Vercel container, build `docker build -f Dockerfile.vercel -t bridgeyok-vercel .` and run `python3 scripts/smoke-dds-image.py bridgeyok-vercel` before deploying. The final runtime stage must include `procps`, even when the DDS binary exists and `ldd` resolves all libraries. Without its `free` command, DDS can exit with `sh: 1: free: not found` and `Memory::GetPtr: 0 vs. 0`; the API maps the process failure to `503 ANALYSIS_UNAVAILABLE`. The `DDS initialized` log only confirms adapter configuration, not native solver readiness.
+
 Verification:
 
 ```sh
