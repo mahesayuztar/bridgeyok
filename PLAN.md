@@ -1510,9 +1510,35 @@ ADR 0018 explicitly supersedes guest-only flows and exclusions of permanent ligh
 
 - [x] Scoped auth/session, landing, navigation and participant boundary audit.
 - [x] Product decision updated in ADR 0018.
-- [ ] Account persistence, independent sessions and predefined avatars.
-- [ ] Server auth/reverse-auth guards, concise landing and Play Home.
-- [ ] Sidebar/mobile bottom navigation and Profile Settings.
-- [ ] Idempotent follows, mutual friends, server presence and participant lookup.
-- [ ] Online-gated invites with existing join authority.
-- [ ] Security/semantics tests and responsive/gameplay regression evidence.
+- [x] Account persistence, independent sessions and predefined avatars.
+- [x] Server auth/reverse-auth guards, concise landing and Play Home.
+- [x] Sidebar/mobile bottom navigation and Profile Settings.
+- [x] Idempotent follows, mutual friends, server presence and participant lookup.
+- [x] Online-gated invites with existing join authority.
+- [x] Security/semantics tests and responsive/gameplay regression evidence.
+
+### Scoped React audit coverage
+
+Audit mode A covered landing/guest entry, lobby, session hook, root layout, and participant/status boundaries. Gameplay engine, animation design, and unrelated screens were excluded.
+
+| Category | Entry and guards | Navigation/profile/social | Table integration |
+|---|---|---|---|
+| Concurrent rendering | clean | clean; requests cancel on unmount | clean; server projection unchanged |
+| Server components | guest-only boundary replaced | server pages with client interaction leaves | server guard wraps existing client |
+| Actions/forms | registration/login use action state | profile action state; server validation | follow/invite use existing action context |
+| Data fetching | authoritative server session validation | bounded cancellable presence/search polling | one shared participant lookup |
+| State management | credential compatibility retained | Friends derived server-side | social state separate from game state |
+| Memoization | n/a | no speculative memoization | existing gameplay memoization unchanged |
+| Effects/events | credential restore cleanup retained | polling abort/interval cleanup | realtime revocation checked per command/ping |
+| Component patterns | one auth form | shared avatar and follow controls | canonical PlayingCard reused |
+| Reuse/dead code | unused GuestEntry removed | one shell and one social list | existing participant and navbar extended |
+
+Account migration 00007 is required before deploying this API/web revision. Validation uses an isolated local PostgreSQL instance; production deployment is not part of this refinement. Existing guest API clients remain supported, while new web entry requires an account. Account passwords have no email recovery in this minimum scope.
+
+### Final validation — 10 September 2026
+
+- API: `go test -race ./apps/api/...`, Go vet/lint, and migration validation pass. Isolated PostgreSQL account/realtime integration tests pass, including independent session revocation, linked WebSocket ticket invalidation, follow idempotency/mutual friendship, participant authorization, offline invite rejection, invite deduplication, and unchanged table revision/seats.
+- Web: production build, TypeScript, 54 unit tests and 3 contract tests pass. ESLint has no errors; two pre-existing `aria-description` warnings remain in score sheet/table status controls.
+- Account browser coverage: three scenarios pass for auth/reverse-auth/return paths, persisted profile/avatar, mutual Friends, table participant follow, online/offline invite, error/retry/self/empty states, Coming soon singleton feedback, touch, and keyboard. Landing, Play, Profile and invite are checked at 320, 390, 768, 1024, 1440 and 1920 px. Unfinished product destinations return 404.
+- Gameplay browser coverage passes across focused runs: four-account board completion with 500 ms delayed authoritative responses, controller replacement/reconnect and hidden-hand privacy; stale-table recovery; bot consensus; completed-board replay; two leave/navigation scenarios. Four deterministic dense-dummy geometry cases pass at 320/390 px, both side orientations.
+- Existing regression expectations now match the already-shipped draggable claim dialog and completed-deal side-card scale. Bulk play waits for the deliberately delayed server projection before the next action while retaining the 250 ms optimistic-removal assertion. Dense dummy suit exposure is reduced on small screens to prevent trick overlap; legality and game projection remain unchanged.

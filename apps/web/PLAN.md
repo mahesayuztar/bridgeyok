@@ -989,3 +989,9 @@ Referensi: tiga screenshot pengguna pada 6 September 2026. Perubahan ini menggan
 - Replay uses the same CompletedDeal, TableSurface, card primitive, player scale tokens, viewer orientation, and result presentation as the completed-board preview. The entire landscape surface is scaled uniformly; separate replay hand layout rules were removed.
 - Mobile portrait replay occupies less than half the screen. Touch devices retain nonmodal interaction in landscape and after rotation; the underlying table remains playable. Claim panels start inside the mobile viewport.
 - Verification: replay interaction checks at 1440, 768, 390, and 320 px; all-dialog mouse/touch/keyboard checks at 1440, 390, and 320 px; canonical card/player geometry comparison within 0.1 CSS px before scaling at desktop, mobile portrait, and landscape; 844×390 touch interaction and rotation recovery. Four replay unit tests, TypeScript, and scoped ESLint pass.
+
+## Pre-Team-Match account refinement — 9 September 2026
+
+ADR 0018 supersedes the previous guest-only web entry and friend-list exclusion. The web product now uses username/password registration, predefined avatars, mutual-follow Friends, and server-leased presence. Public landing/login/signup reverse-guard to Play; each app route validates the account before rendering. Four real capabilities are shown, with only Casual Game usable. No fifth feature or Team Match implementation is introduced.
+
+Main app pages share a desktop sidebar and mobile bottom navigation with Play centered. Gameplay retains its dedicated viewport; participant profile/follow and online-gated invite extend its existing menus. Profile Settings is the only Settings section. Offline/empty/loading/error and coming-soon states are covered in account browser tests. Final evidence is recorded in the root PLAN refinement checklist.
