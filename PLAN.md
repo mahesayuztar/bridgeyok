@@ -22,7 +22,7 @@ Keputusan utama:
 4. **REST untuk lifecycle resource; WebSocket untuk sesi realtime.** Create/join/read history dilakukan lewat HTTPS. Subscribe, presence, command game, acknowledgment, dan event dilakukan lewat WSS.
 5. **Satu table actor per meja aktif.** Satu goroutine memiliki mutable state suatu meja sehingga command diproses berurutan. Setiap koneksi mempunyai read loop, write loop, dan bounded outbound queue.
 6. **Semua response diproyeksikan per penerima.** North tidak pernah menerima kartu East/West/South yang masih tersembunyi. Spectator tidak diimplementasikan.
-7. **Guest/basic identity only.** Identitas cukup untuk create/join, seat ownership, reconnect, dan recovery. OAuth, passkey, account linking, dan public profile tidak direncanakan.
+7. **Lightweight registered identity (ADR 0018).** Akun username/password, avatar bawaan, follow/friends, dan online-aware invite ditambahkan sebelum Team Match. Identitas internal meja dan projection boundary dipertahankan. OAuth, passkey, account linking, dan public profile pages tetap di luar scope.
 8. **Pure engine tetap terisolasi.** Persistence, realtime, deal source, team match, dan DDS berada di application/domain boundary di luar pure game engine.
 9. **Aturan online mencegah irregularity yang dapat dibuat mustahil.** Server hanya menerima call/play yang legal dan mendokumentasikan laws yang memerlukan penilaian Director atau tidak berlaku pada format ini.
 10. **Team Match adalah satu-satunya format lintas meja.** Board disinkronkan pada dua meja, hasil dibandingkan dengan IMP, lalu total match disimpan. Tidak ada tournament movement atau standings umum.
@@ -1503,3 +1503,16 @@ Implemented participant-only `GET /v1/boards/{boardId}/replay` from validated bo
 ## DDS current-position analysis — 8 September 2026
 
 Extend the existing analysis boundary with remaining-position `SolveBoard` output per legal card, keyed by live revision or completed-board card cursor. Reuse the pure engine for historical reconstruction, preserve recipient hidden-hand boundaries, and share one fenced loading/result mechanism between live play and replay. Replay navigation now counts cards rather than tricks. Audit and validation: `docs/dds-position-audit.md`. Concurrent dialog layout/drag work remains owned by its separate task.
+
+## Pre-Team-Match account refinement — 9 September 2026
+
+ADR 0018 explicitly supersedes guest-only flows and exclusions of permanent lightweight accounts/friends above. Historical completed-phase evidence remains unchanged. Registered web entry replaces guest entry; legacy guest API compatibility remains. Four meaningful Home capabilities are used; there is no invented fifth feature. Team Match is not implemented in this task.
+
+- [x] Scoped auth/session, landing, navigation and participant boundary audit.
+- [x] Product decision updated in ADR 0018.
+- [ ] Account persistence, independent sessions and predefined avatars.
+- [ ] Server auth/reverse-auth guards, concise landing and Play Home.
+- [ ] Sidebar/mobile bottom navigation and Profile Settings.
+- [ ] Idempotent follows, mutual friends, server presence and participant lookup.
+- [ ] Online-gated invites with existing join authority.
+- [ ] Security/semantics tests and responsive/gameplay regression evidence.
