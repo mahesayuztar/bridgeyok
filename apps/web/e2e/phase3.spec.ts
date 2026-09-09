@@ -56,10 +56,14 @@ function maxFrameRevision(frames: string[]) {
   }, 0);
 }
 
-async function enterAsGuest(page: Page, nickname: string) {
-  await page.goto("/");
+async function enterAsAccount(page: Page, nickname: string) {
+  await page.goto("/signup");
+  await page.getByLabel("Username", { exact: true }).fill(`p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`);
   await page.getByLabel("Nama di meja").fill(nickname);
-  await page.getByRole("button", { name: "Masuk sebagai tamu" }).click();
+  await page.getByLabel("Kata sandi", { exact: true }).fill("bridge test password");
+  await page.getByRole("button", { name: "Sign Up", exact: true }).click();
+  await expect(page).toHaveURL(/\/play$/);
+  await page.getByRole("link", { name: /Casual Game/ }).click();
   await expect(page).toHaveURL(/\/lobby/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(nickname);
 }
@@ -103,25 +107,25 @@ async function makeBid(page: Page, level: number, strain: string) {
 }
 
 async function playNextCard(pages: Page[]) {
+  await pages[0]!.waitForTimeout(600);
+  let played: { page: Page; label: string } | undefined;
   await expect.poll(async () => {
-    const counts = await Promise.all(pages.map((page) => page.locator('button[aria-label^="Mainkan "]:enabled').count()));
-    return counts.reduce((total, count) => total + count, 0);
-  }).toBeGreaterThan(0);
-  for (const page of pages) {
-    const cards = page.locator('button[aria-label^="Mainkan "]:enabled');
-    if (await cards.count() > 0) {
-      const card = cards.first();
-      const cardLabel = await card.getAttribute("aria-label");
-      const cardButton = page.getByRole("button", {
-        name: cardLabel!,
-        exact: true,
+    for (const page of pages) {
+      const label = await page.evaluate(() => {
+        const card = document.querySelector<HTMLButtonElement>('button[aria-label^="Mainkan "]:enabled');
+        if (!card) return null;
+        const label = card.getAttribute("aria-label");
+        card.click();
+        return label;
       });
-      await card.dispatchEvent("click");
-      await expect(cardButton).toHaveCount(0, { timeout: 250 });
-      return;
+      if (label !== null) {
+        played = { page, label };
+        return true;
+      }
     }
-  }
-  throw new Error("no playable card was exposed to the current controller");
+    return false;
+  }).toBe(true);
+  await expect(played!.page.getByRole("button", { name: played!.label, exact: true })).toHaveCount(0, { timeout: 250 });
 }
 
 async function dragPlayableCard(
@@ -890,11 +894,11 @@ async function assertCompletedDealGeometry(page: Page) {
     geometry.cardSizes.top.height / geometry.cardSizes.top.width,
   ).toBeCloseTo(1.4, 1);
   expect(geometry.cardSizes.left.height).toBeCloseTo(
-    geometry.cardSizes.top.width,
+    geometry.cardSizes.top.width * 1.42,
     0,
   );
   expect(geometry.cardSizes.right.height).toBeCloseTo(
-    geometry.cardSizes.top.width,
+    geometry.cardSizes.top.width * 1.42,
     0,
   );
   expect(geometry.cardSizes.left.width).toBeLessThan(
@@ -931,20 +935,20 @@ async function trickCounts(page: Page) {
   }));
 }
 
-test("stale table recovery returns an authenticated guest to the lobby", async ({ page }) => {
-  await enterAsGuest(page, "Raka");
+test("stale table recovery returns an authenticated account to the lobby", async ({ page }) => {
+  await enterAsAccount(page, "Raka");
   await page.evaluate(() => {
     window.localStorage.setItem("bridgeyok.table.v1", JSON.stringify({ tableId: "00000000-0000-4000-8000-000000000000" }));
   });
 
-  await page.goto("/");
+  await page.goto("/lobby");
 
   await expect(page).toHaveURL(/\/lobby$/);
   await expect(page.getByRole("button", { name: "Buat meja" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem("bridgeyok.table.v1"))).toBeNull();
 });
 
-test("four guests finish boards, recover a controller, and keep hidden hands private", async ({ browser }, testInfo) => {
+test("four accounts finish boards, recover a controller, and keep hidden hands private", async ({ browser }, testInfo) => {
   test.setTimeout(360_000);
   const profiles = [
     { nickname: "Nara", viewport: { width: 1920, height: 1080 } },
@@ -1009,7 +1013,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
         sentFrames.push(String(event.payload)),
       );
     });
-    await enterAsGuest(page, nickname);
+    await enterAsAccount(page, nickname);
     return { context, page, frames, sentFrames };
   }));
   const north = players[0]!;
@@ -1162,7 +1166,7 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
     socket.on("framereceived", (event) => west.frames.push(String(event.payload)));
     socket.on("framesent", (event) => west.sentFrames.push(String(event.payload)));
   });
-  await west.page.goto("/");
+  await west.page.goto(tableURL);
   await expect(west.page).toHaveURL(tableURL);
   await waitForConnection(west.page);
   activePages[3] = west.page;
@@ -1399,17 +1403,20 @@ test("four guests finish boards, recover a controller, and keep hidden hands pri
   await claimTrigger.focus();
   await replacementTab.keyboard.press("Enter");
   await expect(
-    replacementTab.getByRole("group", {
+    replacementTab.getByRole("dialog", {
       name: "Jumlah trick yang diklaim",
     }),
   ).toBeVisible();
   await expect(
     replacementTab.getByRole("button", { name: /^Claim \d+ trick$/ }).first(),
   ).toBeEnabled();
-  const claimMenuBox = (await replacementTab.getByRole("group", { name: "Jumlah trick yang diklaim" }).boundingBox())!;
-  const claimTriggerBox = (await claimTrigger.boundingBox())!;
-  expect(claimMenuBox.y).toBeGreaterThanOrEqual(claimTriggerBox.y + claimTriggerBox.height);
-  await claimTrigger.click({ timeout: 10_000 });
+  const claimMenuBox = (await replacementTab.getByRole("dialog", { name: "Jumlah trick yang diklaim" }).boundingBox())!;
+  expect(claimMenuBox.y).toBeGreaterThanOrEqual(0);
+  expect(claimMenuBox.x).toBeGreaterThanOrEqual(0);
+  expect(claimMenuBox.x + claimMenuBox.width).toBeLessThanOrEqual(replacementTab.viewportSize()!.width);
+  expect(claimMenuBox.y + claimMenuBox.height).toBeLessThanOrEqual(replacementTab.viewportSize()!.height);
+  await claimTrigger.focus();
+  await replacementTab.keyboard.press("Enter");
   await expect(claimTrigger).toBeFocused();
   await expect.poll(async () => {
     const availableUndo = await Promise.all(
@@ -1598,8 +1605,8 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
     });
   }
   try {
-    await enterAsGuest(owner, "Bot Owner");
-    await enterAsGuest(guest, "Human Partner");
+    await enterAsAccount(owner, "Bot Owner");
+    await enterAsAccount(guest, "Human Partner");
     await owner.getByRole("button", { name: "Buat meja" }).click();
     await waitForConnection(owner);
     const inviteCode = (await owner.locator(".invite-inline .invite-code").textContent())!.trim();
@@ -1718,7 +1725,7 @@ test("completed board replay shows four hands and navigates recorded cards", asy
   ]) {
     const context = await browser.newContext({ reducedMotion: "reduce" });
     const page = await context.newPage();
-    await enterAsGuest(page, nickname);
+    await enterAsAccount(page, nickname);
     players.push({ context, page, nickname });
   }
   const north = players[0]!;

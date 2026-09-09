@@ -27,7 +27,7 @@ func TestRegisteredAccountSocialAndInviteBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer postgres.Close()
+	t.Cleanup(postgres.Close)
 	now := time.Now().UTC()
 	service, err := identity.NewService(postgres, []byte(strings.Repeat("account-integration-", 2)), rand.Reader, func() time.Time { return now })
 	if err != nil {

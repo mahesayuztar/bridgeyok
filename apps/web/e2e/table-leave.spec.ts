@@ -1,16 +1,20 @@
 import { expect, test } from "@playwright/test";
 
 test("leaving a table clears recovery in every browser tab", async ({ context, page }) => {
-  await page.goto("/");
+  await page.goto("/signup");
+  await page.getByLabel("Username", { exact: true }).fill(`leave_${Date.now()}`);
+  await page.getByLabel("Kata sandi", { exact: true }).fill("bridge test password");
   await page.getByLabel("Nama di meja").fill("Leave Sync Guest");
-  await page.getByRole("button", { name: "Masuk sebagai tamu" }).click();
+  await page.getByRole("button", { name: "Sign Up", exact: true }).click();
+  await expect(page).toHaveURL(/\/play$/);
+  await page.getByRole("link", { name: /Casual Game/ }).click();
   await expect(page).toHaveURL(/\/lobby/);
   await page.getByRole("button", { name: "Buat meja" }).click();
   await expect(page).toHaveURL(/\/table\//);
   await expect(page.locator(".connection-status")).toContainText("Terhubung");
 
   const secondTab = await context.newPage();
-  await secondTab.goto("/");
+  await secondTab.goto(page.url());
   await expect(secondTab).toHaveURL(/\/table\//);
   await expect(secondTab.locator(".connection-status")).toContainText("Terhubung");
 
@@ -24,9 +28,13 @@ test("leaving a table clears recovery in every browser tab", async ({ context, p
 });
 
 test("active navbar stays usable across viewport sizes and confirms leaving", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/signup");
+  await page.getByLabel("Username", { exact: true }).fill(`leave_${Date.now()}`);
+  await page.getByLabel("Kata sandi", { exact: true }).fill("bridge test password");
   await page.getByLabel("Nama di meja").fill("Navbar Guest");
-  await page.getByRole("button", { name: "Masuk sebagai tamu" }).click();
+  await page.getByRole("button", { name: "Sign Up", exact: true }).click();
+  await expect(page).toHaveURL(/\/play$/);
+  await page.getByRole("link", { name: /Casual Game/ }).click();
   await expect(page).toHaveURL(/\/lobby/);
   await page.getByRole("button", { name: "Buat meja" }).click();
   await expect(page.locator(".connection-status")).toContainText("Terhubung");

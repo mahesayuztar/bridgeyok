@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  ...(process.env.NEXT_DIST_DIR === ".next-e2e" ? { devIndicators: false as const } : {}),
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   // output: "standalone",
   allowedDevOrigins: ["192.168.1.6"],
