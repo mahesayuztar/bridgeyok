@@ -601,6 +601,7 @@ func (connection *connection) writeLoop() {
 		case <-pingTicker.C:
 			if err := connection.validateIdentity(); err != nil {
 				connection.closeWith(websocket.StatusPolicyViolation, "session inactive")
+				connection.performClose()
 				return
 			}
 			pingCtx, cancel := context.WithTimeout(context.Background(), connection.server.options.PongTimeout)
