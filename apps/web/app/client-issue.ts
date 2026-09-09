@@ -32,7 +32,7 @@ export function issueFromServer({ code, status, retryable = false, source }: Iss
     case "SESSION_INACTIVE":
     case "SESSION_INVALID":
     case "UNAUTHORIZED":
-      return { kind: "session", title: "Sesi tamu sudah berakhir", detail: "Masuk kembali sebelum membuka meja. Data privat meja sudah dibersihkan dari tampilan.", retryable: false, action: "signInAgain", source };
+      return { kind: "session", title: "Sesi sudah berakhir", detail: "Masuk kembali sebelum membuka meja. Data privat meja sudah dibersihkan dari tampilan.", retryable: false, action: "signInAgain", source };
     case "ILLEGAL_CALL":
       return { kind: "validation", title: "Call belum legal", detail: "Pilih call lain yang tersedia pada urutan lelang ini.", retryable: false, source };
     case "CARD_NOT_HELD":

@@ -57,7 +57,7 @@ export default function BridgeTable({
 
   useEffect(() => {
     if (session.initializing) return;
-    if (session.nickname === null) {
+    if (session.nickname === null && session.tableState.issue === null) {
       router.replace("/");
       return;
     }
@@ -79,6 +79,7 @@ export default function BridgeTable({
     session.initializing,
     session.nickname,
     session.recoveryState,
+    session.tableState.issue,
     table?.tableId,
   ]);
 
@@ -151,6 +152,7 @@ export default function BridgeTable({
     return (
       <main className="table-client waiting-client">
         <WaitingTableStatusBar
+          inviteCode={session.inviteCode}
           loadBoardReplay={session.loadBoardReplay} loadPositionAnalysis={session.loadPositionAnalysis}
           table={table}
           connectionState={session.connectionState}

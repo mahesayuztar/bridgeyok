@@ -12,38 +12,40 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
   const [joinCode, setJoinCode] = useState(initialInviteCode.trim().toUpperCase());
 
   useEffect(() => {
-    if (!session.initializing && session.nickname === null) {
-      router.replace("/");
-    } else if (!session.initializing && session.recoveryState === "TABLE_ACTIVE" && session.tableState.activeTableId !== null) {
+    if (!session.initializing && session.nickname === null && session.tableState.issue === null) {
+      router.replace("/login");
+    } else if (initialInviteCode === "" && !session.initializing && session.recoveryState === "TABLE_ACTIVE" && session.tableState.activeTableId !== null) {
       router.replace(`/table/${session.tableState.activeTableId}`);
     }
-  }, [router, session.initializing, session.nickname, session.recoveryState, session.tableState.activeTableId]);
+  }, [initialInviteCode, router, session.initializing, session.nickname, session.recoveryState, session.tableState.activeTableId, session.tableState.issue]);
 
   async function createTable() {
-    await session.createTable();
+    const tableId = await session.createTable();
+    if (tableId) router.push(`/table/${tableId}`);
   }
 
   async function submitJoin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await session.joinTable(joinCode);
+    const tableId = await session.joinTable(joinCode);
+    if (tableId) router.push(`/table/${tableId}`);
   }
 
   async function logout() {
     await session.logout();
-    router.replace("/");
+    router.replace("/login");
   }
 
   if (session.initializing || session.nickname === null) {
-    return <main className="loading-state" role="status"><p>Memulihkan sesi tamu…</p></main>;
+    return <main className="loading-state">{session.tableState.issue ? <IssueNotice issue={session.tableState.issue} onAction={() => window.location.reload()} /> : <p role="status">Memulihkan sesi…</p>}</main>;
   }
 
   return (
     <div className="app-page">
       <header className="app-navbar">
-        <Link className="wordmark" href="/">BridgeYok</Link>
+        <Link className="wordmark" href="/play">BridgeYok</Link>
         <div className="app-identity">
           <span>{session.nickname}</span>
-          <button className="quiet-button" type="button" disabled={session.busy} onClick={() => void logout()}>Ganti nama</button>
+          <button className="quiet-button" type="button" disabled={session.busy} onClick={() => void logout()}>Logout</button>
         </div>
       </header>
       <main className="lobby-page">

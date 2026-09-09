@@ -1,4 +1,5 @@
 "use client";
+import { accountRequest, AccountRequestError } from "./account-types";
 import type { LoadPositionAnalysis, PositionAnalysis } from "./use-position-analysis";
 
 import type { components } from "@bridgeyok/contracts/openapi";
@@ -138,6 +139,7 @@ function issueForError(error: unknown): ClientIssue {
 }
 
 function isSessionFailure(error: unknown) {
+  if (error instanceof AccountRequestError) return error.status === 401;
   return error instanceof ApiError && [
     "SESSION_INVALID",
     "SESSION_INACTIVE",
@@ -157,7 +159,6 @@ export type TableSession = {
   inviteCode: string | null;
   tableState: TableClientState;
   projectedTable: LiveTableProjection | null;
-  createIdentity: (nickname: string) => Promise<boolean>;
   logout: () => Promise<void>;
   createTable: () => Promise<string | null>;
   joinTable: (inviteCode: string) => Promise<string | null>;
@@ -197,15 +198,12 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     if (refreshPromiseRef.current !== null) {
       return refreshPromiseRef.current;
     }
-    const storedIdentity = identity ?? readStoredValue<StoredIdentity>(browserStorage("local"), IDENTITY_KEY);
-    if (storedIdentity === null) {
-      throw new ApiError(issueFromServer({ code: "SESSION_INVALID", source: "rest" }), "SESSION_INVALID");
-    }
-    const promise = requestJson<GuestCredentials>("/v1/guest-sessions/refresh", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deviceCredential: storedIdentity.deviceCredential })
-    });
+    const promise = (identity?.deviceCredential === "registered" || identity === undefined)
+      ? accountRequest<{ credentials: GuestCredentials }>().then(result => result.credentials)
+      : requestJson<GuestCredentials>("/v1/guest-sessions/refresh", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceCredential: identity.deviceCredential })
+        });
     refreshPromiseRef.current = promise;
     try {
       const credentials = await promise;
@@ -526,21 +524,13 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     let active = true;
     async function restoreSession() {
       const local = browserStorage("local");
-      const session = browserStorage("session");
-      const identity = readStoredValue<StoredIdentity>(local, IDENTITY_KEY);
-      if (identity === null) {
-        setRecoveryState("NO_SESSION");
-        setInitializing(false);
-        return;
-      }
       try {
-        const access = readStoredValue<StoredAccess>(session, ACCESS_KEY);
-        if (access !== null && Date.parse(access.accessExpiresAt) > Date.now() + 30_000) {
-          credentialsRef.current = { ...identity, ...access };
-          setNickname(identity.nickname);
-        } else {
-          await refreshCredentials(identity);
-        }
+        const result = await accountRequest<{ credentials: GuestCredentials }>();
+        const previousIdentity = readStoredValue<StoredIdentity>(local, IDENTITY_KEY);
+        if (previousIdentity && previousIdentity.sessionId !== result.credentials.sessionId) removeStoredValue(local, TABLE_KEY);
+        credentialsRef.current = result.credentials;
+        persistCredentials(result.credentials);
+        setNickname(result.credentials.nickname);
         const storedTable = readStoredValue<StoredTable>(local, TABLE_KEY);
         if (storedTable !== null && active) {
           const table = normalizeLiveTableProjection(await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(storedTable.tableId)}`));
@@ -617,41 +607,19 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     };
   }, [beginConnection]);
 
-  const createIdentity = useCallback(async (newNickname: string) => {
-    setBusy(true);
-    try {
-      const credentials = await requestJson<GuestCredentials>("/v1/guest-sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname: newNickname.trim() })
-      });
-      credentialsRef.current = credentials;
-      persistCredentials(credentials);
-      setNickname(credentials.nickname);
-      setRecoveryState("SESSION_ONLY");
-      dispatch({ type: "issue", issue: null });
-      return true;
-    } catch (error) {
-      dispatch({ type: "issue", issue: issueForError(error) });
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, []);
-
   const logout = useCallback(async () => {
     setBusy(true);
     clearTable("NO_SESSION");
     try {
       if (credentialsRef.current !== null) {
-        await authenticatedRequest<void>("/v1/guest-sessions/current", { method: "DELETE" });
+        await accountRequest("/logout", { method: "POST" });
       }
     } catch {
     } finally {
       clearIdentity();
       setBusy(false);
     }
-  }, [authenticatedRequest, clearIdentity, clearTable]);
+  }, [clearIdentity, clearTable]);
 
   const createTable = useCallback(async () => {
     setBusy(true);
@@ -866,7 +834,6 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     inviteCode,
     tableState,
     projectedTable,
-    createIdentity,
     logout,
     createTable,
     joinTable,

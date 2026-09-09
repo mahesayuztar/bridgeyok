@@ -1,3 +1,4 @@
+import { TableInvite } from "./table-social";
 import { useDialogDrag } from "./use-dialog-drag";
 import { useRef, type ReactNode } from "react";
 import type { LiveTableProjection } from "../table-state";
@@ -24,12 +25,14 @@ const connectionLabels = {
 };
 
 export function WaitingTableStatusBar({
+  inviteCode,
   table,
   connectionState,
   onLeaveTable,
   loadBoardReplay,
   loadPositionAnalysis,
 }: {
+  inviteCode: string | null;
   table: LiveTableProjection;
   connectionState: TableSession["connectionState"];
   onLeaveTable: () => void;
@@ -41,6 +44,7 @@ export function WaitingTableStatusBar({
       <span className="table-wordmark">BridgeYok</span>
       <span>Meja tunggu</span>
       <div className="status-actions">
+        <TableInvite tableId={table.tableId} inviteCode={inviteCode} disabled={table.locked || table.participants.length >= 4} />
         <ScoreSheet loadBoardReplay={loadBoardReplay} loadPositionAnalysis={loadPositionAnalysis} table={table} />
         <div className="connection-status" data-state={connectionState}>
           <span className="status-mark" />
@@ -82,6 +86,7 @@ export function ActiveTableStatusBar({
   const leaveDrag = useDialogDrag();
   const auctionDrag = useDialogDrag();
   const leaveDialogRef = useRef<HTMLDialogElement>(null);
+  const cancelLeaveRef = useRef<HTMLButtonElement>(null);
   const game = table.game;
   const contract = game?.auction.contract;
   return (
@@ -90,7 +95,7 @@ export function ActiveTableStatusBar({
         className="table-leave-button"
         type="button"
         aria-label="Keluar dari meja"
-        onClick={() => leaveDialogRef.current?.showModal()}
+        onClick={() => { leaveDialogRef.current?.showModal(); cancelLeaveRef.current?.focus(); }}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9" />
@@ -112,7 +117,7 @@ export function ActiveTableStatusBar({
         <div>
           <button
             type="button"
-            autoFocus
+            ref={cancelLeaveRef}
             onClick={() => leaveDialogRef.current?.close()}
           >
             Batal
@@ -231,6 +236,7 @@ export function ActiveTableStatusBar({
                 Akhiri meja
               </button>
             ) : null}
+            <TableInvite tableId={table.tableId} inviteCode={inviteCode} disabled={table.locked || table.participants.length >= 4} />
             {inviteCode === null ? null : (
               <span className="table-menu-invite">
                 <small>Kode undangan</small>

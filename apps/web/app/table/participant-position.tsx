@@ -1,3 +1,6 @@
+import { useTableSocial } from "./table-social";
+import { ProfileAvatar } from "../profile-avatar";
+import { FollowAction } from "../social-users";
 import { useDialogDrag } from "./use-dialog-drag";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -88,7 +91,9 @@ export function ParticipantPosition({
   const [portalOpen, setPortalOpen] = useState(false);
   const assignment = table.seats[seat];
   const isViewer = table.viewerParticipantId === assignment?.participantId;
-  const name = participantName(table, assignment?.participantId);
+  const social = useTableSocial();
+  const profile = social?.profiles.find(profile => profile.participantId === assignment?.participantId);
+  const name = profile?.displayName ?? participantName(table, assignment?.participantId);
   const participant = table.participants.find(
     (candidate) => candidate.id === assignment?.participantId,
   );
@@ -120,6 +125,7 @@ export function ParticipantPosition({
     assignment !== undefined && isBot && table.viewerRole === "OWNER";
   const canManageOwnSeat = isViewer && table.state === "WAITING";
   const hasPortalActions =
+    profile !== undefined ||
     (assignment === undefined && (canTakeSeat || canAddBot)) ||
     canManageOwnSeat ||
     canRemove ||
@@ -185,6 +191,8 @@ export function ParticipantPosition({
                 </button>
               </header>
               <div className="participant-portal-actions">
+                {profile && social ? <div className="participant-social"><ProfileAvatar avatar={profile.avatar} online={profile.online} /><FollowAction profile={profile} viewerId={social.viewerId} onChanged={social.reload} /></div> : null}
+                {social?.error ? <p role="status">{social.error}<button type="button" onClick={social.reload}>Coba lagi</button></p> : null}
                 {assignment !== undefined || !canTakeSeat ? null : (
                   <button
                     type="button"
@@ -329,6 +337,7 @@ export function ParticipantPosition({
           aria-label={`Buka menu ${name}, kursi ${seat}${isBot ? ", bot" : ""}`}
         >
           <span className="player-seat">{seat}</span>
+          {profile ? <ProfileAvatar avatar={profile.avatar} compact /> : null}
           <span className="player-copy">
             <strong>
               <ParticipantIdentity
