@@ -3,11 +3,12 @@ import json
 import pathlib
 import subprocess
 import sys
+import tempfile
 
 
 def main():
-    if len(sys.argv) != 2:
-        raise SystemExit("Usage: smoke-dds-image.py IMAGE")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "--zero-swap"):
+        raise SystemExit("Usage: smoke-dds-image.py IMAGE [--zero-swap]")
     repositoryRoot = pathlib.Path(__file__).resolve().parent.parent
     fixturesPath = repositoryRoot / "apps/api/internal/analysis/testdata/dds-golden.json"
     fixtures = json.loads(fixturesPath.read_text())["fixtures"]
@@ -21,11 +22,23 @@ def main():
                     1 << ("23456789TJQKA".index(card["rank"]) + 2)
                     for card in fixture["deal"][seat] if card["suit"] == suit
                 ))
-        result = subprocess.run(
-            ["docker", "run", "--rm", "-i", "--memory=256m", "--cpus=1",
-             "--entrypoint", "/workspace/bin/bridgeyok-dds", sys.argv[1]],
-            input=" ".join(map(str, values)), text=True, capture_output=True, timeout=30,
-        )
+        with tempfile.TemporaryDirectory(prefix="dds-memory-probe-") as probeDirectory:
+            probeArguments = []
+            if len(sys.argv) == 3:
+                probePath = pathlib.Path(probeDirectory) / "free"
+                probePath.write_text(
+                    "#!/bin/sh\n/usr/bin/free \"$@\" | awk '/^Swap:/ {$2=0; $3=0; $4=0} {print}'\n"
+                )
+                probePath.chmod(0o755)
+                probeArguments = [
+                    "--mount", f"type=bind,src={probePath},dst=/dds-probe/free,readonly",
+                    "--env", "PATH=/dds-probe:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                ]
+            result = subprocess.run(
+                ["docker", "run", "--rm", "-i", "--memory=256m", "--cpus=1", *probeArguments,
+                 "--entrypoint", "/workspace/bin/bridgeyok-dds", sys.argv[1]],
+                input=" ".join(map(str, values)), text=True, capture_output=True, timeout=30,
+            )
         if result.returncode:
             raise SystemExit(
                 f"DDS image failed fixture {fixture['name']} (exit {result.returncode})\n"

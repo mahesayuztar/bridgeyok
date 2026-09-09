@@ -152,6 +152,7 @@ activeRelease="${candidateRelease}"
 printf 'Building local candidate release %s...\n' "${candidateRelease}"
 composeForRelease "${candidateRelease}" build api web
 python3 scripts/smoke-dds-image.py "bridgeyok-api:${candidateRelease}"
+python3 scripts/smoke-dds-image.py "bridgeyok-api:${candidateRelease}" --zero-swap
 docker image tag "bridgeyok-api:${candidateRelease}" "bridgeyok-api:${baselineRelease}"
 docker image tag "bridgeyok-web:${candidateRelease}" "bridgeyok-web:${baselineRelease}"
 
