@@ -229,3 +229,24 @@ test("landscape touch devices can play behind replay and rotate after dragging",
   await expect(dialog).toBeVisible();
   await context.close();
 });
+
+for (const width of [320, 390]) {
+  for (const position of ["left", "right"] as const) {
+    test(`dense dummy stays clear of four trick cards at ${width} ${position}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.setContent(`<style>${stylesheet}</style><div id="root"></div>`);
+      await page.addScriptTag({ content: bundle });
+      await page.evaluate(position => {
+        (window as unknown as { replayTest: { renderDenseDummy: (position: "left" | "right") => void } }).replayTest.renderDenseDummy(position);
+      }, position);
+      await expect(page.getByRole("region", { name: "Dense dummy" }).locator(".physical-card")).toHaveCount(13);
+      const overlaps = await page.evaluate(() => {
+        const dummy = [...document.querySelectorAll(".dummy-hand .physical-card")].map(card => card.getBoundingClientRect());
+        const trick = [...document.querySelectorAll(".trick-slot .physical-card")].map(card => card.getBoundingClientRect());
+        return dummy.some(first => trick.some(second => first.left < second.right - 1 && first.right > second.left + 1 && first.top < second.bottom - 1 && first.bottom > second.top + 1));
+      });
+      await page.screenshot({ path: testInfo.outputPath("dense-dummy.png") });
+      expect(overlaps).toBe(false);
+    });
+  }
+}

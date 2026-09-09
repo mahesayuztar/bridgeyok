@@ -4688,3 +4688,21 @@ button.physical-card.is-dragging {
   .waiting-client .table-status-bar { flex-wrap: wrap; }
   .waiting-client .status-actions { flex-wrap: wrap; }
 }
+.active-table-client .player-trigger > .profile-avatar {
+  width: calc(var(--board-player-block) - .25rem);
+  height: calc(var(--board-player-block) - .25rem);
+  font-size: .7rem;
+}
+.dummy-hand:not(.completed-deal-hand) .hand-card-group[data-density="tight"] {
+  --side-dummy-card-exposure: .875rem;
+}
+
+@media (max-width: 22rem) {
+  .dummy-hand:not(.completed-deal-hand) .hand-card-group[data-density="tight"] {
+    --side-dummy-card-exposure: .625rem;
+  }
+
+  .dummy-hand:not(.completed-deal-hand) .hand-card-group[data-density="tight"] .card-corner {
+    font-size: .625rem;
+  }
+}
