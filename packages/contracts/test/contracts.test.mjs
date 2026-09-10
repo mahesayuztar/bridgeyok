@@ -63,3 +63,11 @@ test("WebSocket contract accepts owner bot mutations", () => {
 });
 
 const realtimeParticipantId = "99ef3682-3ba8-42db-9c33-17238bfb2207";
+
+test("chat commands stay outside gameplay revision and sender authority", () => {
+  const command = { v: 1, kind: "command", name: "chat.private.send", request_id: "chat-request-01", payload: { target: { scope: "private", id: realtimeParticipantId }, content: "👩🏽‍💻" } };
+  assert.equal(validateEnvelope(command), true);
+  for (const fields of [{ expected_revision: 1 }, { controller_epoch: 1 }, { table_id: realtimeParticipantId }, { sender_user_id: realtimeParticipantId }]) assert.equal(validateEnvelope({ ...command, ...fields }), false);
+  assert.equal(validateEnvelope({ ...command, name: "chat.table.send" }), false);
+  assert.equal(validateEnvelope({ ...command, payload: { ...command.payload, sender_user_id: realtimeParticipantId } }), false);
+});

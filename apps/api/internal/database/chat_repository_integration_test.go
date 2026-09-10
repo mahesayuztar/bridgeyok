@@ -128,4 +128,27 @@ func TestChatAuthorizationPersistenceAndRetention(t *testing.T) {
 	if err = postgres.pool.QueryRow(ctx, `SELECT count(*) FROM bridgeyok.chat_messages WHERE message_id IN ($1,$2)`, message.MessageID, tableMessage.MessageID).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("cleanup: %d %v", count, err)
 	}
+	if _, err := postgres.ChatHistory(ctx, alice.SessionID, target, strings.Repeat("a", 513), 50); !errors.Is(err, chat.ErrInput) {
+		t.Fatalf("oversized cursor: %v", err)
+	}
+	if err := postgres.Follow(ctx, bob.Profile.ID, alice.Profile.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := postgres.SendChat(ctx, alice.SessionID, target, "request-revoked", "denied"); !errors.Is(err, chat.ErrAccess) {
+		t.Fatalf("revoked friendship: %v", err)
+	}
+	if _, err := postgres.ChatHistory(ctx, alice.SessionID, target, "", 50); !errors.Is(err, chat.ErrAccess) {
+		t.Fatalf("revoked history: %v", err)
+	}
+	if _, err := postgres.pool.Exec(ctx, `UPDATE bridgeyok.table_participants SET left_at=now() WHERE table_id=$1 AND session_id=$2`, tableID, alice.SessionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := postgres.SendChat(ctx, alice.SessionID, tableTarget, "table-revoked", "denied"); !errors.Is(err, chat.ErrAccess) {
+		t.Fatalf("departed participant: %v", err)
+	}
+	var noInviteStorage bool
+	if err := postgres.pool.QueryRow(ctx, `SELECT to_regclass('bridgeyok.player_invites') IS NULL`).Scan(&noInviteStorage); err != nil || !noInviteStorage {
+		t.Fatalf("notification persistence: %v", err)
+	}
+
 }

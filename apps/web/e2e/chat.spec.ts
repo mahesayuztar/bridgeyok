@@ -101,7 +101,7 @@ test("table chat preserves gameplay geometry and pointer actions across viewport
   browser,
 }, testInfo) => {
   test.setTimeout(120000);
-  const context = await browser.newContext();
+  const context = await browser.newContext({ hasTouch: true });
   const page = await context.newPage();
   const name = `ct_${Date.now()}`;
   await signup(page, name);
@@ -195,6 +195,41 @@ test("table chat preserves gameplay geometry and pointer actions across viewport
   await expect(
     page.locator(".own-hand .physical-card,.dummy-hand .physical-card"),
   ).toHaveCount(count - 1);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await panel.getByRole("button", { name: "Tutup chat" }).click();
+  const touchCard = page
+    .locator('button[aria-label^="Mainkan "]:enabled')
+    .last();
+  await expect(touchCard).toBeVisible();
+  await touchCard.scrollIntoViewIfNeeded();
+  const touchStart = (await touchCard.boundingBox())!;
+  const touchEnd = (await page.locator(".board-play-zone").boundingBox())!;
+  const touchCount = await page
+    .locator(".own-hand .physical-card,.dummy-hand .physical-card")
+    .count();
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: touchStart.x + 8, y: touchStart.y + 12 }],
+  });
+  await expect(page.locator(".card-drag-preview")).toHaveCount(1);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [
+      {
+        x: touchEnd.x + touchEnd.width / 2,
+        y: touchEnd.y + touchEnd.height / 2,
+      },
+    ],
+  });
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect(
+    page.locator(".own-hand .physical-card,.dummy-hand .physical-card"),
+  ).toHaveCount(touchCount - 1);
+  await cdp.detach();
   await context.close();
 });
 
@@ -252,6 +287,10 @@ test("social toast actions and table chat stay scoped to authorized recipients",
   await bob.getByRole("button", { name: "Masuk", exact: true }).click();
   await expect(bob).toHaveURL(tableURL);
   await expect(bob.locator(".connection-status")).toContainText("Terhubung");
+  await bob.goto("/friends");
+  await expect(
+    bob.getByRole("button", { name: `Unfollow ${aName}`, exact: true }),
+  ).toBeVisible();
   await alice.getByRole("button", { name: "Tutup invite" }).click();
   await alice.getByRole("button", { name: "Chat", exact: true }).click();
   await alice.getByLabel("Pesan", { exact: true }).fill("table only");
@@ -283,4 +322,90 @@ test("social toast actions and table chat stay scoped to authorized recipients",
   await first.close();
   await second.close();
   await third.close();
+});
+
+test("history pagination preserves reading position and incoming messages show an indicator", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const owner = await signup(page, `history_${Date.now()}`);
+  const friend = {
+    id: "11111111-1111-4111-8111-111111111111",
+    username: "history_friend",
+    displayName: "History Friend",
+    avatar: "heart",
+    online: true,
+    following: true,
+    friends: true,
+  };
+  await page.route("**/api/account/users?*", (route) =>
+    route.fulfill({ json: [friend] }),
+  );
+  const makeMessage = (_index: number) => ({
+    messageId: `history-${_index}`,
+    scope: "private",
+    conversationId: [owner.id, friend.id].sort().join(":"),
+    senderUserId: friend.id,
+    sender: friend,
+    clientRequestId: `request-history-${_index}`,
+    content: `Message ${_index}`,
+    createdAt: new Date(Date.UTC(2026, 8, 10, 0, _index)).toISOString(),
+  });
+  await page.route("**/api/account/chat?*", (route) => {
+    const older =
+      new URL(route.request().url()).searchParams.get("cursor") === "older";
+    return route.fulfill({
+      json: {
+        messages: Array.from({ length: 50 }, (_, _index) =>
+          makeMessage((older ? 0 : 50) + _index),
+        ).reverse(),
+        ...(older ? {} : { nextCursor: "older" }),
+      },
+    });
+  });
+  let push: ((message: string) => void) | undefined;
+  await page.routeWebSocket("ws://localhost:8180/v1/ws?*", (route) => {
+    const server = route.connectToServer();
+    server.onMessage((message) => route.send(message));
+    push = (message) => route.send(message);
+  });
+  await page.goto("/friends");
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Chat History Friend" });
+  await expect(panel.getByText("Message 99", { exact: true })).toBeVisible();
+  const list = panel.locator(".chat-messages");
+  await list.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await expect(panel.getByText("Message 50", { exact: true })).toBeVisible();
+  expect(push).toBeDefined();
+  push!(
+    JSON.stringify({
+      v: 1,
+      kind: "control",
+      name: "chat.private.received",
+      payload: { message: makeMessage(100) },
+    }),
+  );
+  await expect(
+    panel.getByRole("button", { name: "Pesan baru ↓" }),
+  ).toBeVisible();
+  expect(await list.evaluate((element) => element.scrollTop)).toBe(0);
+  const before = await panel
+    .getByText("Message 50", { exact: true })
+    .boundingBox();
+  await panel.getByRole("button", { name: "Muat riwayat" }).click();
+  await expect(panel.getByText("Message 0", { exact: true })).toBeAttached();
+  await expect
+    .poll(async () =>
+      Math.abs(
+        (await panel.getByText("Message 50", { exact: true }).boundingBox())!
+          .y - before!.y,
+      ),
+    )
+    .toBeLessThan(2);
+  await panel.getByRole("button", { name: "Pesan baru ↓" }).click();
+  await expect(panel.getByText("Message 100", { exact: true })).toBeVisible();
+  await context.close();
 });
