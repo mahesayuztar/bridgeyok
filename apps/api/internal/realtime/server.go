@@ -48,6 +48,7 @@ type Options struct {
 	Identity                 IdentityService
 	Tables                   TableRuntime
 	Events                   EventStore
+	Chat                     ChatRepository
 	Random                   io.Reader
 	Now                      func() time.Time
 	ReadLimitBytes           int64
@@ -65,8 +66,9 @@ type Options struct {
 
 // Server is the single-instance authenticated WebSocket endpoint and local room registry.
 type Server struct {
-	options Options
-	broker  *broker
+	options   Options
+	broker    *broker
+	chatSlots chan struct{}
 
 	mutex                sync.Mutex
 	connections          map[*connection]struct{}
@@ -85,15 +87,21 @@ type outboundFrame struct {
 }
 
 type connection struct {
-	id       string
-	session  identity.Session
-	socket   *websocket.Conn
-	server   *Server
-	ctx      context.Context
-	cancel   context.CancelFunc
-	done     chan struct{}
-	outbound chan outboundFrame
-	limiter  tokenBucket
+	id                string
+	session           identity.Session
+	socket            *websocket.Conn
+	server            *Server
+	ctx               context.Context
+	cancel            context.CancelFunc
+	done              chan struct{}
+	outbound          chan outboundFrame
+	socialOutbound    chan outboundFrame
+	lifecycleOutbound chan outboundFrame
+	presenceOutbound  chan outboundFrame
+	socialInbound     chan ClientEnvelope
+	socialDone        chan struct{}
+	socialLimiter     tokenBucket
+	limiter           tokenBucket
 
 	queueMutex      sync.Mutex
 	queuedBytes     int
@@ -138,6 +146,7 @@ func NewServer(options Options) (*Server, error) {
 	server := &Server{
 		options:              options,
 		connections:          make(map[*connection]struct{}),
+		chatSlots:            make(chan struct{}, 1),
 		connectionsBySession: make(map[string]int),
 	}
 	server.broker = newBroker(options.Logger, options.Now)
@@ -201,14 +210,20 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	socket.SetReadLimit(server.options.ReadLimitBytes)
 	ctx, cancel := context.WithCancel(request.Context())
 	client := &connection{
-		id:       "conn_" + rand.Text(),
-		session:  session,
-		socket:   socket,
-		server:   server,
-		ctx:      ctx,
-		cancel:   cancel,
-		done:     make(chan struct{}),
-		outbound: make(chan outboundFrame, server.options.OutboundQueueCapacity),
+		id:                "conn_" + rand.Text(),
+		session:           session,
+		socket:            socket,
+		server:            server,
+		ctx:               ctx,
+		cancel:            cancel,
+		done:              make(chan struct{}),
+		outbound:          make(chan outboundFrame, server.options.OutboundQueueCapacity),
+		socialOutbound:    make(chan outboundFrame, 32),
+		lifecycleOutbound: make(chan outboundFrame, 16),
+		presenceOutbound:  make(chan outboundFrame, 16),
+		socialInbound:     make(chan ClientEnvelope, 8),
+		socialDone:        make(chan struct{}),
+		socialLimiter:     tokenBucket{tokens: 8, last: server.options.Now().UTC(), rate: 2, burst: 8},
 		limiter: tokenBucket{
 			tokens: float64(server.options.MessageBurst),
 			last:   server.options.Now().UTC(),
@@ -223,6 +238,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	defer func() {
 		client.cancel()
 		<-client.done
+		<-client.socialDone
 		server.broker.unsubscribe(client)
 		if err := socket.CloseNow(); err != nil && !errors.Is(err, net.ErrClosed) {
 			server.options.Logger.Warn("realtime_connection_cleanup_failed", "connection_id", client.id, "result_code", "CLOSE_ERROR")
@@ -236,6 +252,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	}()
 
 	go client.writeLoop()
+	go client.chatLoop()
 	if shouldDrain {
 		client.shutdown()
 	}
@@ -374,17 +391,8 @@ func (connection *connection) readLoop() {
 			<-connection.sendErrorAndClose(ClientEnvelope{}, "INVALID_TEXT", false, websocket.StatusInvalidFramePayloadData, "message is not valid UTF-8")
 			return
 		}
-		if !connection.limiter.allow(connection.server.options.Now().UTC()) {
-			<-connection.sendErrorAndClose(ClientEnvelope{}, "RATE_LIMITED", true, websocket.StatusPolicyViolation, "message rate exceeded")
-			return
-		}
 		if connection.isDraining() {
 			connection.closeWith(websocket.StatusServiceRestart, "server draining")
-			return
-		}
-		if err := connection.validateIdentity(); err != nil {
-			connection.server.options.Logger.WarnContext(connection.ctx, "realtime_message_rejected", "connection_id", connection.id, "result_code", "SESSION_INACTIVE")
-			<-connection.sendErrorAndClose(ClientEnvelope{}, "SESSION_INACTIVE", false, websocket.StatusPolicyViolation, "session inactive")
 			return
 		}
 		envelope, err := decodeClientEnvelope(message)
@@ -397,6 +405,25 @@ func (connection *connection) readLoop() {
 			}
 			connection.sendError(ClientEnvelope{}, "INVALID_MESSAGE", false, nil, nil)
 			continue
+		}
+		if envelope.Name == "chat.private.send" || envelope.Name == "chat.table.send" {
+			if !connection.socialLimiter.allow(connection.server.options.Now().UTC()) {
+				continue
+			}
+			select {
+			case connection.socialInbound <- envelope:
+			default:
+			}
+			continue
+		}
+		if err := connection.validateIdentity(); err != nil {
+			connection.server.options.Logger.WarnContext(connection.ctx, "realtime_message_rejected", "connection_id", connection.id, "result_code", "SESSION_INACTIVE")
+			<-connection.sendErrorAndClose(ClientEnvelope{}, "SESSION_INACTIVE", false, websocket.StatusPolicyViolation, "session inactive")
+			return
+		}
+		if !connection.limiter.allow(connection.server.options.Now().UTC()) {
+			<-connection.sendErrorAndClose(ClientEnvelope{}, "RATE_LIMITED", true, websocket.StatusPolicyViolation, "message rate exceeded")
+			return
 		}
 		connection.invalidMessages = 0
 		if envelope.Kind == kindControl {
@@ -581,23 +608,13 @@ func (connection *connection) writeLoop() {
 	for {
 		select {
 		case frame := <-connection.outbound:
-			connection.releaseQueuedBytes(len(frame.message))
-			writeCtx, cancel := context.WithTimeout(context.Background(), connection.server.options.WriteTimeout)
-			err := connection.socket.Write(writeCtx, websocket.MessageText, frame.message)
-			cancel()
-			if frame.delivered != nil {
-				close(frame.delivered)
-			}
-			if err != nil {
-				connection.closeWith(websocket.StatusGoingAway, "write failed")
-				connection.performClose()
-				return
-			}
-			if frame.closeStatus != 0 {
-				connection.closeWith(frame.closeStatus, frame.closeReason)
-				connection.performClose()
-				return
-			}
+			connection.writeFrame(frame)
+		case frame := <-connection.lifecycleOutbound:
+			connection.writePrioritizedFrame(frame, 1)
+		case frame := <-connection.socialOutbound:
+			connection.writePrioritizedFrame(frame, 2)
+		case frame := <-connection.presenceOutbound:
+			connection.writePrioritizedFrame(frame, 3)
 		case <-pingTicker.C:
 			if err := connection.validateIdentity(); err != nil {
 				connection.closeWith(websocket.StatusPolicyViolation, "session inactive")
@@ -632,8 +649,26 @@ func (connection *connection) enqueue(frame outboundFrame) bool {
 	if connection.queuedBytes+len(frame.message) > connection.server.options.OutboundQueueBytes {
 		return false
 	}
+	queue := connection.outbound
+	var header struct {
+		Name string `json:"name"`
+		Kind string `json:"kind"`
+	}
+	if frame.closeStatus == 0 && json.Unmarshal(frame.message, &header) == nil {
+		switch {
+		case (strings.HasPrefix(header.Name, "chat.") || strings.HasPrefix(header.Name, "social.")) && connection.socialOutbound != nil:
+			queue = connection.socialOutbound
+		case strings.HasPrefix(header.Name, "presence.") && connection.presenceOutbound != nil:
+			queue = connection.presenceOutbound
+		case header.Kind == "control" && strings.HasPrefix(header.Name, "table.") && connection.lifecycleOutbound != nil:
+			queue = connection.lifecycleOutbound
+		}
+		if queue != connection.outbound && connection.queuedBytes+len(frame.message) > connection.server.options.OutboundQueueBytes/4 {
+			return false
+		}
+	}
 	select {
-	case connection.outbound <- frame:
+	case queue <- frame:
 		connection.queuedBytes += len(frame.message)
 		return true
 	default:
@@ -648,8 +683,12 @@ func (connection *connection) releaseQueuedBytes(bytes int) {
 }
 
 func (connection *connection) sendError(envelope ClientEnvelope, code string, retryable bool, revision *int64, seq *int64) {
+	name := "command.rejected"
+	if strings.HasPrefix(envelope.Name, "chat.") {
+		name = "chat.rejected"
+	}
 	frame, err := json.Marshal(errorEnvelope{
-		Version: protocolVersion, Kind: "error", Name: "command.rejected", RequestID: envelope.RequestID,
+		Version: protocolVersion, Kind: "error", Name: name, RequestID: envelope.RequestID,
 		TableID: envelope.TableID, Code: code, Retryable: retryable, Revision: revision, Seq: seq, Payload: map[string]any{},
 	})
 	if err != nil || !connection.enqueue(outboundFrame{message: frame}) {
@@ -834,4 +873,50 @@ func (connection *connection) validateIdentity() error {
 	}
 	_, err := connection.server.options.Identity.ValidateSession(connection.ctx, connection.session.ID)
 	return err
+}
+
+func (connection *connection) writeFrame(frame outboundFrame) {
+	connection.releaseQueuedBytes(len(frame.message))
+	writeCtx, cancel := context.WithTimeout(context.Background(), connection.server.options.WriteTimeout)
+	err := connection.socket.Write(writeCtx, websocket.MessageText, frame.message)
+	cancel()
+	if frame.delivered != nil {
+		close(frame.delivered)
+	}
+	if err != nil {
+		connection.closeWith(websocket.StatusGoingAway, "write failed")
+		connection.performClose()
+		return
+	}
+	if frame.closeStatus != 0 {
+		connection.closeWith(frame.closeStatus, frame.closeReason)
+		connection.performClose()
+		return
+	}
+
+}
+
+func (connection *connection) writePrioritizedFrame(frame outboundFrame, priority int) {
+	for _index := 0; _index < 16 && connection.ctx.Err() == nil; _index++ {
+		urgent, exists := connection.takeHigherPriority(priority)
+		if !exists {
+			break
+		}
+		connection.writeFrame(urgent)
+	}
+	if connection.ctx.Err() == nil {
+		connection.writeFrame(frame)
+	}
+}
+
+func (connection *connection) takeHigherPriority(priority int) (outboundFrame, bool) {
+	queues := []chan outboundFrame{connection.outbound, connection.lifecycleOutbound, connection.socialOutbound}
+	for _, queue := range queues[:priority] {
+		select {
+		case frame := <-queue:
+			return frame, true
+		default:
+		}
+	}
+	return outboundFrame{}, false
 }

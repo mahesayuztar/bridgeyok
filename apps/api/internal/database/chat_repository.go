@@ -76,10 +76,11 @@ func (postgres *Postgres) SendChat(ctx context.Context, sessionID string, target
 		return chat.Message{}, false, err
 	}
 	var message chat.Message
-	err = tx.QueryRow(ctx, `SELECT message_id::text,scope,conversation_id,sender_user_id::text,content,client_request_id,created_at FROM bridgeyok.chat_messages WHERE sender_user_id=$1 AND client_request_id=$2`, userID, requestID).Scan(&message.MessageID, &message.Scope, &message.ConversationID, &message.SenderUserID, &message.Content, &message.ClientRequestID, &message.CreatedAt)
+	err = tx.QueryRow(ctx, `SELECT m.message_id::text,m.scope,m.conversation_id,m.sender_user_id::text,m.content,m.client_request_id,m.created_at,u.username,u.display_name,u.avatar FROM bridgeyok.chat_messages m JOIN bridgeyok.users u ON u.id=m.sender_user_id WHERE m.sender_user_id=$1 AND m.client_request_id=$2`, userID, requestID).Scan(&message.MessageID, &message.Scope, &message.ConversationID, &message.SenderUserID, &message.Content, &message.ClientRequestID, &message.CreatedAt, &message.Sender.Username, &message.Sender.DisplayName, &message.Sender.Avatar)
 	if err != nil {
 		return chat.Message{}, false, err
 	}
+	message.Sender.ID = message.SenderUserID
 	if message.Scope != target.Scope || message.ConversationID != conversationID || message.Content != content {
 		return chat.Message{}, false, chat.ErrConflict
 	}
@@ -118,17 +119,18 @@ func (postgres *Postgres) ChatHistory(ctx context.Context, sessionID string, tar
 	if target.Scope == "private" {
 		days = 90
 	}
-	rows, err := tx.Query(ctx, `SELECT message_id::text,scope,conversation_id,sender_user_id::text,content,client_request_id,created_at FROM bridgeyok.chat_messages WHERE scope=$1 AND conversation_id=$2 AND created_at >= now()-make_interval(days=>$3) AND (created_at,message_id)<($4,$5::uuid) ORDER BY created_at DESC,message_id DESC LIMIT $6`, target.Scope, conversationID, days, before.CreatedAt, before.MessageID, limit+1)
+	rows, err := tx.Query(ctx, `SELECT m.message_id::text,m.scope,m.conversation_id,m.sender_user_id::text,m.content,m.client_request_id,m.created_at,u.username,u.display_name,u.avatar FROM bridgeyok.chat_messages m JOIN bridgeyok.users u ON u.id=m.sender_user_id WHERE m.scope=$1 AND m.conversation_id=$2 AND m.created_at >= now()-make_interval(days=>$3) AND (m.created_at,m.message_id)<($4,$5::uuid) ORDER BY m.created_at DESC,m.message_id DESC LIMIT $6`, target.Scope, conversationID, days, before.CreatedAt, before.MessageID, limit+1)
 	if err != nil {
 		return chat.Page{}, err
 	}
 	page := chat.Page{Messages: []chat.Message{}}
 	for rows.Next() {
 		var message chat.Message
-		if err := rows.Scan(&message.MessageID, &message.Scope, &message.ConversationID, &message.SenderUserID, &message.Content, &message.ClientRequestID, &message.CreatedAt); err != nil {
+		if err := rows.Scan(&message.MessageID, &message.Scope, &message.ConversationID, &message.SenderUserID, &message.Content, &message.ClientRequestID, &message.CreatedAt, &message.Sender.Username, &message.Sender.DisplayName, &message.Sender.Avatar); err != nil {
 			rows.Close()
 			return chat.Page{}, err
 		}
+		message.Sender.ID = message.SenderUserID
 		page.Messages = append(page.Messages, message)
 	}
 	err = rows.Err()

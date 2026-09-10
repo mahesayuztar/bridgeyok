@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/chat"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
 )
 
@@ -147,6 +148,13 @@ func decodeClientEnvelope(message []byte) (ClientEnvelope, error) {
 	case kindCommand:
 		if !validRequestID(envelope.RequestID) {
 			return ClientEnvelope{}, fmt.Errorf("request id is invalid")
+		}
+		if envelope.Name == "chat.private.send" || envelope.Name == "chat.table.send" {
+			var payload chatPayload
+			if envelope.TableID != "" || envelope.ExpectedRevision != nil || envelope.ControllerEpoch != nil || decodeStrict(envelope.Payload, &payload) != nil || envelope.Name != "chat."+payload.Target.Scope+".send" || chat.Validate(payload.Target, envelope.RequestID, payload.Content) != nil {
+				return ClientEnvelope{}, fmt.Errorf("invalid chat command")
+			}
+			return envelope, nil
 		}
 		if _, err := uuid.Parse(envelope.TableID); err != nil {
 			return ClientEnvelope{}, fmt.Errorf("table id is invalid")

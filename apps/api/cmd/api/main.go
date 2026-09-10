@@ -67,6 +67,7 @@ func main() {
 		Identity:                 identityService,
 		Tables:                   actorRegistry,
 		Events:                   postgres,
+		Chat:                     postgres,
 		Random:                   rand.Reader,
 		Now:                      time.Now,
 		ReadLimitBytes:           appConfig.RealtimeReadLimitBytes,

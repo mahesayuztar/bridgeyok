@@ -166,8 +166,8 @@ func TestRegisteredAccountSocialAndInviteBoundary(t *testing.T) {
 		}
 	}
 	inbox, err := postgres.Invitations(ctx, bob.Profile.ID, now)
-	if err != nil || len(inbox) != 1 || inbox[0].TableID != tableID {
-		t.Fatalf("deduplicated inbox: %+v %v", inbox, err)
+	if err != nil || len(inbox) != 0 {
+		t.Fatalf("ephemeral invite must not create inbox: %+v %v", inbox, err)
 	}
 	unchanged, err := tables.Get(ctx, tableID, aliceSession)
 	if err != nil || unchanged.Revision != created.Projection.Revision || len(unchanged.Participants) != 1 || len(unchanged.Seats) != 0 {

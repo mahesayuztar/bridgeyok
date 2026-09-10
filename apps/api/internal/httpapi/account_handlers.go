@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/chat"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
 )
 
@@ -17,6 +19,7 @@ type accountHTTPHandler struct {
 	tables        TableService
 	identity      identityHTTPHandler
 	passwordSlots chan struct{}
+	realtime      RealtimeService
 }
 
 func (handler accountHTTPHandler) credentials(writer http.ResponseWriter, request *http.Request) {
@@ -85,6 +88,13 @@ func (handler accountHTTPHandler) serve(writer http.ResponseWriter, request *htt
 			break
 		}
 		result, err = handler.repository.SearchUsers(request.Context(), account.Profile.ID, query, request.URL.Query().Get("friends") == "true", time.Now().UTC())
+	case request.URL.Path == "/v1/account/chat":
+		repository, ok := handler.repository.(chat.Repository)
+		if !ok {
+			err = chat.ErrAccess
+			break
+		}
+		result, err = repository.ChatHistory(request.Context(), account.SessionID, chat.Target{Scope: request.URL.Query().Get("scope"), ID: request.URL.Query().Get("id")}, request.URL.Query().Get("cursor"), 50)
 	case request.URL.Path == "/v1/account/invitations":
 		result, err = handler.repository.Invitations(request.Context(), account.Profile.ID, time.Now().UTC())
 	case chi.URLParam(request, "userId") != "":
@@ -93,7 +103,20 @@ func (handler accountHTTPHandler) serve(writer http.ResponseWriter, request *htt
 			err = identity.ErrAccountInput
 			break
 		}
-		err = handler.repository.Follow(request.Context(), account.Profile.ID, targetID, request.Method == http.MethodPut)
+		if events, ok := handler.repository.(interface {
+			FollowWithEvent(context.Context, string, string) (bool, bool, error)
+		}); ok && request.Method == http.MethodPut {
+			var changed, mutual bool
+			changed, mutual, err = events.FollowWithEvent(request.Context(), account.Profile.ID, targetID)
+			if err == nil && changed {
+				handler.notify(request, targetID, "follow", account.Profile, map[string]any{})
+				if mutual {
+					handler.notify(request, targetID, "friend", account.Profile, map[string]any{})
+				}
+			}
+		} else {
+			err = handler.repository.Follow(request.Context(), account.Profile.ID, targetID, request.Method == http.MethodPut)
+		}
 	case chi.URLParam(request, "tableId") != "":
 		tableID := chi.URLParam(request, "tableId")
 		if _, parseErr := uuid.Parse(tableID); parseErr != nil {
@@ -136,6 +159,9 @@ func (handler accountHTTPHandler) serve(writer http.ResponseWriter, request *htt
 			break
 		}
 		err = handler.repository.InvitePlayer(request.Context(), account.Profile.ID, body.UserID, tableID, body.InviteCode, time.Now().UTC())
+		if err == nil {
+			handler.notify(request, body.UserID, "invite", account.Profile, map[string]any{"tableId": tableID, "inviteCode": body.InviteCode})
+		}
 	default:
 		handler.identity.writeError(writer, request, 404, "NOT_FOUND", "common.error.not_found", false)
 		return
@@ -154,6 +180,10 @@ func (handler accountHTTPHandler) serve(writer http.ResponseWriter, request *htt
 func (handler accountHTTPHandler) fail(writer http.ResponseWriter, request *http.Request, err error) {
 	status, code := 500, "INTERNAL_ERROR"
 	switch {
+	case errors.Is(err, chat.ErrAccess):
+		status, code = 403, "CHAT_ACCESS_DENIED"
+	case errors.Is(err, chat.ErrInput):
+		status, code = 400, "INVALID_CHAT_INPUT"
 	case errors.Is(err, identity.ErrAccountRate):
 		status, code = 429, "RATE_LIMITED"
 	case errors.Is(err, identity.ErrAccountInput):
@@ -167,4 +197,25 @@ func (handler accountHTTPHandler) fail(writer http.ResponseWriter, request *http
 	}
 	handler.identity.logger.InfoContext(request.Context(), "account_operation", "request_id", requestIDFromContext(request.Context()), "result_code", code)
 	handler.identity.writeError(writer, request, status, code, "account.error."+strings.ToLower(code), status >= 500)
+}
+
+func (handler accountHTTPHandler) notify(request *http.Request, targetID, name string, sender identity.Profile, payload map[string]any) {
+	repository, ok := handler.repository.(interface {
+		SocialProfile(context.Context, string) (identity.Profile, string, error)
+	})
+	if !ok {
+		return
+	}
+	realtime, ok := handler.realtime.(interface {
+		NotifySession(string, string, string, map[string]any)
+	})
+	if !ok {
+		return
+	}
+	_, sessionID, err := repository.SocialProfile(request.Context(), targetID)
+	if err != nil {
+		return
+	}
+	payload["sender"] = sender
+	realtime.NotifySession(sessionID, uuid.NewString(), name, payload)
 }

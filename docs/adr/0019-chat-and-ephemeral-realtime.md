@@ -1,0 +1,23 @@
+# ADR 0019 — Chat retention and ephemeral realtime events
+
+Accepted 10 September 2026 by explicit chat implementation request. Supersedes the chat exclusion in PLAN and the persisted invite notice behavior introduced in ADR 0018. Team Match and unrelated account refinement stay outside scope.
+
+Private chat is restricted to current mutual Friends and retained for 90 days. Table chat is restricted to active participants of the named table in WAITING, ACTIVE or BETWEEN_BOARDS and retained for 14 days. Removing friendship or table participation removes history/send access. Reads exclude expired messages even before daily cleanup. Account user IDs come from authenticated stable sessions, never client sender fields.
+
+Migration 00008 adds chat_messages with sender/request uniqueness, keyset history index, retention index and RLS without browser policies. A request ID is immutable for its sender: different content, scope or conversation is rejected. Private conversation IDs are sorted user UUID pairs; table conversations use the table UUID. History uses GET /v1/account/chat?scope=private|table&id=<friend or table UUID>&cursor=<opaque cursor>, 50 records newest-first, plus nextCursor. Validation caps content at 1000 Unicode grapheme clusters and 16000 UTF-8 bytes; neither client nor server truncates content.
+
+Commands on the existing WebSocket endpoint are chat.private.send and chat.table.send. Both use request_id and payload {target:{scope,id},content}; table_id, sender fields, expected_revision and controller_epoch are prohibited. chat.accepted is a control ACK with {message,duplicate}. chat.private.received/chat.table.received carry {message}. chat.rejected is a request-correlated error. Chat never allocates a game revision or sequence. Sender profile metadata accompanies authoritative messages.
+
+The existing table connection also carries private/social traffic. Account pages connect to the same Go endpoint without table subscription. Durable history recovers missed chat; retry retains request identity; ACK, live event and history reconcile one optimistic message. This introduces no second socket service, Redis, Supabase Realtime or notification delivery queue.
+
+P0 authoritative game ACK/error/snapshot/event frames retain FIFO ordering, including lifecycle snapshots with game sequence. P1 covers unsequenced table lifecycle controls, P2 chat/social/invite, P3 presence. Separate bounded queues reserve at least three quarters of the byte budget for P0. The writer favors higher queues in bounded bursts of 16, permitting lower traffic to progress. A bounded per-connection chat worker and a single process-wide chat database slot prevent chat persistence from occupying every database connection. Game input remains on its existing path. Slow consumers retain existing close/recovery behavior; presence may be dropped. Over-limit inbound chat receives no persistence; the client times out to retryable failed state.
+
+Follow, mutual-friend and invite events are live-only social.follow/social.friend/social.invite controls with an eventId and sender. No self-action toast; clients deduplicate replayed IDs. Migration 00009 removes player_invites and its previous offline polling queue. The compatibility invitations endpoint returns an empty array. Invite authorization rechecks the existing authoritative online lease and table membership/state at processing time. Invite events do not grant a seat or alter game state; Join goes through the existing invite authority.
+
+## Operations
+
+Apply migrations 00008 and 00009 before deploying this API revision. With the privileged migration connection, run db/operations/chat-retention.sql once to install the named daily 03:17 cleanup job. The named cron.schedule call updates the same job on subsequent runs. Verify cron.job and cron.job_run_details. The job invokes bridgeyok.cleanup_chat_messages(); it does not retain an archive. pg_cron is the existing Supabase database scheduler, not a new service ([official setup](https://supabase.com/docs/guides/cron/install), [job scheduling](https://supabase.com/docs/guides/cron/quickstart)).
+
+Local PostgreSQL17 verification applied both migrations, installed pg_cron, checked the daily job, and executed a temporary one-second job successfully three times before removing the probe. Production schema and scheduler have not been changed by this task.
+
+Rollback removes the named cron job before reverting migration 00008. Reverting migration 00009 recreates an empty compatibility invite table; deleted ephemeral invitations are intentionally not recovered. Deploy older API only together with the corresponding schema rollback.

@@ -278,10 +278,146 @@
         "table": { "$ref": "#/$defs/tableProjection" }
       }
     },
+    "chatCommandEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "kind",
+        "name",
+        "request_id",
+        "payload"
+      ],
+      "properties": {
+        "v": {
+          "$ref": "#/$defs/version"
+        },
+        "kind": {
+          "const": "command"
+        },
+        "name": {
+          "enum": [
+            "chat.private.send",
+            "chat.table.send"
+          ]
+        },
+        "request_id": {
+          "$ref": "#/$defs/requestId"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "target",
+            "content"
+          ],
+          "properties": {
+            "target": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "scope",
+                "id"
+              ],
+              "properties": {
+                "scope": {
+                  "enum": [
+                    "private",
+                    "table"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1,
+              "description": "At most 1000 Unicode grapheme clusters and 16000 UTF-8 bytes; reject blank or NUL. Never truncate."
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "const": "chat.private.send"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "target": {
+                    "properties": {
+                      "scope": {
+                        "const": "private"
+                      }
+                    },
+                    "required": [
+                      "scope"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "target"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "name": {
+                "const": "chat.table.send"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "properties": {
+                  "target": {
+                    "properties": {
+                      "scope": {
+                        "const": "table"
+                      }
+                    },
+                    "required": [
+                      "scope"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "target"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        }
+      ]
+    },
     "commandEnvelope": {
       "oneOf": [
         { "$ref": "#/$defs/subscriptionCommandEnvelope" },
-        { "$ref": "#/$defs/mutationCommandEnvelope" }
+        { "$ref": "#/$defs/mutationCommandEnvelope" },
+        { "$ref": "#/$defs/chatCommandEnvelope" }
       ]
     },
     "subscriptionCommandEnvelope": {

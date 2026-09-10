@@ -37,7 +37,7 @@ func TestLoad(t *testing.T) {
 				if config.TableInactivityTimeout != 5*time.Minute || config.TableLifecycleSweepInterval != 15*time.Second {
 					t.Fatalf("table lifecycle defaults = %s and %s, want 5m and 15s", config.TableInactivityTimeout, config.TableLifecycleSweepInterval)
 				}
-				if config.RealtimeReadLimitBytes != 8<<10 || config.RealtimeOutboundQueueCapacity != 64 || config.RealtimeOutboundQueueBytes != 256<<10 || config.RealtimeRecoveryLimit != 128 {
+				if config.RealtimeReadLimitBytes != 32<<10 || config.RealtimeOutboundQueueCapacity != 64 || config.RealtimeOutboundQueueBytes != 256<<10 || config.RealtimeRecoveryLimit != 128 {
 					t.Fatalf("unexpected realtime bounds: %+v", config)
 				}
 				if config.RealtimeWriteTimeout != 5*time.Second || config.RealtimePingInterval != 20*time.Second || config.RealtimePongTimeout != 10*time.Second {

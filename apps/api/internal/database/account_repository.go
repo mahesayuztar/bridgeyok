@@ -117,11 +117,7 @@ func (postgres *Postgres) Follow(ctx context.Context, viewerID, targetID string,
 		_, err := postgres.pool.Exec(ctx, `DELETE FROM bridgeyok.follows WHERE follower_id=$1 AND followed_id=$2`, viewerID, targetID)
 		return err
 	}
-	_, err := postgres.pool.Exec(ctx, `INSERT INTO bridgeyok.follows(follower_id,followed_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, viewerID, targetID)
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-		return identity.ErrAccountInput
-	}
+	_, _, err := postgres.FollowWithEvent(ctx, viewerID, targetID)
 	return err
 }
 
@@ -151,36 +147,18 @@ func (postgres *Postgres) InvitePlayer(ctx context.Context, senderID, recipientI
 	if senderID == recipientID {
 		return identity.ErrAccountInput
 	}
-	result, err := postgres.pool.Exec(ctx, `INSERT INTO bridgeyok.player_invites(sender_id,recipient_id,table_id,invite_code,expires_at)
- SELECT $1,$2,$3,$4,$5 WHERE EXISTS(SELECT 1 FROM bridgeyok.account_sessions WHERE user_id=$2 AND online_until>$6 AND expires_at>$6)
+	var allowed bool
+	err := postgres.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM bridgeyok.account_sessions WHERE user_id=$2 AND online_until>$4 AND expires_at>$4)
  AND EXISTS(SELECT 1 FROM bridgeyok.table_participants p JOIN bridgeyok.users u ON u.session_id=p.session_id WHERE p.table_id=$3 AND u.id=$1 AND p.left_at IS NULL)
- AND EXISTS(SELECT 1 FROM bridgeyok.tables WHERE id=$3 AND NOT locked AND state IN ('WAITING','ACTIVE','BETWEEN_BOARDS'))
- ON CONFLICT(sender_id,recipient_id,table_id) DO UPDATE SET expires_at=EXCLUDED.expires_at,invite_code=EXCLUDED.invite_code`, senderID, recipientID, tableID, code, now.Add(10*time.Minute), now)
-	if err == nil && result.RowsAffected() != 1 {
+ AND EXISTS(SELECT 1 FROM bridgeyok.tables WHERE id=$3 AND NOT locked AND state IN ('WAITING','ACTIVE','BETWEEN_BOARDS'))`, senderID, recipientID, tableID, now).Scan(&allowed)
+	if err == nil && !allowed {
 		return identity.ErrUserOffline
 	}
 	return err
 }
 
-func (postgres *Postgres) Invitations(ctx context.Context, recipientID string, now time.Time) ([]identity.Invitation, error) {
-	rows, err := postgres.pool.Query(ctx, `SELECT u.id::text,u.username,u.display_name,u.avatar,i.table_id::text,i.invite_code,i.expires_at,
- EXISTS(SELECT 1 FROM bridgeyok.account_sessions s WHERE s.user_id=u.id AND s.online_until>$2 AND s.expires_at>$2)
- FROM bridgeyok.player_invites i JOIN bridgeyok.users u ON u.id=i.sender_id JOIN bridgeyok.tables t ON t.id=i.table_id
- WHERE i.recipient_id=$1 AND i.expires_at>$2 AND t.state IN ('WAITING','ACTIVE','BETWEEN_BOARDS') AND NOT t.locked
- ORDER BY i.expires_at DESC LIMIT 20`, recipientID, now)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	invitations := []identity.Invitation{}
-	for rows.Next() {
-		var invite identity.Invitation
-		if err := rows.Scan(&invite.Sender.ID, &invite.Sender.Username, &invite.Sender.DisplayName, &invite.Sender.Avatar, &invite.TableID, &invite.InviteCode, &invite.ExpiresAt, &invite.Sender.Online); err != nil {
-			return nil, err
-		}
-		invitations = append(invitations, invite)
-	}
-	return invitations, rows.Err()
+func (postgres *Postgres) Invitations(context.Context, string, time.Time) ([]identity.Invitation, error) {
+	return []identity.Invitation{}, nil
 }
 
 func (postgres *Postgres) StoreAccountTicket(ctx context.Context, ticketHash []byte, sessionID string, accountHash []byte, createdAt, expiresAt time.Time) error {

@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
 	"github.com/rivo/uniseg"
 )
 
@@ -19,13 +20,14 @@ const MaxGraphemes = 1000
 const MaxBytes = 16000
 
 type Message struct {
-	MessageID       string    `json:"messageId"`
-	Scope           string    `json:"scope"`
-	ConversationID  string    `json:"conversationId"`
-	SenderUserID    string    `json:"senderUserId"`
-	Content         string    `json:"content"`
-	ClientRequestID string    `json:"clientRequestId"`
-	CreatedAt       time.Time `json:"createdAt"`
+	Sender          identity.Profile `json:"sender"`
+	MessageID       string           `json:"messageId"`
+	Scope           string           `json:"scope"`
+	ConversationID  string           `json:"conversationId"`
+	SenderUserID    string           `json:"senderUserId"`
+	Content         string           `json:"content"`
+	ClientRequestID string           `json:"clientRequestId"`
+	CreatedAt       time.Time        `json:"createdAt"`
 }
 
 type Target struct {

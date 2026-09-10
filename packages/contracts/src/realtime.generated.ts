@@ -7,7 +7,7 @@
 
 export type BridgeYokRealtimeEnvelope =
   CommandEnvelope | AckEnvelope | EventEnvelope | ErrorEnvelope | SnapshotEnvelope | ControlEnvelope;
-export type CommandEnvelope = SubscriptionCommandEnvelope | MutationCommandEnvelope;
+export type CommandEnvelope = SubscriptionCommandEnvelope | MutationCommandEnvelope | ChatCommandEnvelope;
 export type Version = 1;
 export type RequestId = string;
 export type TableId = string;
@@ -42,6 +42,22 @@ export type MutationCommandEnvelope = {
   payload: Payload;
 };
 export type Revision = number;
+export type ChatCommandEnvelope = {
+  v: Version;
+  kind: "command";
+  name: "chat.private.send" | "chat.table.send";
+  request_id: RequestId;
+  payload: {
+    target: {
+      scope: "private" | "table";
+      id: string;
+    };
+    /**
+     * At most 1000 Unicode grapheme clusters and 16000 UTF-8 bytes; reject blank or NUL. Never truncate.
+     */
+    content: string;
+  };
+};
 export type MessageName = string;
 export type ControlEnvelope = {
   v: Version;
