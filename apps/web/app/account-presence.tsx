@@ -60,6 +60,7 @@ export function AccountPresence({ compact = false }: { compact?: boolean }) {
           try {
             chatStore.receive(
               JSON.parse(String(event.data)) as Record<string, unknown>,
+              next,
             );
           } catch {}
         };

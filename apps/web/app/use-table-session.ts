@@ -368,7 +368,7 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
           } catch {
             return;
           }
-          if (chatStore.receive(envelope)) return;
+          if (chatStore.receive(envelope, socket)) return;
           if (envelope.table_id !== undefined && envelope.table_id !== tableId) {
             return;
           }

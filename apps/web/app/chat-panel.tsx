@@ -87,7 +87,7 @@ export function ChatPanel({
     window.addEventListener("chat-connected", load);
     return () => {
       controller.abort();
-      chatStore.open(null);
+      chatStore.close(target);
       window.removeEventListener("chat-connected", load);
     };
   }, [scope, id]);
