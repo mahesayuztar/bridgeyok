@@ -5,7 +5,7 @@ import type { AccountLogin } from "../../../account-types";
 
 async function handle(request: Request, context: { params: Promise<{ path?: string[] }> }) {
   const path = (await context.params).path?.join("/") ?? "";
-  const allowed = /^(signup|login|logout|heartbeat|profile|users|invitations|users\/[a-f0-9-]+\/follow|tables\/[a-f0-9-]+\/(participants|invites))?$/;
+  const allowed = /^(signup|login|logout|heartbeat|profile|users|invitations|chat|users\/[a-f0-9-]+\/follow|tables\/[a-f0-9-]+\/(participants|invites))?$/;
   if (!allowed.test(path)) return new Response(null, { status: 404 });
   if (request.method !== "GET" && request.headers.get("origin") !== new URL(request.url).origin) return new Response(null, { status: 403 });
   const cookieStore = await cookies();

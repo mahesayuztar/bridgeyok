@@ -1,4 +1,5 @@
 "use client";
+import { chatStore } from "./chat-store";
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -20,6 +21,7 @@ export function ProfileSettings({ profile }: { profile: Profile }) {
   async function logout() {
     try {
       await accountRequest("/logout", { method: "POST" });
+      chatStore.identify("");
       try {
       localStorage.removeItem("bridgeyok.identity.v1");
       sessionStorage.removeItem("bridgeyok.access.v1");

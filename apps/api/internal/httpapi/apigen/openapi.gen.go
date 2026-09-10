@@ -191,6 +191,24 @@ func (e BoardAnalysisProvenanceType) Valid() bool {
 	}
 }
 
+// Defines values for ChatMessageScope.
+const (
+	ChatMessageScopePrivate ChatMessageScope = "private"
+	ChatMessageScopeTable   ChatMessageScope = "table"
+)
+
+// Valid indicates whether the value is a known member of the ChatMessageScope enum.
+func (e ChatMessageScope) Valid() bool {
+	switch e {
+	case ChatMessageScopePrivate:
+		return true
+	case ChatMessageScopeTable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthResponseStatus.
 const (
 	Ok          HealthResponseStatus = "ok"
@@ -569,6 +587,24 @@ func (e TableState) Valid() bool {
 	}
 }
 
+// Defines values for GetChatHistoryParamsScope.
+const (
+	GetChatHistoryParamsScopePrivate GetChatHistoryParamsScope = "private"
+	GetChatHistoryParamsScopeTable   GetChatHistoryParamsScope = "table"
+)
+
+// Valid indicates whether the value is a known member of the GetChatHistoryParamsScope enum.
+func (e GetChatHistoryParamsScope) Valid() bool {
+	switch e {
+	case GetChatHistoryParamsScopePrivate:
+		return true
+	case GetChatHistoryParamsScopeTable:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccountLogin defines model for AccountLogin.
 type AccountLogin struct {
 	ExpiresAt time.Time          `json:"expiresAt"`
@@ -692,6 +728,29 @@ type BoardReplay struct {
 	BoardId  openapi_types.UUID `json:"boardId"`
 	FullDeal ReplayDeal         `json:"fullDeal"`
 	Game     ReplayGame         `json:"game"`
+}
+
+// ChatMessage defines model for ChatMessage.
+type ChatMessage struct {
+	ClientRequestId string `json:"clientRequestId"`
+
+	// Content Up to 1000 grapheme clusters and 16000 UTF-8 bytes, never truncated.
+	Content        string             `json:"content"`
+	ConversationId string             `json:"conversationId"`
+	CreatedAt      time.Time          `json:"createdAt"`
+	MessageId      openapi_types.UUID `json:"messageId"`
+	Scope          ChatMessageScope   `json:"scope"`
+	Sender         AccountProfile     `json:"sender"`
+	SenderUserId   openapi_types.UUID `json:"senderUserId"`
+}
+
+// ChatMessageScope defines model for ChatMessage.Scope.
+type ChatMessageScope string
+
+// ChatPage defines model for ChatPage.
+type ChatPage struct {
+	Messages   []ChatMessage `json:"messages"`
+	NextCursor *string       `json:"nextCursor,omitempty"`
 }
 
 // CreateGuestSessionRequest defines model for CreateGuestSessionRequest.
@@ -945,6 +1004,18 @@ type TableId = openapi_types.UUID
 
 // ProblemResponse defines model for ProblemResponse.
 type ProblemResponse = Problem
+
+// GetChatHistoryParams defines parameters for GetChatHistory.
+type GetChatHistoryParams struct {
+	Scope GetChatHistoryParamsScope `form:"scope" json:"scope"`
+
+	// Id Friend user UUID for private chat, table UUID for table chat.
+	Id     openapi_types.UUID `form:"id" json:"id"`
+	Cursor *string            `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// GetChatHistoryParamsScope defines parameters for GetChatHistory.
+type GetChatHistoryParamsScope string
 
 // SearchAccountUsersParams defines parameters for SearchAccountUsers.
 type SearchAccountUsersParams struct {

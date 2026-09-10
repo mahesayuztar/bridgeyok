@@ -97,6 +97,9 @@ func (postgres *Postgres) ChatHistory(ctx context.Context, sessionID string, tar
 		return chat.Page{}, chat.ErrInput
 	}
 	before := chatCursor{CreatedAt: time.Now().UTC().Add(time.Hour), MessageID: "ffffffff-ffff-ffff-ffff-ffffffffffff"}
+	if len(cursor) > 512 {
+		return chat.Page{}, chat.ErrInput
+	}
 	if cursor != "" {
 		raw, err := base64.RawURLEncoding.DecodeString(cursor)
 		if err != nil || len(raw) > 256 || json.Unmarshal(raw, &before) != nil || before.CreatedAt.IsZero() {

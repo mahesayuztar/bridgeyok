@@ -164,6 +164,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/account/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Current mutual Friends or active table participants only. Expired messages are excluded before cleanup. Newest-first keyset pagination; no gameplay revision. */
+        get: operations["getChatHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/account/invitations": {
         parameters: {
             query?: never;
@@ -171,6 +188,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * @deprecated
+         * @description Compatibility endpoint always returns an empty array. Invitations are realtime-only.
+         */
         get: operations["listPlayerInvitations"];
         put?: never;
         post?: never;
@@ -477,6 +498,25 @@ export interface components {
             /** Format: uuid */
             userId: string;
             inviteCode: string;
+        };
+        ChatMessage: {
+            /** Format: uuid */
+            messageId: string;
+            /** @enum {string} */
+            scope: "private" | "table";
+            conversationId: string;
+            /** Format: uuid */
+            senderUserId: string;
+            sender: components["schemas"]["AccountProfile"];
+            /** @description Up to 1000 grapheme clusters and 16000 UTF-8 bytes, never truncated. */
+            content: string;
+            clientRequestId: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ChatPage: {
+            messages: components["schemas"]["ChatMessage"][];
+            nextCursor?: string;
         };
         PlayerInvitation: {
             sender: components["schemas"]["AccountProfile"];
@@ -1076,6 +1116,40 @@ export interface operations {
                 content?: never;
             };
             /** @description Account operation rejected */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getChatHistory: {
+        parameters: {
+            query: {
+                scope: "private" | "table";
+                /** @description Friend user UUID for private chat, table UUID for table chat. */
+                id: string;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Retained messages, up to 50 per page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPage"];
+                };
+            };
+            /** @description Invalid request, unauthenticated account, or forbidden conversation. */
             default: {
                 headers: {
                     [name: string]: unknown;

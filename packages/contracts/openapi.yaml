@@ -247,8 +247,48 @@ paths:
         schema:
           type: string
           format: uuid
+  /v1/account/chat:
+    get:
+      operationId: getChatHistory
+      description: Current mutual Friends or active table participants only. Expired messages are excluded before cleanup. Newest-first keyset pagination; no gameplay revision.
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: scope
+        in: query
+        required: true
+        schema:
+          type: string
+          enum: [private, table]
+      - name: id
+        in: query
+        required: true
+        description: Friend user UUID for private chat, table UUID for table chat.
+        schema:
+          type: string
+          format: uuid
+      - name: cursor
+        in: query
+        schema:
+          type: string
+          maxLength: 512
+      responses:
+        '200':
+          description: Retained messages, up to 50 per page.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatPage'
+        default:
+          description: Invalid request, unauthenticated account, or forbidden conversation.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /v1/account/invitations:
     get:
+      deprecated: true
+      description: Compatibility endpoint always returns an empty array. Invitations are realtime-only.
       operationId: listPlayerInvitations
       security:
       - bearerAuth: []
@@ -759,6 +799,45 @@ components:
         inviteCode:
           type: string
           pattern: ^[A-Z2-7]{26}$
+    ChatMessage:
+      type: object
+      additionalProperties: false
+      required: [messageId, scope, conversationId, senderUserId, sender, content, clientRequestId, createdAt]
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          enum: [private, table]
+        conversationId:
+          type: string
+        senderUserId:
+          type: string
+          format: uuid
+        sender:
+          $ref: '#/components/schemas/AccountProfile'
+        content:
+          type: string
+          description: Up to 1000 grapheme clusters and 16000 UTF-8 bytes, never truncated.
+        clientRequestId:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{8,64}$'
+        createdAt:
+          type: string
+          format: date-time
+    ChatPage:
+      type: object
+      additionalProperties: false
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+        nextCursor:
+          type: string
     PlayerInvitation:
       type: object
       additionalProperties: false

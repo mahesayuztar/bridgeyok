@@ -1,4 +1,5 @@
 "use client";
+import { chatStore } from "./chat-store";
 import { accountRequest, AccountRequestError } from "./account-types";
 import type { LoadPositionAnalysis, PositionAnalysis } from "./use-position-analysis";
 
@@ -330,6 +331,8 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
         let rotationTimer: ReturnType<typeof setTimeout> | null = null;
         socketRef.current = socket;
         socket.onopen = () => {
+ chatStore.attach(socket);
+ window.dispatchEvent(new Event("chat-connected"));
           if (connectionGenerationRef.current !== generation) {
             socket.close(1000, "stale connection");
             return;
@@ -365,6 +368,7 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
           } catch {
             return;
           }
+          if (chatStore.receive(envelope)) return;
           if (envelope.table_id !== undefined && envelope.table_id !== tableId) {
             return;
           }
@@ -454,6 +458,7 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
           }
         };
         socket.onclose = (event) => {
+ chatStore.detach(socket);
           if (rotationTimer !== null) {
             clearTimeout(rotationTimer);
           }
@@ -599,6 +604,7 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
       }
     } catch {
     } finally {
+      chatStore.identify("");
       clearIdentity();
       setBusy(false);
     }

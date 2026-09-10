@@ -4706,3 +4706,19 @@ button.physical-card.is-dragging {
     font-size: .625rem;
   }
 }
+
+.chat-panel { display:flex; flex-direction:column; min-width:0; width:100%; max-width:38rem; height:min(32rem,65dvh); background:var(--background); color:var(--foreground); border:1px solid var(--line); border-radius:.5rem; overflow:hidden; }
+.chat-panel > header { display:flex; align-items:center; gap:.65rem; padding:.75rem; border-bottom:1px solid var(--line); }
+.chat-panel > header > div { flex:1; min-width:0; }
+.chat-panel small { display:block; color:var(--muted); font-size:.75rem; }
+.chat-messages { flex:1; overflow:auto; min-height:0; padding:.75rem; overscroll-behavior:contain; }
+.chat-message { padding:.55rem 0; overflow-wrap:anywhere; }
+.chat-message p { margin:0 0 .2rem; white-space:pre-wrap; }
+.chat-panel form { display:flex; align-items:center; gap:.5rem; padding:.65rem; border-top:1px solid var(--line); }
+.chat-panel textarea { min-width:0; width:100%; resize:none; font:inherit; font-size:1rem; padding:.5rem; background:var(--card); color:var(--foreground); border:1px solid var(--line); }
+.chat-panel button { padding:.45rem; }
+.chat-toast { position:fixed; z-index:150; bottom:5rem; right:1rem; max-width:calc(100vw - 2rem); display:flex; gap:.6rem; align-items:center; padding:1rem; background:var(--background); border:1px solid var(--line); }
+.chat-toast > span { max-width:14rem; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.table-chat-container { position:fixed; z-index:90; right:1rem; bottom:max(1rem,var(--chat-keyboard-offset,0px)); width:min(22rem,calc(100vw - 2rem)); }
+@media(max-width:767px) { .table-chat-container { right:0; bottom:var(--chat-keyboard-offset,0px); width:100%; } .table-chat-container .chat-panel { height:min(24rem,calc(var(--chat-visible-height,100dvh) * 0.5)); max-width:none; border-radius:.5rem .5rem 0 0; } }
+@media(min-width:1280px) { body.table-chat-open .table-client { margin-right:calc(clamp(16rem,18vw,22rem) + 2rem); } body.table-chat-open .table-chat-container { top:5rem; bottom:1rem; width:clamp(16rem,18vw,22rem); } body.table-chat-open .table-chat-container .chat-panel { height:100%; } }

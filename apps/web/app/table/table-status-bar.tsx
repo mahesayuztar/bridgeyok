@@ -1,3 +1,4 @@
+import { TableChat } from "./table-chat";
 import { TableInvite } from "./table-social";
 import { useDialogDrag } from "./use-dialog-drag";
 import { useRef, type ReactNode } from "react";
@@ -44,7 +45,7 @@ export function WaitingTableStatusBar({
       <span className="table-wordmark">BridgeYok</span>
       <span>Meja tunggu</span>
       <div className="status-actions">
-        <TableInvite tableId={table.tableId} inviteCode={inviteCode} disabled={table.locked || table.participants.length >= 4} />
+        <TableChat tableId={table.tableId} /><TableInvite tableId={table.tableId} inviteCode={inviteCode} disabled={table.locked || table.participants.length >= 4} />
         <ScoreSheet loadBoardReplay={loadBoardReplay} loadPositionAnalysis={loadPositionAnalysis} table={table} />
         <div className="connection-status" data-state={connectionState}>
           <span className="status-mark" />
@@ -210,6 +211,7 @@ export function ActiveTableStatusBar({
         onCommand={onCommand}
       />
       <div className="status-actions">
+        <TableChat tableId={table.tableId} />
         <div
           className="connection-status"
           data-state={connectionState}
