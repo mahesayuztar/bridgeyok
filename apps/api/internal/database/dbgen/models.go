@@ -119,6 +119,53 @@ type BridgeyokGuestSession struct {
 	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
 }
 
+type BridgeyokMatchAssignment struct {
+	MatchID   string `json:"match_id"`
+	Room      string `json:"room"`
+	Seat      string `json:"seat"`
+	SessionID string `json:"session_id"`
+	Ready     bool   `json:"ready"`
+}
+
+type BridgeyokMatchBoard struct {
+	MatchID      string `json:"match_id"`
+	ID           string `json:"id"`
+	BoardNumber  int32  `json:"board_number"`
+	SourceRecord []byte `json:"source_record"`
+}
+
+type BridgeyokMatchComparison struct {
+	MatchID    string             `json:"match_id"`
+	BoardID    string             `json:"board_id"`
+	OpenRoom   string             `json:"open_room"`
+	ClosedRoom string             `json:"closed_room"`
+	TeamAImp   int32              `json:"team_a_imp"`
+	ComparedAt pgtype.Timestamptz `json:"compared_at"`
+}
+
+type BridgeyokMatchResult struct {
+	MatchID      string             `json:"match_id"`
+	BoardID      string             `json:"board_id"`
+	Room         string             `json:"room"`
+	TableBoardID string             `json:"table_board_id"`
+	ScoreNs      int32              `json:"score_ns"`
+	FinalizedAt  pgtype.Timestamptz `json:"finalized_at"`
+}
+
+type BridgeyokMatchRoom struct {
+	MatchID string `json:"match_id"`
+	Room    string `json:"room"`
+	TableID string `json:"table_id"`
+}
+
+type BridgeyokMatchRoomBoard struct {
+	MatchID      string `json:"match_id"`
+	BoardID      string `json:"board_id"`
+	Room         string `json:"room"`
+	TableID      string `json:"table_id"`
+	TableBoardID string `json:"table_board_id"`
+}
+
 type BridgeyokProcessedCommand struct {
 	TableID     string             `json:"table_id"`
 	SessionID   string             `json:"session_id"`
@@ -171,6 +218,18 @@ type BridgeyokTableSeat struct {
 	RecoveryHash    []byte             `json:"recovery_hash"`
 	OfflineSince    pgtype.Timestamptz `json:"offline_since"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BridgeyokTeamMatch struct {
+	ID             string             `json:"id"`
+	OwnerSessionID string             `json:"owner_session_id"`
+	Status         string             `json:"status"`
+	BoardCount     int32              `json:"board_count"`
+	Revision       int64              `json:"revision"`
+	TotalImp       int32              `json:"total_imp"`
+	CreationHash   []byte             `json:"creation_hash"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
 type BridgeyokUser struct {
