@@ -178,6 +178,7 @@ SELECT id,
        revision
 FROM bridgeyok.tables
 WHERE state IN ('WAITING', 'ACTIVE', 'BETWEEN_BOARDS', 'PAUSED')
+  AND NOT EXISTS (SELECT 1 FROM bridgeyok.match_rooms r WHERE r.table_id = bridgeyok.tables.id)
   AND meaningful_at <= $1
 ORDER BY meaningful_at, id
 LIMIT $2

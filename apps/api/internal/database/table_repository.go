@@ -106,6 +106,11 @@ func (postgres *Postgres) JoinTable(ctx context.Context, inviteCodeHash []byte, 
 				return nil
 			}
 		}
+		if _, err := queries.FindTableMatch(ctx, aggregate.ID); err == nil {
+			return table.ErrTableUnavailable
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
 		decision, domainError := table.Decide(aggregate, table.Command{Name: table.CommandJoinTable, Participant: &participant})
 		if domainError != nil {
 			return domainError
@@ -181,6 +186,11 @@ func (postgres *Postgres) LeaveTable(ctx context.Context, tableID string, sessio
 			revision: row.Revision, lastSeq: int64(row.LastSeq),
 		})
 		if err != nil {
+			return err
+		}
+		if _, err := queries.FindTableMatch(ctx, aggregate.ID); err == nil {
+			return &table.DomainError{Code: table.ErrorInvalidState, Message: "match lineup is fixed"}
+		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
 		decision, domainError := table.Decide(aggregate, table.Command{Name: table.CommandLeaveTable, SessionID: sessionID, OccurredAt: occurredAt})

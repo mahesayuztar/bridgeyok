@@ -57,6 +57,14 @@ func (postgres *Postgres) ProcessCommand(ctx context.Context, request table.Comm
 			result = rejectedResult(request, aggregate, table.ErrorStateChanged)
 			return insertProcessedOutcome(ctx, queries, request, result.Outcome, processedAt, expiresAt)
 		}
+		matchBoard, matchError, err := prepareMatchCommand(ctx, queries, aggregate, &request)
+		if err != nil {
+			return err
+		}
+		if matchError != "" {
+			result = rejectedResult(request, aggregate, matchError)
+			return insertProcessedOutcome(ctx, queries, request, result.Outcome, processedAt, expiresAt)
+		}
 		decision, domainError := table.Decide(aggregate, request.Command)
 		if domainError != nil && domainError.Code == table.ErrorDealRequired {
 			source := postgres.dealSource
@@ -82,6 +90,16 @@ func (postgres *Postgres) ProcessCommand(ctx context.Context, request table.Comm
 		result, err = persistAcceptedDecision(ctx, queries, request, aggregate, decision, processedAt)
 		if err != nil {
 			return err
+		}
+		if matchBoard != nil {
+			if err := queries.InsertMatchRoomBoard(ctx, dbgen.InsertMatchRoomBoardParams{MatchID: matchBoard.MatchID, BoardID: matchBoard.BoardID, Room: matchBoard.Room, TableID: matchBoard.TableID, TableBoardID: matchBoard.TableBoardID}); err != nil {
+				return err
+			}
+		}
+		if request.Command.Name == table.CommandSetReady {
+			if err := syncMatchReadiness(ctx, queries, request, processedAt); err != nil {
+				return err
+			}
 		}
 		return insertProcessedOutcome(ctx, queries, request, result.Outcome, processedAt, expiresAt)
 	})

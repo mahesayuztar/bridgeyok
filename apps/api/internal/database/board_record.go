@@ -211,6 +211,9 @@ func compactFinalBoard(ctx context.Context, queries *dbgen.Queries, current tabl
 		lastBatch.Revision != stored.FinalRevision {
 		return fmt.Errorf("conflicting permanent board record")
 	}
+	if err := collectFinalMatchBoard(ctx, queries, current.ID, current.BoardID, occurredAt); err != nil {
+		return err
+	}
 	return queries.DeleteCompactedBoardEvents(ctx, current.BoardID)
 }
 

@@ -28,6 +28,11 @@ SELECT * FROM bridgeyok.board_records WHERE board_id = sqlc.arg(board_id);
 -- name: FindBoardRecord :one
 SELECT r.record FROM bridgeyok.board_records r
 WHERE r.board_id = sqlc.arg(board_id)
+  AND NOT EXISTS (
+      SELECT 1 FROM bridgeyok.match_rooms mr
+      JOIN bridgeyok.team_matches m ON m.id = mr.match_id
+      WHERE mr.table_id = r.table_id AND m.status <> 'COMPLETE'
+  )
   AND EXISTS (SELECT 1 FROM bridgeyok.table_participants p
               WHERE p.table_id = r.table_id AND p.session_id = sqlc.arg(session_id) AND p.left_at IS NULL);
 
