@@ -93,10 +93,11 @@ func load(lookup lookupFunc) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	realtimeReadLimitBytes, err := integerValue(lookup, "REALTIME_READ_LIMIT_BYTES", 32<<10, 32<<10, 64<<10)
+	realtimeReadLimitBytes, err := integerValue(lookup, "REALTIME_READ_LIMIT_BYTES", 32<<10, 1024, 64<<10)
 	if err != nil {
 		return Config{}, err
 	}
+	realtimeReadLimitBytes = max(realtimeReadLimitBytes, 32<<10)
 	realtimeOutboundQueueCapacity, err := integerValue(lookup, "REALTIME_OUTBOUND_QUEUE_CAPACITY", 64, 1, 1024)
 	if err != nil {
 		return Config{}, err
