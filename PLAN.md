@@ -1546,3 +1546,17 @@ Account migration 00007 is required before deploying this API/web revision. Vali
 ## Chat and ephemeral realtime — 10 September 2026
 
 Explicit request authorizes private Friends chat (90 days), active table chat (14 days), optimistic delivery and realtime-only notifications before Team Match. ADR 0019 records protocol, storage, priority queues and invite persistence removal. Existing Go WebSocket and PostgreSQL remain the only realtime/persistence infrastructure. JOB-01–08 passed local verification on 11 September 2026. The completed checkpoint is archived in `docs/chat-implementation-validation.md`, including responsive/pointer evidence and deployment prerequisites. Production deployment remains outside this task.
+
+
+## Vercel chat deployment follow-up — 14 September 2026
+
+- [x] Inspect live API health, authentication rejection and origin allowlist behavior.
+- [x] Verify Supabase migrations 00008–00009, chat RLS and restricted cleanup execution.
+- [x] Install daily pg_cron retention and verify actual scheduled execution; remove probe.
+- [x] Reject stale 8 KB frame configuration; validate chat schema before accepting API traffic.
+- [x] Validate Vercel web API URLs; build and smoke-test the non-root API/DDS container.
+- [ ] Verify Vercel project settings with authenticated access (not available in this workspace).
+- [ ] Resolve cross-instance realtime coordination and verify clients across instances/deployments.
+- [ ] Promote the hardened revision and perform authenticated production chat/gameplay checks.
+
+Deployment remains BLOCKED for an unrestricted multi-instance API. Existing connection maps, table actors and broadcasts are process-local. Evidence, configuration and resumption steps: `docs/vercel-chat-deployment.md`. No production deployment was triggered or application code pushed by this follow-up.

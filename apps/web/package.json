@@ -8,7 +8,7 @@
     "e2e": "playwright test",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test app/*.test.mjs",
+    "test": "node --test app/*.test.mjs next.config.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
