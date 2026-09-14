@@ -1329,12 +1329,16 @@ Phase 5 dimulai. ADR 0020 mencatat orientasi tim, 1–32 shared boards, progres 
 - [x] Domain `internal/match`: exactly two rooms/eight distinct seats, owner assignment, readiness reset, atomic board-set generation, independent ordered progression, immutable/idempotent result collection, and final status.
 - [x] Law 78B IMP boundary/sign tests, paired comparisons and aggregate totals, including zero/passed-out scores.
 - [x] Validated private snapshot hydration and defensive-copy tests; participant projection omits deals and withholds detailed results until match completion.
-- [ ] PostgreSQL schema/repository, shared board binding, transactionally sealed table results, unique paired-result persistence, restart and concurrent retry evidence.
+- [x] PostgreSQL schema/repository, shared board binding, transactionally sealed table results, unique paired-result persistence, reopened-repository recovery and concurrent retry evidence (15 September 2026).
 - [ ] Match lifecycle API, owner controls, table actor integration, and match-aware replay/DDS/history/privacy guards.
 - [ ] Team Match UI, eight-client integration, responsive Playwright happy path.
 - [ ] Closed-beta hardening, restart drills, capacity pilot, independent WBF sign-off, and supported single-instance production hosting.
 
-API race suite, Go vet, and API lint (0 issues) pass; domain tests achieve 98.4% statement coverage. Snapshot JSON round-trip demonstrates domain reconstruction only; durable database recovery and end-to-end exactly-once behavior remain unverified. No existing gameplay/API/UI behavior or production deployment is changed.
+Initial domain evidence: API race suite, Go vet, and API lint (0 issues) pass; domain tests achieve 98.4% statement coverage.
+
+**PostgreSQL integration — 15 September 2026:** migration 00010 and sqlc queries persist normalized rooms, assignments/readiness, immutable shared sources, distinct room-board bindings, archive-backed results, comparisons, and totals. Start commits both initial table snapshots and the complete source set atomically. Next-board/finish uses the existing command transaction to seal/archive the old board and collect its match result. Row locking and unique constraints prevent duplicate comparison; consistent reads validate reconstructed state against stored totals. Casual lifecycle guards preserve the board set/lineup; replay and DDS are withheld until match completion and retain room authorization.
+
+Validation: isolated PostgreSQL 17 migration up/down/up PASS; uncached database integration with race detector PASS (35.144s), final targeted match suite PASS (11.272s), realtime integration PASS (1.205s), API race suite, Go vet, lint, and migration validation PASS. Scenarios cover eight concurrent starts (one generated set), 16 simultaneous/retried finalizations (one comparison), readiness/revision fencing, independent two-board progress, nonzero signed IMP totals, passed-out results, pre-final undo, reopened repository recovery, archive redelivery, missing-binding rejection, partial-start/failed-comparison rollback, immutable results, cross-room access, and RLS/readiness. This is database/repository evidence; eight-client lifecycle/actor publication and browser validation remain pending. No production migration or deployment was performed. Details and rollback limits: `docs/operations/phase5-postgres.md`.
 
 ### Deferred outside this roadmap
 
