@@ -34,7 +34,7 @@ export function AccountPresence({ compact = false }: { compact?: boolean }) {
       try {
         const base =
           process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-        const response = await fetch(`${base}/v1/realtime/tickets`, {
+        const response = await fetch(new URL("/v1/realtime/tickets", base), {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
@@ -42,7 +42,7 @@ export function AccountPresence({ compact = false }: { compact?: boolean }) {
         if (!response.ok) throw new Error("ticket failed");
         const ticket = (await response.json()) as { ticket: string };
         if (controller.signal.aborted) return;
-        const url = new URL(`${base}/v1/ws`);
+        const url = new URL("/v1/ws", base);
         url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
         url.searchParams.set("ticket", ticket.ticket);
         const next = new WebSocket(url);
