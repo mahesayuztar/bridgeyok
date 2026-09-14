@@ -39,8 +39,8 @@ export default defineConfig({
       reuseExistingServer: false,
       env: {
         ...process.env,
-        API_BASE_URL: apiURL,
-        NEXT_PUBLIC_API_BASE_URL: apiURL,
+        API_BASE_URL: `${apiURL}/`,
+        NEXT_PUBLIC_API_BASE_URL: `${apiURL}/`,
         NEXT_DIST_DIR: ".next-e2e",
         PORT: "3100"
       }
