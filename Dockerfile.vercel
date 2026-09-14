@@ -76,6 +76,11 @@ COPY --from=builder \
 
 USER bridgeyok
 
+ENV PORT=8080
+ENV API_HOST=0.0.0.0
+ENV APP_ENV=production
+ENV REALTIME_READ_LIMIT_BYTES=32768
+
 EXPOSE 8080
 
 CMD ["/workspace/bridgeyok-api"]

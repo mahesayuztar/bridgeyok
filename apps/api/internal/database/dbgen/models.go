@@ -73,6 +73,18 @@ type BridgeyokBoardSeatAttribution struct {
 	IsBot      bool   `json:"is_bot"`
 }
 
+type BridgeyokChatMessage struct {
+	MessageID       string             `json:"message_id"`
+	Scope           string             `json:"scope"`
+	ConversationID  string             `json:"conversation_id"`
+	TableID         pgtype.UUID        `json:"table_id"`
+	SenderUserID    string             `json:"sender_user_id"`
+	RecipientUserID pgtype.UUID        `json:"recipient_user_id"`
+	Content         string             `json:"content"`
+	ClientRequestID string             `json:"client_request_id"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
 type BridgeyokFollow struct {
 	FollowerID string `json:"follower_id"`
 	FollowedID string `json:"followed_id"`
@@ -105,14 +117,6 @@ type BridgeyokGuestSession struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	LastSeenAt     pgtype.Timestamptz `json:"last_seen_at"`
 	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
-}
-
-type BridgeyokPlayerInvite struct {
-	SenderID    string             `json:"sender_id"`
-	RecipientID string             `json:"recipient_id"`
-	TableID     string             `json:"table_id"`
-	InviteCode  string             `json:"invite_code"`
-	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
 }
 
 type BridgeyokProcessedCommand struct {

@@ -30,6 +30,12 @@ func main() {
 	logger := observability.NewLogger(appConfig.LogLevel)
 	databaseCtx, cancelDatabase := context.WithTimeout(context.Background(), 10*time.Second)
 	postgres, err := database.Open(databaseCtx, appConfig.DatabaseURL, appConfig.DatabaseMaxConns)
+	if err == nil {
+		err = postgres.Ping(databaseCtx)
+		if err != nil {
+			postgres.Close()
+		}
+	}
 	cancelDatabase()
 	if err != nil {
 		logger.Error("database initialization failed", "error", err)

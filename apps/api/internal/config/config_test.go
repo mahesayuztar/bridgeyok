@@ -149,10 +149,10 @@ func TestLoad(t *testing.T) {
 			wantErr: "TABLE_INACTIVITY_TIMEOUT must be a positive duration",
 		},
 		{
-			name: "invalid realtime frame limit",
+			name: "legacy realtime frame limit cannot carry maximum chat payload",
 			values: map[string]string{
 				"DATABASE_URL":              "postgresql://bridgeyok:secret@localhost:5432/bridgeyok",
-				"REALTIME_READ_LIMIT_BYTES": "512",
+				"REALTIME_READ_LIMIT_BYTES": "8192",
 			},
 			wantErr: "REALTIME_READ_LIMIT_BYTES must be an integer",
 		},

@@ -1,6 +1,7 @@
 -- name: IsSchemaReady :one
-SELECT EXISTS (
-    SELECT 1
-    FROM pg_catalog.pg_namespace
-    WHERE nspname = 'bridgeyok'
+SELECT (
+    to_regclass('bridgeyok.tables') IS NOT NULL
+    AND to_regclass('bridgeyok.users') IS NOT NULL
+    AND to_regclass('bridgeyok.chat_messages') IS NOT NULL
+    AND to_regprocedure('bridgeyok.cleanup_chat_messages()') IS NOT NULL
 )::boolean AS ready;
