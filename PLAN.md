@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 fondasi domain berjalan
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1321,6 +1321,20 @@ ENG-03 **PASS pada 6 September 2026**. Claim/undo tersedia pada empat seat teris
 - [ ] Known limitations dan WBF compliance boundary terlihat bagi tester; tidak ada unresolved correctness, data-loss, hidden-hand, atau security severity tinggi.
 
 **Cheapest appropriate test level:** pure table-driven/golden test untuk IMP dan orientation; application unit test untuk match state machine; PostgreSQL integration test untuk paired-result idempotency/finalization/restart; scripted eight-client test untuk board synchronization dan privacy; satu Playwright Team Match happy path sebagai release smoke.
+
+### Phase 5 implementation checkpoint — 14 September 2026
+
+Phase 5 dimulai. ADR 0020 mencatat orientasi tim, 1–32 shared boards, progres room independen, hasil final immutable, dan batas proyeksi. Checklist berikut merupakan urutan implementasi, bukan klaim seluruh Phase 5 selesai.
+
+- [x] Domain `internal/match`: exactly two rooms/eight distinct seats, owner assignment, readiness reset, atomic board-set generation, independent ordered progression, immutable/idempotent result collection, and final status.
+- [x] Law 78B IMP boundary/sign tests, paired comparisons and aggregate totals, including zero/passed-out scores.
+- [x] Validated private snapshot hydration and defensive-copy tests; participant projection omits deals and withholds detailed results until match completion.
+- [ ] PostgreSQL schema/repository, shared board binding, transactionally sealed table results, unique paired-result persistence, restart and concurrent retry evidence.
+- [ ] Match lifecycle API, owner controls, table actor integration, and match-aware replay/DDS/history/privacy guards.
+- [ ] Team Match UI, eight-client integration, responsive Playwright happy path.
+- [ ] Closed-beta hardening, restart drills, capacity pilot, independent WBF sign-off, and supported single-instance production hosting.
+
+API race suite, Go vet, and API lint (0 issues) pass; domain tests achieve 98.4% statement coverage. Snapshot JSON round-trip demonstrates domain reconstruction only; durable database recovery and end-to-end exactly-once behavior remain unverified. No existing gameplay/API/UI behavior or production deployment is changed.
 
 ### Deferred outside this roadmap
 
