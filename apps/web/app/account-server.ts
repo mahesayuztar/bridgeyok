@@ -9,7 +9,7 @@ export const ACCOUNT_API_URL = process.env.API_BASE_URL ?? process.env.NEXT_PUBL
 export const currentAccount = cache(async () => {
   const token = (await cookies()).get(ACCOUNT_COOKIE)?.value;
   if (!token) return null;
-  const response = await fetch(`${ACCOUNT_API_URL}/v1/account`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(8000) });
+  const response = await fetch(new URL("/v1/account", ACCOUNT_API_URL), { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(8000) });
   if (response.status === 401) return null;
   if (!response.ok) throw new Error("Layanan akun belum terhubung. Silakan coba lagi.");
   return await response.json() as AccountLogin;

@@ -5,7 +5,7 @@ Last updated: 14 September 2026. Branch: main. Continuation of chat JOB-01–08,
 ## Changes completed
 
 - API startup and `/health/ready` require the table, account and chat tables plus the cleanup function. The former check only required the schema namespace, allowing readiness to pass before chat migration.
-- WebSocket frame configuration now requires at least 32768 bytes. Deployment examples and the Vercel image use that limit. Existing explicit 8192-byte environment overrides must be updated before deploying; the API now rejects them instead of breaking valid large Unicode messages.
+- WebSocket frame configuration now uses at least 32768 bytes. Deployment examples and the Vercel image use that limit. Existing explicit 8192-byte overrides are raised automatically for compatibility, without blocking startup. Values outside the existing configuration range remain invalid.
 - The Vercel image explicitly sets port 8080, binds 0.0.0.0, defaults to production and runs as its existing unprivileged user. Project environment variables can override image defaults.
 - Vercel web configuration rejects missing or non-HTTPS public API origins and mismatched server/browser API URLs. Seven configuration tests cover rejection and valid fallback.
 - sqlc models were regenerated against migrations 00008–00009.
@@ -47,3 +47,12 @@ API project root: repository root, `Dockerfile.vercel`; web project root: `apps/
 Web: `NEXT_PUBLIC_API_BASE_URL=https://bridgeyok-api.vercel.app`; omit `API_BASE_URL` or set it to the same URL. Rebuild after changing NEXT_PUBLIC variables. Preview deployments must use an isolated database/secret/API and an explicit matching Origin allowlist.
 
 Next action: obtain authenticated Vercel project access, verify deployment topology, resolve the process-local realtime blocker, then run the production promotion checks. Supabase permission is already granted and must not be requested again.
+
+
+## Login incident follow-up — 14 September 2026
+
+Subsequent live checks returned Vercel FUNCTION_INVOCATION_FAILED (500) from API `/health/live`, `/health/ready`, and POST `/v1/account/login`. Frontend POST `/api/account/login` propagates the upstream failure. User-provided frontend logs also show account-service failures; API runtime logs are still needed to establish the startup cause. The earlier successful health checks above predate this incident.
+
+The frontend route is an intentional same-origin account proxy for cookie handling. The API environment screenshot includes a trailing slash. Replaced string concatenation in both the proxy and server account lookup with URL construction, avoiding `//v1/account`. A local Next.js HTTP smoke test with an upstream stub verifies POST method, request body, query and upstream 401 are preserved with a trailing-slash base URL.
+
+The strict 32 KB minimum added in the deployment follow-up was also revised: a valid legacy 8 KB setting is now upgraded automatically, rather than aborting startup. Whether the strict check caused the production incident remains unconfirmed until API logs are available. Font visibility warnings are unrelated to the API invocation failure. No production deploy was performed by the assistant.
