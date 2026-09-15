@@ -110,7 +110,11 @@ func (handler identityHTTPHandler) authenticate(writer http.ResponseWriter, requ
 	}
 	session, err := handler.service.Authenticate(request.Context(), strings.TrimPrefix(authorization, "Bearer "))
 	if err != nil {
-		handler.writeError(writer, request, http.StatusUnauthorized, "INVALID_ACCESS_TOKEN", "identity.error.invalid_access_token", false)
+		if errors.Is(err, identity.ErrInvalidCredential) || errors.Is(err, identity.ErrSessionInactive) {
+			handler.writeError(writer, request, http.StatusUnauthorized, "INVALID_ACCESS_TOKEN", "identity.error.invalid_access_token", false)
+		} else {
+			handler.writeError(writer, request, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "common.error.service_unavailable", true)
+		}
 		return identity.Session{}, false
 	}
 	return session, true

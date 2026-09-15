@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -171,5 +172,35 @@ func testCredentials(nickname string) identity.CredentialSet {
 		AccessToken:      "access-token",
 		AccessExpiresAt:  time.Date(2026, 8, 30, 4, 15, 0, 0, time.UTC),
 		DeviceCredential: "device-credential",
+	}
+}
+
+func TestAuthenticationFailureClassification(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name   string
+		err    error
+		status int
+		code   string
+	}{
+		{name: "invalid credential", err: identity.ErrInvalidCredential, status: 401, code: "INVALID_ACCESS_TOKEN"},
+		{name: "inactive session", err: fmt.Errorf("session lookup: %w", identity.ErrSessionInactive), status: 401, code: "INVALID_ACCESS_TOKEN"},
+		{name: "database unavailable", err: errors.New("private database connection details"), status: 503, code: "SERVICE_UNAVAILABLE"},
+		{name: "database timeout", err: context.DeadlineExceeded, status: 503, code: "SERVICE_UNAVAILABLE"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			router, logs := testIdentityRouter(&identityServiceFake{authenticateError: test.err})
+			request := httptest.NewRequest(http.MethodPost, "/v1/realtime/tickets", nil)
+			request.Header.Set("Authorization", "Bearer valid-access")
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			if response.Code != test.status || !strings.Contains(response.Body.String(), test.code) {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			if strings.Contains(response.Body.String(), test.err.Error()) || strings.Contains(logs.String(), test.err.Error()) {
+				t.Fatal("authentication leaked internal failure")
+			}
+		})
 	}
 }
