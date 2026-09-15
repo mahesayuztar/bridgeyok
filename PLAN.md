@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor dan UI lokal selesai; closed-beta gates pending
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1332,7 +1332,8 @@ Phase 5 dimulai. ADR 0020 mencatat orientasi tim, 1–32 shared boards, progres 
 - [x] PostgreSQL schema/repository, shared board binding, transactionally sealed table results, unique paired-result persistence, reopened-repository recovery and concurrent retry evidence (15 September 2026).
 - [x] Match lifecycle API, owner controls, table actor integration, and match-aware replay/DDS/history/privacy guards (15 September 2026).
 - [x] Team Match UI, eight-client integration, responsive Playwright happy path (15 September 2026).
-- [ ] Closed-beta hardening, restart drills, capacity pilot, independent WBF sign-off, and supported single-instance production hosting.
+- [x] Local hardening: create/cancel rollback, capacity/discovery, process restart, database outage, recipient recovery, compatible application rollback and security scans (16 September 2026).
+- [ ] Human closed-beta pilot, independent WBF sign-off, and supported single-instance production hosting.
 
 Initial domain evidence: API race suite, Go vet, and API lint (0 issues) pass; domain tests achieve 98.4% statement coverage.
 
@@ -1589,3 +1590,14 @@ The Play Team Match entry now opens setup and the participant's own match list. 
 Verification: API race suite, Go vet, API lint (0 issues), migration validation, 67 web unit tests, contract tests, TypeScript and production web build PASS. PostgreSQL match suite with race detector PASS (21.198s); eight-client HTTP/WebSocket privacy and actor-recovery test PASS (47.383s). Real Playwright eight-account create/ready/start/two-room passed-out/finish/final-reload smoke PASS (final run 1.9m), with pointer interactions and overflow/screenshots at 320, 390, 768, 1024, 1440 and 1920 px. Web lint reports zero errors and two existing `aria-description` warnings. Browser evidence is in `apps/web/test-results`; the first run's incorrect card selector was fixed before the passing run.
 
 Remaining Phase 5: operational restart/failure/security/capacity drills, pilot closed beta, independent WBF review, and supported single-instance hosting. No production migration or deployment. See ADR 0020 and `docs/operations/phase5-postgres.md` before continuing; do not start AI work.
+
+
+### Phase 5 local hardening checkpoint — 16 September 2026
+
+Local hardening PASS. Unfinished matches now precede recent history in the twenty-entry participant list, preventing cancellation history from hiding an active room. Shared HTTP authentication now returns retryable 503 for infrastructure failure and retains 401 for invalid/inactive credentials.
+
+An isolated disposable PostgreSQL 17 runner verifies eight concurrent creates (four accepted/four capacity rejections), create/cancel SQL rollback, and discovery after 22 cancellations. A race-instrumented real API process supports four two-board matches, eight rooms and 32 distinct player sockets; survives SIGKILL after a call in every room; recovers from stopped/restarted PostgreSQL without another API restart; reconnects recipients with unchanged own hands; finishes all rooms concurrently; and hydrates identical final results under rollback build `0200467` without schema changes. Lifecycle test PASS (23.56 s), process drill PASS (132.43 s). The 272 local ACK samples measured p50 64.3 ms, p95 310.6 ms, maximum 758.1 ms; this is a bounded smoke, not a production capacity promise.
+
+API race/vet/lint, changed integration-test lint and contract tests pass. govulncheck finds no vulnerabilities; pnpm production audit has zero advisories; redacted Gitleaks history scan finds no leaks. All test infrastructure is cleaned automatically. No UI, AI, production data or deployment changed.
+
+Reproduction, evidence and limitations: `docs/operations/phase5-hardening.md`, `scripts/harden-phase5.sh`. The remaining release gates are supported single-instance hosting, independent WBF review, and a real eight-person closed-beta pilot. The local passed-out smoke does not replace those gates or full card-play capacity evidence.

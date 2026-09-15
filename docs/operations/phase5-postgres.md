@@ -28,7 +28,7 @@ Reopen the PostgreSQL repository and call `LoadMatch` for match state, and the e
 
 A source-generation or SQL failure before start commit leaves both waiting tables and all shared source rows unchanged. Failure while closing a board leaves its previous scored snapshot, undo state, events, and match ledger unchanged; retry the same table request ID after recovery.
 
-Do not run migration down on live match data. Down removes the match ledger/bindings and its safeguards. After match creation is enabled, an application rollback target must retain migration-00010 compatibility and match lifecycle/privacy guards. An older casual-only API must not serve bound rooms. Pause service instead if no compatible rollback build exists. Waiting cancellation is supported. Active cancellation, owner succession/substitution, and inactivity expiry remain unavailable. Migration 00011 down rejects retained CANCELLED rows; do not use down as an application rollback.
+Do not run migration down on live match data. Down removes the match ledger/bindings and its safeguards. After match creation is enabled, an application rollback target must retain migration-00010/00011 compatibility and match lifecycle/privacy guards. An older casual-only API must not serve bound rooms. Pause service instead if no compatible rollback build exists. Waiting cancellation is supported. Active cancellation, owner succession/substitution, and inactivity expiry remain unavailable. Migration 00011 down rejects retained CANCELLED rows; do not use down as an application rollback.
 
 ## Local validation
 
@@ -60,3 +60,8 @@ Playwright `e2e/team-match.spec.ts` PASS (final run 1.9m): eight registered brow
 Production web build, TypeScript, 67 web unit tests and contract tests PASS. Web lint: zero errors, two pre-existing aria-description warnings. No production migration/deployment, operational restart drill or pilot has been performed.
 
 Migration 00011 up/down/up also PASS on a newly created disposable local database. The database was dropped after verification; the browser database and unrelated chat database were not altered by this drill.
+
+
+## Local hardening — 16 September 2026
+
+Lifecycle rollback/capacity/discovery and real-process restart/database-outage/compatible-rollback checks now PASS. Four two-board matches and 32 player sockets recovered and completed with identical final results under build `0200467`. Security scans and focused race/vet/lint checks pass. The list prioritizes unfinished matches, and authentication treats infrastructure errors as retryable 503. See `docs/operations/phase5-hardening.md` for exact scope, timings, reproduction, fixture corrections and remaining release gates. No production migration or deployment was performed.
