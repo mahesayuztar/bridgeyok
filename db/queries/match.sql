@@ -76,7 +76,8 @@ INSERT INTO bridgeyok.match_create_requests(owner_session_id,request_id,request_
 -- name: ListParticipantMatchIDs :many
 SELECT m.id FROM bridgeyok.team_matches m
 JOIN bridgeyok.match_assignments a ON a.match_id=m.id
-WHERE a.session_id=$1 ORDER BY m.updated_at DESC,m.id LIMIT 20;
+WHERE a.session_id=$1
+ORDER BY (m.status IN ('WAITING','ACTIVE')) DESC,m.updated_at DESC,m.id LIMIT 20;
 
 -- name: CountPendingMatchInvitations :one
 SELECT count(*) FROM bridgeyok.match_assignments a

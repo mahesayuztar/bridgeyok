@@ -396,7 +396,8 @@ func (q *Queries) ListMatchRooms(ctx context.Context, matchID string) ([]Bridgey
 const listParticipantMatchIDs = `-- name: ListParticipantMatchIDs :many
 SELECT m.id FROM bridgeyok.team_matches m
 JOIN bridgeyok.match_assignments a ON a.match_id=m.id
-WHERE a.session_id=$1 ORDER BY m.updated_at DESC,m.id LIMIT 20
+WHERE a.session_id=$1
+ORDER BY (m.status IN ('WAITING','ACTIVE')) DESC,m.updated_at DESC,m.id LIMIT 20
 `
 
 func (q *Queries) ListParticipantMatchIDs(ctx context.Context, sessionID string) ([]string, error) {

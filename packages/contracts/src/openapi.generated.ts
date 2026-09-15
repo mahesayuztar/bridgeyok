@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Lists at most 20 matches assigned to the authenticated identity; never public discovery. */
+        /** @description Lists at most 20 matches assigned to the authenticated identity, unfinished matches first then recent history; never public discovery. */
         get: operations["listMatches"];
         put?: never;
         /** @description Creates fresh rooms for eight registered accounts, all unready. The owner must be assigned. Identical request IDs return the same match; changed bodies conflict. Each assigned account may have at most four pending/active matches. */

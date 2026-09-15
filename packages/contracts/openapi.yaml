@@ -10,8 +10,8 @@ paths:
   /v1/matches:
     get:
       operationId: listMatches
-      description: Lists at most 20 matches assigned to the authenticated identity;
-        never public discovery.
+      description: Lists at most 20 matches assigned to the authenticated identity,
+        unfinished matches first then recent history; never public discovery.
       security:
       - bearerAuth: []
       responses:
