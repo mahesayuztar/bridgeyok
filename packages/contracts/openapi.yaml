@@ -7,6 +7,189 @@ servers:
   - url: http://localhost:8080
     description: Local development
 paths:
+  /v1/matches:
+    get:
+      operationId: listMatches
+      description: Lists at most 20 matches assigned to the authenticated identity;
+        never public discovery.
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items:
+                  $ref: '#/components/schemas/MatchView'
+        default:
+          description: Structured authentication, input, membership, state, capacity,
+            or infrastructure failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    post:
+      operationId: createMatch
+      description: Creates fresh rooms for eight registered accounts, all unready. The
+        owner must be assigned. Identical request IDs return the same match; changed
+        bodies conflict. Each assigned account may have at most four pending/active
+        matches.
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchView'
+        default:
+          description: Structured authentication, input, membership, state, capacity,
+            or infrastructure failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchCreateRequest'
+  /v1/matches/{matchId}:
+    get:
+      operationId: getMatch
+      description: Returns recipient match status and own room. Comparisons are withheld
+        until completion.
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchView'
+        default:
+          description: Structured authentication, input, membership, state, capacity,
+            or infrastructure failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      parameters:
+      - name: matchId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /v1/matches/{matchId}/ready:
+    post:
+      operationId: setMatchReady
+      description: Explicit player consent through the table actor and existing idempotent
+        table command path. Uses tableRevision, not match revision.
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchView'
+        default:
+          description: Structured authentication, input, membership, state, capacity,
+            or infrastructure failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchReadyRequest'
+      parameters:
+      - name: matchId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /v1/matches/{matchId}/start:
+    post:
+      operationId: startMatch
+      description: Owner-only atomic start when all eight players are ready. Retries
+        refresh both actors without regenerating deals. syncPending means durable success
+        with incomplete realtime notification.
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchView'
+        default:
+          description: Structured authentication, input, membership, state, capacity,
+            or infrastructure failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchRevisionRequest'
+      parameters:
+      - name: matchId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /v1/matches/{matchId}/cancel:
+    post:
+      operationId: cancelMatch
+      description: Any assigned player can decline a waiting match. Closes both rooms
+        atomically; repeated cancellation is idempotent. Active matches cannot be cancelled.
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchView'
+        default:
+          description: Structured authentication, input, membership, state, capacity,
+            or infrastructure failure
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchRevisionRequest'
+      parameters:
+      - name: matchId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
   /v1/account/signup:
     post:
       operationId: registerAccount
@@ -683,6 +866,187 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    MatchSeatRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - room
+      - seat
+      properties:
+        userId:
+          type: string
+          format: uuid
+        room:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        seat:
+          $ref: '#/components/schemas/TableSeat'
+    MatchCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - boardCount
+      - assignments
+      properties:
+        requestId:
+          type: string
+          minLength: 8
+          maxLength: 64
+          pattern: ^[A-Za-z0-9_-]+$
+        boardCount:
+          type: integer
+          minimum: 1
+          maximum: 32
+        assignments:
+          type: array
+          minItems: 8
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/MatchSeatRequest'
+    MatchRevisionRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedRevision
+      properties:
+        expectedRevision:
+          type: integer
+          format: int64
+          minimum: 0
+    MatchReadyRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - expectedTableRevision
+      - ready
+      properties:
+        requestId:
+          type: string
+          minLength: 8
+          maxLength: 64
+          pattern: ^[A-Za-z0-9_-]+$
+        expectedTableRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        ready:
+          type: boolean
+    MatchComparison:
+      type: object
+      additionalProperties: false
+      required:
+      - boardId
+      - openScoreNS
+      - closedScoreNS
+      - teamAIMP
+      properties:
+        boardId:
+          type: string
+          format: uuid
+        openScoreNS:
+          type: integer
+        closedScoreNS:
+          type: integer
+        teamAIMP:
+          type: integer
+          minimum: -24
+          maximum: 24
+    MatchView:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - status
+      - revision
+      - isOwner
+      - tableId
+      - tableRevision
+      - room
+      - seat
+      - team
+      - boardCount
+      - ready
+      - readyCount
+      - openCompleted
+      - closedCompleted
+      - canStart
+      - canCancel
+      - syncPending
+      - teamAIMP
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - WAITING
+          - ACTIVE
+          - COMPLETE
+          - CANCELLED
+        revision:
+          type: integer
+          format: int64
+          minimum: 0
+        isOwner:
+          type: boolean
+        tableId:
+          type: string
+          format: uuid
+        tableRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        room:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        seat:
+          $ref: '#/components/schemas/TableSeat'
+        team:
+          type: string
+          enum:
+          - A
+          - B
+        boardCount:
+          type: integer
+          minimum: 1
+          maximum: 32
+        ready:
+          type: boolean
+        readyCount:
+          type: integer
+          minimum: 0
+          maximum: 8
+        openCompleted:
+          type: integer
+          minimum: 0
+          maximum: 32
+        closedCompleted:
+          type: integer
+          minimum: 0
+          maximum: 32
+        canStart:
+          type: boolean
+        canCancel:
+          type: boolean
+        syncPending:
+          type: boolean
+        comparisons:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/MatchComparison'
+        teamAIMP:
+          type: integer
+          minimum: -768
+          maximum: 768
     AccountProfile:
       type: object
       additionalProperties: false

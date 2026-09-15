@@ -266,7 +266,10 @@
         },
         "game": { "type": "object" },
         "actionRequest": { "$ref": "#/$defs/actionRequest" },
-        "canRequestUndo": { "type": "boolean" }
+        "canRequestUndo": { "type": "boolean" },
+        "matchComplete": { "type": "boolean" },
+        "matchId": { "type": "string", "format": "uuid" },
+        "matchBoardCount": { "type": "integer", "minimum": 1, "maximum": 32 }
       }
     },
     "projectedEventPayload": {

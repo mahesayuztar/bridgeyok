@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countPendingMatchInvitations = `-- name: CountPendingMatchInvitations :one
+SELECT count(*) FROM bridgeyok.match_assignments a
+JOIN bridgeyok.team_matches m ON m.id=a.match_id
+WHERE a.session_id=$1 AND m.status IN ('WAITING','ACTIVE')
+`
+
+func (q *Queries) CountPendingMatchInvitations(ctx context.Context, sessionID string) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingMatchInvitations, sessionID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createMatch = `-- name: CreateMatch :exec
 INSERT INTO bridgeyok.team_matches(id, owner_session_id, status, board_count, creation_hash, created_at, updated_at)
 VALUES ($1, $2, 'WAITING', $3, $4, $5, $5)
@@ -33,6 +46,27 @@ func (q *Queries) CreateMatch(ctx context.Context, arg CreateMatchParams) error 
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const findMatchCreateRequest = `-- name: FindMatchCreateRequest :one
+SELECT owner_session_id, request_id, request_hash, match_id FROM bridgeyok.match_create_requests WHERE owner_session_id=$1 AND request_id=$2
+`
+
+type FindMatchCreateRequestParams struct {
+	OwnerSessionID string `json:"owner_session_id"`
+	RequestID      string `json:"request_id"`
+}
+
+func (q *Queries) FindMatchCreateRequest(ctx context.Context, arg FindMatchCreateRequestParams) (BridgeyokMatchCreateRequest, error) {
+	row := q.db.QueryRow(ctx, findMatchCreateRequest, arg.OwnerSessionID, arg.RequestID)
+	var i BridgeyokMatchCreateRequest
+	err := row.Scan(
+		&i.OwnerSessionID,
+		&i.RequestID,
+		&i.RequestHash,
+		&i.MatchID,
+	)
+	return i, err
 }
 
 const findMatchRoomBoard = `-- name: FindMatchRoomBoard :one
@@ -124,6 +158,27 @@ func (q *Queries) InsertMatchComparison(ctx context.Context, arg InsertMatchComp
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const insertMatchCreateRequest = `-- name: InsertMatchCreateRequest :exec
+INSERT INTO bridgeyok.match_create_requests(owner_session_id,request_id,request_hash,match_id) VALUES ($1,$2,$3,$4)
+`
+
+type InsertMatchCreateRequestParams struct {
+	OwnerSessionID string `json:"owner_session_id"`
+	RequestID      string `json:"request_id"`
+	RequestHash    []byte `json:"request_hash"`
+	MatchID        string `json:"match_id"`
+}
+
+func (q *Queries) InsertMatchCreateRequest(ctx context.Context, arg InsertMatchCreateRequestParams) error {
+	_, err := q.db.Exec(ctx, insertMatchCreateRequest,
+		arg.OwnerSessionID,
+		arg.RequestID,
+		arg.RequestHash,
+		arg.MatchID,
+	)
+	return err
 }
 
 const insertMatchResult = `-- name: InsertMatchResult :exec
@@ -338,6 +393,32 @@ func (q *Queries) ListMatchRooms(ctx context.Context, matchID string) ([]Bridgey
 	return items, nil
 }
 
+const listParticipantMatchIDs = `-- name: ListParticipantMatchIDs :many
+SELECT m.id FROM bridgeyok.team_matches m
+JOIN bridgeyok.match_assignments a ON a.match_id=m.id
+WHERE a.session_id=$1 ORDER BY m.updated_at DESC,m.id LIMIT 20
+`
+
+func (q *Queries) ListParticipantMatchIDs(ctx context.Context, sessionID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listParticipantMatchIDs, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const loadMatch = `-- name: LoadMatch :one
 SELECT id, owner_session_id, status, board_count, revision, total_imp, creation_hash, created_at, updated_at FROM bridgeyok.team_matches WHERE id = $1
 `
@@ -377,6 +458,59 @@ func (q *Queries) LockMatch(ctx context.Context, id string) (BridgeyokTeamMatch,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const lockMatchPlayers = `-- name: LockMatchPlayers :many
+SELECT id,session_id FROM bridgeyok.users WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE
+`
+
+type LockMatchPlayersRow struct {
+	ID        string `json:"id"`
+	SessionID string `json:"session_id"`
+}
+
+func (q *Queries) LockMatchPlayers(ctx context.Context, userIds []string) ([]LockMatchPlayersRow, error) {
+	rows, err := q.db.Query(ctx, lockMatchPlayers, userIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LockMatchPlayersRow{}
+	for rows.Next() {
+		var i LockMatchPlayersRow
+		if err := rows.Scan(&i.ID, &i.SessionID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const resolveMatchPlayer = `-- name: ResolveMatchPlayer :one
+SELECT u.id, u.session_id, g.nickname FROM bridgeyok.users u
+JOIN bridgeyok.guest_sessions g ON g.id=u.session_id
+WHERE u.id=$1 AND g.status='ACTIVE' AND g.expires_at>$2
+`
+
+type ResolveMatchPlayerParams struct {
+	ID        string             `json:"id"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+}
+
+type ResolveMatchPlayerRow struct {
+	ID        string `json:"id"`
+	SessionID string `json:"session_id"`
+	Nickname  string `json:"nickname"`
+}
+
+func (q *Queries) ResolveMatchPlayer(ctx context.Context, arg ResolveMatchPlayerParams) (ResolveMatchPlayerRow, error) {
+	row := q.db.QueryRow(ctx, resolveMatchPlayer, arg.ID, arg.ExpiresAt)
+	var i ResolveMatchPlayerRow
+	err := row.Scan(&i.ID, &i.SessionID, &i.Nickname)
 	return i, err
 }
 

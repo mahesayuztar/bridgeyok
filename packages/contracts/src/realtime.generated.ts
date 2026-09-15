@@ -135,6 +135,9 @@ export interface TableProjection {
   };
   actionRequest?: ActionRequest;
   canRequestUndo: boolean;
+  matchComplete?: boolean;
+  matchId?: string;
+  matchBoardCount?: number;
 }
 export interface ScoreSheetEntry {
   boardId: TableId;

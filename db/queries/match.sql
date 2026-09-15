@@ -61,3 +61,27 @@ WHERE c.match_id = $1 ORDER BY b.board_number;
 -- name: UpdateMatch :execrows
 UPDATE bridgeyok.team_matches SET status = $2, total_imp = $3, revision = revision + 1, updated_at = $4
 WHERE id = $1 AND revision = $5;
+
+-- name: ResolveMatchPlayer :one
+SELECT u.id, u.session_id, g.nickname FROM bridgeyok.users u
+JOIN bridgeyok.guest_sessions g ON g.id=u.session_id
+WHERE u.id=$1 AND g.status='ACTIVE' AND g.expires_at>$2;
+
+-- name: FindMatchCreateRequest :one
+SELECT * FROM bridgeyok.match_create_requests WHERE owner_session_id=$1 AND request_id=$2;
+
+-- name: InsertMatchCreateRequest :exec
+INSERT INTO bridgeyok.match_create_requests(owner_session_id,request_id,request_hash,match_id) VALUES ($1,$2,$3,$4);
+
+-- name: ListParticipantMatchIDs :many
+SELECT m.id FROM bridgeyok.team_matches m
+JOIN bridgeyok.match_assignments a ON a.match_id=m.id
+WHERE a.session_id=$1 ORDER BY m.updated_at DESC,m.id LIMIT 20;
+
+-- name: CountPendingMatchInvitations :one
+SELECT count(*) FROM bridgeyok.match_assignments a
+JOIN bridgeyok.team_matches m ON m.id=a.match_id
+WHERE a.session_id=$1 AND m.status IN ('WAITING','ACTIVE');
+
+-- name: LockMatchPlayers :many
+SELECT id,session_id FROM bridgeyok.users WHERE id=ANY(sqlc.arg(user_ids)::uuid[]) ORDER BY id FOR UPDATE;

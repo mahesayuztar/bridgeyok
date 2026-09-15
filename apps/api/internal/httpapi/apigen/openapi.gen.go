@@ -230,6 +230,84 @@ func (e HealthResponseStatus) Valid() bool {
 	}
 }
 
+// Defines values for MatchSeatRequestRoom.
+const (
+	MatchSeatRequestRoomCLOSED MatchSeatRequestRoom = "CLOSED"
+	MatchSeatRequestRoomOPEN   MatchSeatRequestRoom = "OPEN"
+)
+
+// Valid indicates whether the value is a known member of the MatchSeatRequestRoom enum.
+func (e MatchSeatRequestRoom) Valid() bool {
+	switch e {
+	case MatchSeatRequestRoomCLOSED:
+		return true
+	case MatchSeatRequestRoomOPEN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MatchViewRoom.
+const (
+	MatchViewRoomCLOSED MatchViewRoom = "CLOSED"
+	MatchViewRoomOPEN   MatchViewRoom = "OPEN"
+)
+
+// Valid indicates whether the value is a known member of the MatchViewRoom enum.
+func (e MatchViewRoom) Valid() bool {
+	switch e {
+	case MatchViewRoomCLOSED:
+		return true
+	case MatchViewRoomOPEN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MatchViewStatus.
+const (
+	MatchViewStatusACTIVE    MatchViewStatus = "ACTIVE"
+	MatchViewStatusCANCELLED MatchViewStatus = "CANCELLED"
+	MatchViewStatusCOMPLETE  MatchViewStatus = "COMPLETE"
+	MatchViewStatusWAITING   MatchViewStatus = "WAITING"
+)
+
+// Valid indicates whether the value is a known member of the MatchViewStatus enum.
+func (e MatchViewStatus) Valid() bool {
+	switch e {
+	case MatchViewStatusACTIVE:
+		return true
+	case MatchViewStatusCANCELLED:
+		return true
+	case MatchViewStatusCOMPLETE:
+		return true
+	case MatchViewStatusWAITING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MatchViewTeam.
+const (
+	MatchViewTeamA MatchViewTeam = "A"
+	MatchViewTeamB MatchViewTeam = "B"
+)
+
+// Valid indicates whether the value is a known member of the MatchViewTeam enum.
+func (e MatchViewTeam) Valid() bool {
+	switch e {
+	case MatchViewTeamA:
+		return true
+	case MatchViewTeamB:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReplayCallKind.
 const (
 	BID      ReplayCallKind = "BID"
@@ -283,49 +361,49 @@ func (e ReplayCallStrain) Valid() bool {
 
 // Defines values for ReplayCardRank.
 const (
-	A  ReplayCardRank = "A"
-	J  ReplayCardRank = "J"
-	K  ReplayCardRank = "K"
-	N2 ReplayCardRank = "2"
-	N3 ReplayCardRank = "3"
-	N4 ReplayCardRank = "4"
-	N5 ReplayCardRank = "5"
-	N6 ReplayCardRank = "6"
-	N7 ReplayCardRank = "7"
-	N8 ReplayCardRank = "8"
-	N9 ReplayCardRank = "9"
-	Q  ReplayCardRank = "Q"
-	T  ReplayCardRank = "T"
+	ReplayCardRankA  ReplayCardRank = "A"
+	ReplayCardRankJ  ReplayCardRank = "J"
+	ReplayCardRankK  ReplayCardRank = "K"
+	ReplayCardRankN2 ReplayCardRank = "2"
+	ReplayCardRankN3 ReplayCardRank = "3"
+	ReplayCardRankN4 ReplayCardRank = "4"
+	ReplayCardRankN5 ReplayCardRank = "5"
+	ReplayCardRankN6 ReplayCardRank = "6"
+	ReplayCardRankN7 ReplayCardRank = "7"
+	ReplayCardRankN8 ReplayCardRank = "8"
+	ReplayCardRankN9 ReplayCardRank = "9"
+	ReplayCardRankQ  ReplayCardRank = "Q"
+	ReplayCardRankT  ReplayCardRank = "T"
 )
 
 // Valid indicates whether the value is a known member of the ReplayCardRank enum.
 func (e ReplayCardRank) Valid() bool {
 	switch e {
-	case A:
+	case ReplayCardRankA:
 		return true
-	case J:
+	case ReplayCardRankJ:
 		return true
-	case K:
+	case ReplayCardRankK:
 		return true
-	case N2:
+	case ReplayCardRankN2:
 		return true
-	case N3:
+	case ReplayCardRankN3:
 		return true
-	case N4:
+	case ReplayCardRankN4:
 		return true
-	case N5:
+	case ReplayCardRankN5:
 		return true
-	case N6:
+	case ReplayCardRankN6:
 		return true
-	case N7:
+	case ReplayCardRankN7:
 		return true
-	case N8:
+	case ReplayCardRankN8:
 		return true
-	case N9:
+	case ReplayCardRankN9:
 		return true
-	case Q:
+	case ReplayCardRankQ:
 		return true
-	case T:
+	case ReplayCardRankT:
 		return true
 	default:
 		return false
@@ -562,25 +640,25 @@ func (e TableSeat) Valid() bool {
 
 // Defines values for TableState.
 const (
-	ACTIVE        TableState = "ACTIVE"
-	BETWEENBOARDS TableState = "BETWEEN_BOARDS"
-	FINISHED      TableState = "FINISHED"
-	PAUSED        TableState = "PAUSED"
-	WAITING       TableState = "WAITING"
+	TableStateACTIVE        TableState = "ACTIVE"
+	TableStateBETWEENBOARDS TableState = "BETWEEN_BOARDS"
+	TableStateFINISHED      TableState = "FINISHED"
+	TableStatePAUSED        TableState = "PAUSED"
+	TableStateWAITING       TableState = "WAITING"
 )
 
 // Valid indicates whether the value is a known member of the TableState enum.
 func (e TableState) Valid() bool {
 	switch e {
-	case ACTIVE:
+	case TableStateACTIVE:
 		return true
-	case BETWEENBOARDS:
+	case TableStateBETWEENBOARDS:
 		return true
-	case FINISHED:
+	case TableStateFINISHED:
 		return true
-	case PAUSED:
+	case TableStatePAUSED:
 		return true
-	case WAITING:
+	case TableStateWAITING:
 		return true
 	default:
 		return false
@@ -781,6 +859,75 @@ type HealthResponse struct {
 
 // HealthResponseStatus defines model for HealthResponse.Status.
 type HealthResponseStatus string
+
+// MatchComparison defines model for MatchComparison.
+type MatchComparison struct {
+	BoardId       openapi_types.UUID `json:"boardId"`
+	ClosedScoreNS int                `json:"closedScoreNS"`
+	OpenScoreNS   int                `json:"openScoreNS"`
+	TeamAIMP      int                `json:"teamAIMP"`
+}
+
+// MatchCreateRequest defines model for MatchCreateRequest.
+type MatchCreateRequest struct {
+	Assignments []MatchSeatRequest `json:"assignments"`
+	BoardCount  int                `json:"boardCount"`
+	RequestId   string             `json:"requestId"`
+}
+
+// MatchReadyRequest defines model for MatchReadyRequest.
+type MatchReadyRequest struct {
+	ExpectedTableRevision int64  `json:"expectedTableRevision"`
+	Ready                 bool   `json:"ready"`
+	RequestId             string `json:"requestId"`
+}
+
+// MatchRevisionRequest defines model for MatchRevisionRequest.
+type MatchRevisionRequest struct {
+	ExpectedRevision int64 `json:"expectedRevision"`
+}
+
+// MatchSeatRequest defines model for MatchSeatRequest.
+type MatchSeatRequest struct {
+	Room   MatchSeatRequestRoom `json:"room"`
+	Seat   TableSeat            `json:"seat"`
+	UserId openapi_types.UUID   `json:"userId"`
+}
+
+// MatchSeatRequestRoom defines model for MatchSeatRequest.Room.
+type MatchSeatRequestRoom string
+
+// MatchView defines model for MatchView.
+type MatchView struct {
+	BoardCount      int                `json:"boardCount"`
+	CanCancel       bool               `json:"canCancel"`
+	CanStart        bool               `json:"canStart"`
+	ClosedCompleted int                `json:"closedCompleted"`
+	Comparisons     *[]MatchComparison `json:"comparisons,omitempty"`
+	Id              openapi_types.UUID `json:"id"`
+	IsOwner         bool               `json:"isOwner"`
+	OpenCompleted   int                `json:"openCompleted"`
+	Ready           bool               `json:"ready"`
+	ReadyCount      int                `json:"readyCount"`
+	Revision        int64              `json:"revision"`
+	Room            MatchViewRoom      `json:"room"`
+	Seat            TableSeat          `json:"seat"`
+	Status          MatchViewStatus    `json:"status"`
+	SyncPending     bool               `json:"syncPending"`
+	TableId         openapi_types.UUID `json:"tableId"`
+	TableRevision   int64              `json:"tableRevision"`
+	Team            MatchViewTeam      `json:"team"`
+	TeamAIMP        int                `json:"teamAIMP"`
+}
+
+// MatchViewRoom defines model for MatchView.Room.
+type MatchViewRoom string
+
+// MatchViewStatus defines model for MatchView.Status.
+type MatchViewStatus string
+
+// MatchViewTeam defines model for MatchView.Team.
+type MatchViewTeam string
 
 // PlayerInvitation defines model for PlayerInvitation.
 type PlayerInvitation struct {
@@ -1054,6 +1201,18 @@ type CreateGuestSessionJSONRequestBody = CreateGuestSessionRequest
 
 // RefreshGuestSessionJSONRequestBody defines body for RefreshGuestSession for application/json ContentType.
 type RefreshGuestSessionJSONRequestBody = RefreshGuestSessionRequest
+
+// CreateMatchJSONRequestBody defines body for CreateMatch for application/json ContentType.
+type CreateMatchJSONRequestBody = MatchCreateRequest
+
+// CancelMatchJSONRequestBody defines body for CancelMatch for application/json ContentType.
+type CancelMatchJSONRequestBody = MatchRevisionRequest
+
+// SetMatchReadyJSONRequestBody defines body for SetMatchReady for application/json ContentType.
+type SetMatchReadyJSONRequestBody = MatchReadyRequest
+
+// StartMatchJSONRequestBody defines body for StartMatch for application/json ContentType.
+type StartMatchJSONRequestBody = MatchRevisionRequest
 
 // AsBoardAnalysis returns the union data inside the AnalyzeCompletedBoard200JSONResponseBody as a BoardAnalysis
 func (t AnalyzeCompletedBoard200JSONResponseBody) AsBoardAnalysis() (BoardAnalysis, error) {

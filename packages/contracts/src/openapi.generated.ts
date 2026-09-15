@@ -4,6 +4,92 @@
  */
 
 export interface paths {
+    "/v1/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Lists at most 20 matches assigned to the authenticated identity; never public discovery. */
+        get: operations["listMatches"];
+        put?: never;
+        /** @description Creates fresh rooms for eight registered accounts, all unready. The owner must be assigned. Identical request IDs return the same match; changed bodies conflict. Each assigned account may have at most four pending/active matches. */
+        post: operations["createMatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/matches/{matchId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns recipient match status and own room. Comparisons are withheld until completion. */
+        get: operations["getMatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/matches/{matchId}/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Explicit player consent through the table actor and existing idempotent table command path. Uses tableRevision, not match revision. */
+        post: operations["setMatchReady"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/matches/{matchId}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Owner-only atomic start when all eight players are ready. Retries refresh both actors without regenerating deals. syncPending means durable success with incomplete realtime notification. */
+        post: operations["startMatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/matches/{matchId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Any assigned player can decline a waiting match. Closes both rooms atomically; repeated cancellation is idempotent. Active matches cannot be cancelled. */
+        post: operations["cancelMatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/account/signup": {
         parameters: {
             query?: never;
@@ -457,6 +543,63 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        MatchSeatRequest: {
+            /** Format: uuid */
+            userId: string;
+            /** @enum {string} */
+            room: "OPEN" | "CLOSED";
+            seat: components["schemas"]["TableSeat"];
+        };
+        MatchCreateRequest: {
+            requestId: string;
+            boardCount: number;
+            assignments: components["schemas"]["MatchSeatRequest"][];
+        };
+        MatchRevisionRequest: {
+            /** Format: int64 */
+            expectedRevision: number;
+        };
+        MatchReadyRequest: {
+            requestId: string;
+            /** Format: int64 */
+            expectedTableRevision: number;
+            ready: boolean;
+        };
+        MatchComparison: {
+            /** Format: uuid */
+            boardId: string;
+            openScoreNS: number;
+            closedScoreNS: number;
+            teamAIMP: number;
+        };
+        MatchView: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "WAITING" | "ACTIVE" | "COMPLETE" | "CANCELLED";
+            /** Format: int64 */
+            revision: number;
+            isOwner: boolean;
+            /** Format: uuid */
+            tableId: string;
+            /** Format: int64 */
+            tableRevision: number;
+            /** @enum {string} */
+            room: "OPEN" | "CLOSED";
+            seat: components["schemas"]["TableSeat"];
+            /** @enum {string} */
+            team: "A" | "B";
+            boardCount: number;
+            ready: boolean;
+            readyCount: number;
+            openCompleted: number;
+            closedCompleted: number;
+            canStart: boolean;
+            canCancel: boolean;
+            syncPending: boolean;
+            comparisons?: components["schemas"]["MatchComparison"][];
+            teamAIMP: number;
+        };
         AccountProfile: {
             /** Format: uuid */
             id: string;
@@ -790,6 +933,204 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listMatches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful operation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchView"][];
+                };
+            };
+            /** @description Structured authentication, input, membership, state, capacity, or infrastructure failure */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful operation */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchView"];
+                };
+            };
+            /** @description Structured authentication, input, membership, state, capacity, or infrastructure failure */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful operation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchView"];
+                };
+            };
+            /** @description Structured authentication, input, membership, state, capacity, or infrastructure failure */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setMatchReady: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchReadyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful operation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchView"];
+                };
+            };
+            /** @description Structured authentication, input, membership, state, capacity, or infrastructure failure */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    startMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful operation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchView"];
+                };
+            };
+            /** @description Structured authentication, input, membership, state, capacity, or infrastructure failure */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cancelMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                matchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful operation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchView"];
+                };
+            };
+            /** @description Structured authentication, input, membership, state, capacity, or infrastructure failure */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     registerAccount: {
         parameters: {
             query?: never;

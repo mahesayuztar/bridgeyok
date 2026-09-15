@@ -143,6 +143,13 @@ type BridgeyokMatchComparison struct {
 	ComparedAt pgtype.Timestamptz `json:"compared_at"`
 }
 
+type BridgeyokMatchCreateRequest struct {
+	OwnerSessionID string `json:"owner_session_id"`
+	RequestID      string `json:"request_id"`
+	RequestHash    []byte `json:"request_hash"`
+	MatchID        string `json:"match_id"`
+}
+
 type BridgeyokMatchResult struct {
 	MatchID      string             `json:"match_id"`
 	BoardID      string             `json:"board_id"`
