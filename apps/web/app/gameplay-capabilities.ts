@@ -51,6 +51,11 @@ export function canSendTableCommand(
   if (name === "table.takeover") return context.controllerState === "readyToTakeover";
   if (context.controllerState !== "current") return false;
 
+  if (table.matchId) {
+    if (["table.take_seat", "table.leave_seat", "table.lock", "table.add_bot", "table.remove_bot", "table.replace_with_bot", "table.remove_participant", "table.start_game", "table.leave"].includes(name)) return false;
+    if (name === "table.finish" && (table.state !== "BETWEEN_BOARDS" || table.boardNumber !== table.matchBoardCount)) return false;
+    if (name === "table.next_board" && table.boardNumber === table.matchBoardCount) return false;
+  }
   const game = table.game;
   const isOwner = table.viewerRole === "OWNER";
   const seat = isSeat(payload.seat) ? payload.seat : undefined;

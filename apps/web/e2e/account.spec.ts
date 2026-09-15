@@ -42,7 +42,7 @@ test("account guards, profile, navigation and responsive critical path", async (
       expect(Math.abs(play!.x + play!.width / 2 - width! / 2)).toBeLessThan(2);
       expect(play!.height).toBeGreaterThanOrEqual(44);
     }
-    await page.getByRole("button", { name: /Team Match/ }).click();
+    await page.getByRole("button", { name: /VS Robot/ }).click();
     await expect(page.getByRole("status").filter({ hasText: "Coming soon" })).toBeVisible();
     await page.getByRole("button", { name: "Tutup pesan" }).click();
     await navigation.getByRole("button", { name: "History" }).click();
@@ -55,7 +55,7 @@ test("account guards, profile, navigation and responsive critical path", async (
     await page.screenshot({ path: testInfo.outputPath(`profile-${width}.png`) });
     await navigation.getByRole("link", { name: "Play", exact: true }).click();
   }
-  await page.getByRole("button", { name: /Team Match/ }).click();
+  await page.getByRole("button", { name: /Teacher Table/ }).click();
   await page.getByRole("button", { name: /VS Robot/ }).click();
   await expect(page.getByRole("status").filter({ hasText: "Coming soon" })).toHaveCount(1);
   await page.getByRole("button", { name: "Tutup pesan" }).click();

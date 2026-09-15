@@ -5,7 +5,7 @@ import type { AccountLogin } from "../../../account-types";
 
 async function handle(request: Request, context: { params: Promise<{ path?: string[] }> }) {
   const path = (await context.params).path?.join("/") ?? "";
-  const allowed = /^(signup|login|logout|heartbeat|profile|users|invitations|chat|users\/[a-f0-9-]+\/follow|tables\/[a-f0-9-]+\/(participants|invites))?$/;
+  const allowed = /^(signup|login|logout|heartbeat|profile|users|invitations|chat|matches|matches\/[a-f0-9-]+(?:\/(?:ready|start|cancel))?|users\/[a-f0-9-]+\/follow|tables\/[a-f0-9-]+\/(participants|invites))?$/;
   if (!allowed.test(path)) return new Response(null, { status: 404 });
   if (request.method !== "GET" && request.headers.get("origin") !== new URL(request.url).origin) return new Response(null, { status: 403 });
   const cookieStore = await cookies();
@@ -15,7 +15,7 @@ async function handle(request: Request, context: { params: Promise<{ path?: stri
   try {
     const body = request.method === "GET" ? undefined : await request.text();
     if (body && body.length > 8192) return new Response(null, { status: 413 });
-    const response = await fetch(new URL(`/v1/account${path ? `/${path}` : ""}${new URL(request.url).search}`, ACCOUNT_API_URL), {
+    const response = await fetch(new URL(`${path === "matches" || path.startsWith("matches/") ? `/v1/${path}` : `/v1/account${path ? `/${path}` : ""}`}${new URL(request.url).search}`, ACCOUNT_API_URL), {
       method: request.method,
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       ...(body === undefined ? {} : { body }), cache: "no-store", signal: AbortSignal.timeout(8000)

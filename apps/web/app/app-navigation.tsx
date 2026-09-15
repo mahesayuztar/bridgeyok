@@ -40,7 +40,7 @@ export function AppNavigation({ profile }: { profile: Profile }) {
       <nav aria-label="Navigasi utama">
         {navigation.map(item => item.href ? (
           <Link key={item.label} href={item.href} className={item.label === "Play" ? "nav-play" : ""}
-            aria-current={path === item.href || (item.href === "/play" && path === "/lobby") ? "page" : undefined}>
+            aria-current={path === item.href || (item.href === "/play" && (path === "/lobby" || path.startsWith("/match"))) ? "page" : undefined}>
             <span aria-hidden="true">{item.icon}</span>{item.label}
           </Link>
         ) : (

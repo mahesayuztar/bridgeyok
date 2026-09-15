@@ -127,3 +127,17 @@ test("bot presence follows projected consensus eligibility and requires occupied
   assert.equal(canSendTableCommand(context(table), "game.request_claim", { tricks: 5 }), false);
   assert.equal(canSendTableCommand(context(table), "game.request_undo"), false);
 });
+
+test("match seats and shared board boundary disable casual lifecycle actions", () => {
+  const table = { ...activeTable(), matchId: "match-a", matchBoardCount: 2, state: "WAITING" };
+  for (const name of ["table.start_game", "table.leave_seat", "table.leave", "table.add_bot", "table.lock"]) {
+    assert.equal(canSendTableCommand(context(table), name, { seat: "E", locked: true }), false);
+  }
+  assert.equal(canSendTableCommand(context(table), "table.set_ready", { ready: true }), true);
+  table.state = "BETWEEN_BOARDS";
+  assert.equal(canSendTableCommand(context(table), "table.finish"), false);
+  assert.equal(canSendTableCommand(context(table), "table.next_board"), true);
+  table.boardNumber = 2;
+  assert.equal(canSendTableCommand(context(table), "table.finish"), true);
+  assert.equal(canSendTableCommand(context(table), "table.next_board"), false);
+});

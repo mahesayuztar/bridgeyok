@@ -415,6 +415,7 @@ export function normalizeLiveTableProjection(value: unknown): LiveTableProjectio
 
   return {
     tableId: value.tableId,
+    ...(typeof value.matchId === "string" && Number.isInteger(value.matchBoardCount) ? { matchId: value.matchId, matchBoardCount: value.matchBoardCount as number, matchComplete: value.matchComplete === true } : {}),
     state: value.state as LiveTableProjection["state"],
     locked: value.locked,
     revision: value.revision,

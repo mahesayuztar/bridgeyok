@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { TableChat } from "./table-chat";
 import { TableInvite } from "./table-social";
 import { useDialogDrag } from "./use-dialog-drag";
@@ -45,7 +46,7 @@ export function WaitingTableStatusBar({
       <span className="table-wordmark">BridgeYok</span>
       <span>Meja tunggu</span>
       <div className="status-actions">
-        <TableChat tableId={table.tableId} /><TableInvite tableId={table.tableId} inviteCode={inviteCode} disabled={table.locked || table.participants.length >= 4} />
+        {table.matchId ? <Link href={`/match/${table.matchId}`}>Match</Link> : <TableChat tableId={table.tableId} />}{table.matchId ? null : <TableInvite tableId={table.tableId} inviteCode={inviteCode} disabled={table.locked || table.participants.length >= 4} />}
         <ScoreSheet loadBoardReplay={loadBoardReplay} loadPositionAnalysis={loadPositionAnalysis} table={table} />
         <div className="connection-status" data-state={connectionState}>
           <span className="status-mark" />
@@ -95,8 +96,8 @@ export function ActiveTableStatusBar({
       <button
         className="table-leave-button"
         type="button"
-        aria-label="Keluar dari meja"
-        onClick={() => { leaveDialogRef.current?.showModal(); cancelLeaveRef.current?.focus(); }}
+        aria-label={table.matchId ? "Kembali ke match" : "Keluar dari meja"}
+        onClick={() => { if (table.matchId) { onLeaveTable(); return; } leaveDialogRef.current?.showModal(); cancelLeaveRef.current?.focus(); }}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M10 5H5v14h5M14 8l4 4-4 4M9 12h9" />
@@ -211,7 +212,7 @@ export function ActiveTableStatusBar({
         onCommand={onCommand}
       />
       <div className="status-actions">
-        <TableChat tableId={table.tableId} />
+        {table.matchId ? <Link href={`/match/${table.matchId}`}>Match</Link> : <TableChat tableId={table.tableId} />}
         <div
           className="connection-status"
           data-state={connectionState}
@@ -235,10 +236,10 @@ export function ActiveTableStatusBar({
                   onCommand("table.finish");
                 }}
               >
-                Akhiri meja
+                {table.matchId ? "Selesaikan room" : "Akhiri meja"}
               </button>
             ) : null}
-            <TableInvite tableId={table.tableId} inviteCode={inviteCode} disabled={table.locked || table.participants.length >= 4} />
+            {table.matchId ? null : <TableInvite tableId={table.tableId} inviteCode={inviteCode} disabled={table.locked || table.participants.length >= 4} />}
             {inviteCode === null ? null : (
               <span className="table-menu-invite">
                 <small>Kode undangan</small>

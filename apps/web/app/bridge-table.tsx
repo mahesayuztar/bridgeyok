@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePositionAnalysis } from "./use-position-analysis";
@@ -115,6 +116,7 @@ export default function BridgeTable({
   }, [canSendCommand, game, sendCommand, viewerTurn]);
 
   async function returnToLobby() {
+    if (table?.matchId) { router.push(`/match/${table.matchId}`); return; }
     if (await session.leaveTable()) {
       router.replace("/lobby");
     }
@@ -146,6 +148,10 @@ export default function BridgeTable({
         )}
       </main>
     );
+  }
+
+  if (table.state === "WAITING" && table.matchId) {
+    return <main className="table-route-state"><h1>Team Match</h1><p>Persiapan dan persetujuan delapan pemain ada di halaman match.</p><Link className="primary-button" href={`/match/${table.matchId}`}>Buka persiapan match</Link></main>;
   }
 
   if (table.state === "WAITING") {
@@ -205,7 +211,7 @@ export default function BridgeTable({
         inviteCode={session.inviteCode}
         canSendCommand={session.canSendCommand}
         onCommand={session.sendCommand}
-        analysisControl={<button type="button" aria-pressed={doubleDummy} onClick={() => setDoubleDummy((value) => !value)} title="Predicted total tricks untuk pasangan yang sedang turn">DD {doubleDummy ? "ON" : "OFF"}</button>}
+        analysisControl={table.matchId ? null : <button type="button" aria-pressed={doubleDummy} onClick={() => setDoubleDummy((value) => !value)} title="Predicted total tricks untuk pasangan yang sedang turn">DD {doubleDummy ? "ON" : "OFF"}</button>}
         soundMuted={turnAudio.muted}
         onSoundMutedChange={turnAudio.setMuted}
         onLeaveTable={() => void returnToLobby()}
@@ -305,7 +311,7 @@ export default function BridgeTable({
         {game?.result === undefined &&
         table.state !== "FINISHED" ? null : table.state === "FINISHED" ? (
           <section className="board-result finished-result">
-            <p>Meja selesai</p>
+            <p>{table.matchId ? "Room selesai" : "Meja selesai"}</p>
             <h2>Terima kasih sudah bermain.</h2>
             <button
               className="primary-button"
@@ -313,7 +319,7 @@ export default function BridgeTable({
               disabled={session.busy}
               onClick={() => void returnToLobby()}
             >
-              Kembali ke lobby
+              {table.matchId ? "Lihat progres match" : "Kembali ke lobby"}
             </button>
           </section>
         ) : (

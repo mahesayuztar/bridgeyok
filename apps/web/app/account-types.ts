@@ -6,7 +6,7 @@ export type AccountLogin = components["schemas"]["AccountLogin"];
 export type Invitation = components["schemas"]["PlayerInvitation"];
 
 export function safeReturnPath(value: string | null | undefined) {
-  if (!value || !/^\/(play|lobby|friends|settings|table\/[^/?#]+)(\?|$)/.test(value) || value.includes("\\") || /[\r\n]/.test(value)) return "/play";
+  if (!value || !/^\/(play|lobby|friends|settings|match(?:\/[^/?#]+)?|table\/[^/?#]+)(\?|$)/.test(value) || value.includes("\\") || /[\r\n]/.test(value)) return "/play";
   return value;
 }
 
@@ -28,6 +28,11 @@ export async function accountRequest<T>(path = "", init: RequestInit = {}): Prom
       USERNAME_TAKEN: "Username sudah digunakan.",
       INVALID_ACCOUNT_INPUT: "Periksa isian: username 3–24 huruf/angka/_, nama 2–24 karakter, kata sandi 10–128 karakter.",
       USER_OFFLINE: "Pemain sedang offline atau meja tidak tersedia.",
+      MATCH_NOT_FOUND: "Match tidak ditemukan atau kamu bukan pesertanya.",
+      MATCH_FORBIDDEN: "Hanya pemilik yang dapat memulai match.",
+      INVALID_MATCH_INPUT: "Pilih delapan pemain berbeda dan 1–32 board.",
+      MATCH_CAPACITY: "Salah satu pemain sudah memiliki empat match yang belum selesai.",
+      STATE_CHANGED: "Status telah berubah. Periksa pembaruan lalu coba lagi.",
       RATE_LIMITED: "Terlalu banyak percobaan. Coba lagi sebentar."
     };
     throw new AccountRequestError(messages[problem.code ?? ""] ?? "Layanan belum terhubung. Coba lagi.", response.status);

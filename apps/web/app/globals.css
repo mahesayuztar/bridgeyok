@@ -4722,3 +4722,36 @@ button.physical-card.is-dragging {
 .table-chat-container { position:fixed; z-index:90; right:1rem; bottom:max(1rem,var(--chat-keyboard-offset,0px)); width:min(22rem,calc(100vw - 2rem)); }
 @media(max-width:767px) { .table-chat-container { right:0; bottom:var(--chat-keyboard-offset,0px); width:100%; } .table-chat-container .chat-panel { height:min(24rem,calc(var(--chat-visible-height,100dvh) * 0.5)); max-width:none; border-radius:.5rem .5rem 0 0; } }
 @media(min-width:1280px) { body.table-chat-open .table-client { margin-right:calc(clamp(16rem,18vw,22rem) + 2rem); } body.table-chat-open .table-chat-container { top:5rem; bottom:1rem; width:clamp(16rem,18vw,22rem); } body.table-chat-open .table-chat-container .chat-panel { height:100%; } }
+
+.match-main { max-width: 68rem; }
+.match-section { margin-block: 2rem; padding-block: 1.5rem; border-top: 1px solid var(--line); }
+.match-list { list-style: none; padding: 0; }
+.match-list li { border-bottom: 1px solid var(--line); }
+.match-list a { display: grid; gap: .4rem; padding-block: 1rem; text-decoration: none; }
+.match-list a:hover strong { text-decoration: underline; }
+.match-list span, .match-seat small { color: var(--muted); }
+.match-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-block: 1rem; }
+.match-actions a { text-decoration: none; }
+.match-board-count { display: grid; gap: .5rem; max-width: 12rem; margin-block: 1.5rem; }
+.match-board-count input { width: 100%; }
+.match-rooms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+.match-rooms fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.match-rooms legend { font-weight: 700; margin-bottom: .75rem; }
+.match-seat { display: grid; width: 100%; text-align: left; gap: .25rem; margin-bottom: .5rem; overflow-wrap: anywhere; }
+.match-seat[aria-pressed="true"] { outline: 2px solid var(--focus); outline-offset: 1px; }
+.match-seat:disabled { opacity: 1; }
+.match-progress { display: grid; gap: 1rem; }
+.match-progress label { display: grid; gap: .5rem; }
+.match-progress progress { width: 100%; accent-color: var(--ready); }
+.match-score-scroll { overflow-x: auto; }
+.match-scores { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.match-scores th, .match-scores td { padding: .75rem .4rem; text-align: right; border-bottom: 1px solid var(--line); }
+.match-scores th:first-child { text-align: left; }
+.match-scores caption { text-align: left; padding-block: .75rem; color: var(--muted); }
+.match-total { font-size: 1.5rem; }
+@media (max-width: 767px) { .match-rooms { grid-template-columns: 1fr; } }
+.match-actions a, .table-route-state a.primary-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: .75rem 1rem; border: 1px solid var(--accent-strong); text-decoration: none; }
+.match-progress progress { appearance: none; height: .5rem; border: 0; background: var(--surface-strong); }
+.match-progress progress::-webkit-progress-bar { background: var(--surface-strong); }
+.match-progress progress::-webkit-progress-value { background: var(--ready); }
+.match-progress progress::-moz-progress-bar { background: var(--ready); }

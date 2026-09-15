@@ -100,6 +100,7 @@ export function ScoreSheet({
                   <tr
                     key={entry.boardId}
                     onClick={(event) => {
+                      if (table.matchId && !table.matchComplete) return;
                       selectedTriggerRef.current =
                         event.currentTarget.querySelector("button");
                       selectedTriggerRef.current?.focus();
@@ -109,6 +110,8 @@ export function ScoreSheet({
                   >
                     <th scope="row">
                       <button
+                        disabled={Boolean(table.matchId && !table.matchComplete)}
+                        title={table.matchId && !table.matchComplete ? "Replay terbuka setelah kedua room selesai" : undefined}
                         className="score-replay-trigger"
                         type="button"
                         aria-label={`Replay board ${entry.boardNumber}`}
