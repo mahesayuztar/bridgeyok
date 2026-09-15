@@ -138,6 +138,9 @@ type SeatAssignment struct {
 
 // Aggregate is the authoritative private state of one table.
 type Aggregate struct {
+	MatchComplete      bool                           `json:"matchComplete,omitempty"`
+	MatchID            string                         `json:"matchId,omitempty"`
+	MatchBoardCount    int                            `json:"matchBoardCount,omitempty"`
 	SchemaVersion      int                            `json:"schemaVersion"`
 	ID                 string                         `json:"id"`
 	OwnerSessionID     string                         `json:"ownerSessionId"`

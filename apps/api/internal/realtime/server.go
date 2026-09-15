@@ -261,14 +261,25 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 
 // TableChanged refreshes actor state and publishes a recipient snapshot after REST lifecycle commits.
 func (server *Server) TableChanged(ctx context.Context, tableID string) {
-	aggregate, err := server.options.Tables.Refresh(ctx, tableID)
-	if err != nil {
-		server.options.Logger.WarnContext(ctx, "realtime_lifecycle_refresh_failed", "table_id", tableID, "result_code", "REFRESH_ERROR")
-		return
+	_ = server.RefreshTables(ctx, []string{tableID})
+}
+
+// RefreshTables reloads each actor and publishes current recipient snapshots after a multi-room commit.
+func (server *Server) RefreshTables(ctx context.Context, tableIDs []string) error {
+	var failures []error
+	for _, tableID := range tableIDs {
+		aggregate, err := server.options.Tables.Refresh(ctx, tableID)
+		if err != nil {
+			server.options.Logger.WarnContext(ctx, "realtime_lifecycle_refresh_failed", "table_id", tableID, "result_code", "REFRESH_ERROR")
+			failures = append(failures, err)
+			continue
+		}
+		if err := server.broker.publishSnapshot(ctx, aggregate); err != nil {
+			server.options.Logger.ErrorContext(ctx, "realtime_lifecycle_publish_failed", "table_id", tableID, "result_code", "PROJECTION_ERROR")
+			failures = append(failures, err)
+		}
 	}
-	if err := server.broker.publishSnapshot(ctx, aggregate); err != nil {
-		server.options.Logger.ErrorContext(ctx, "realtime_lifecycle_publish_failed", "table_id", tableID, "result_code", "PROJECTION_ERROR")
-	}
+	return errors.Join(failures...)
 }
 
 // TableOfflineSince reports whether a table has had no subscribed clients for the returned duration anchor.

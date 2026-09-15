@@ -34,6 +34,7 @@ type Options struct {
 	Analysis       AnalysisService
 	Replay         BoardReplayService
 	Accounts       identity.AccountRepository
+	Match          MatchService
 }
 
 type RealtimeService interface {
@@ -111,6 +112,13 @@ func NewRouter(options Options) http.Handler {
 	router.Get("/v1/boards/{boardId}/analysis", analysisHandler.analyze)
 	replayHandler := boardReplayHTTPHandler{service: options.Replay, identity: identityHandler, logger: options.Logger}
 	router.Get("/v1/boards/{boardId}/replay", replayHandler.get)
+	matchHandler := matchHTTPHandler{service: options.Match, identity: identityHandler, logger: options.Logger}
+	router.Get("/v1/matches", matchHandler.serve)
+	router.Post("/v1/matches", matchHandler.serve)
+	router.Get("/v1/matches/{matchId}", matchHandler.serve)
+	router.Post("/v1/matches/{matchId}/start", matchHandler.serve)
+	router.Post("/v1/matches/{matchId}/ready", matchHandler.serve)
+	router.Post("/v1/matches/{matchId}/cancel", matchHandler.serve)
 	router.Post("/v1/tables", tableHandler.createTable)
 	router.Get("/v1/tables/{inviteCode}/preview", tableHandler.previewTable)
 	router.Post("/v1/tables/{inviteCode}/join", tableHandler.joinTable)

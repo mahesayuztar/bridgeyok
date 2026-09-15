@@ -86,7 +86,7 @@ func newMatchTestEnvironment(t *testing.T, boardCount int) matchTestEnvironment 
 	return matchTestEnvironment{open: open, closed: closed, initial: state}
 }
 
-func (environment matchTestEnvironment) start(t *testing.T) StartedMatch {
+func (environment matchTestEnvironment) start(t *testing.T) match.Started {
 	t.Helper()
 	started, err := environment.open.postgres.StartMatch(t.Context(), environment.initial.ID, environment.initial.OwnerID, 0, time.Now())
 	if err != nil {
@@ -382,7 +382,7 @@ func TestMatchRepositoryConcurrentStartAndFinalization(t *testing.T) {
 	source := &matchTestSource{}
 	postgres.dealSource = source
 	var group sync.WaitGroup
-	starts := make(chan StartedMatch, 8)
+	starts := make(chan match.Started, 8)
 	failures := make(chan error, 8)
 	for _index := 0; _index < 8; _index++ {
 		group.Go(func() {

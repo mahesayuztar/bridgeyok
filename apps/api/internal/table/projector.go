@@ -8,6 +8,9 @@ import (
 
 // Projection is the only client-visible representation of private table state.
 type Projection struct {
+	MatchComplete       bool                           `json:"matchComplete,omitempty"`
+	MatchID             string                         `json:"matchId,omitempty"`
+	MatchBoardCount     int                            `json:"matchBoardCount,omitempty"`
 	TableID             string                         `json:"tableId"`
 	State               State                          `json:"state"`
 	Locked              bool                           `json:"locked"`
@@ -72,6 +75,9 @@ func Project(aggregate Aggregate, viewerSessionID string) (Projection, *DomainEr
 	}
 	projection := Projection{
 		TableID:             aggregate.ID,
+		MatchComplete:       aggregate.MatchComplete,
+		MatchID:             aggregate.MatchID,
+		MatchBoardCount:     aggregate.MatchBoardCount,
 		State:               aggregate.State,
 		Locked:              aggregate.Locked,
 		Revision:            aggregate.Revision,

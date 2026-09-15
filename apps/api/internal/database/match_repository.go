@@ -21,19 +21,17 @@ import (
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
 )
 
-type StoredMatch struct {
-	Match    *match.Match
-	Revision int64
-}
-
-type StartedMatch struct {
-	StoredMatch
-	Tables    []table.CommandResult
-	Duplicate bool
-}
-
 // CreateMatch binds two prepared waiting tables. Assignment participant IDs are stable session IDs, not table-local participant IDs.
 func (postgres *Postgres) CreateMatch(ctx context.Context, state match.Snapshot, occurredAt time.Time) error {
+	err := pgx.BeginFunc(ctx, postgres.pool, func(tx pgx.Tx) error { return createMatch(ctx, postgres.queries.WithTx(tx), state, occurredAt) })
+	var postgresError *pgconn.PgError
+	if errors.As(err, &postgresError) && postgresError.Code == "23505" {
+		return match.ErrState
+	}
+	return err
+}
+
+func createMatch(ctx context.Context, queries *dbgen.Queries, state match.Snapshot, occurredAt time.Time) error {
 	candidate, err := match.Restore(state)
 	if err != nil {
 		return err
@@ -60,114 +58,109 @@ func (postgres *Postgres) CreateMatch(ctx context.Context, state match.Snapshot,
 		return err
 	}
 	creationHash := sha256.Sum256(encoded)
-	err = pgx.BeginFunc(ctx, postgres.pool, func(tx pgx.Tx) error {
-		queries := postgres.queries.WithTx(tx)
-		tables, err := lockMatchTables(ctx, queries, []string{state.OpenTableID, state.ClosedTableID})
-		if err != nil {
-			return err
-		}
-		existing, err := queries.LoadMatch(ctx, state.ID)
-		if err == nil {
-			if !bytes.Equal(existing.CreationHash, creationHash[:]) {
-				return match.ErrState
-			}
-			return nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		for _, aggregate := range tables {
-			if aggregate.State != table.StateWaiting || aggregate.BoardID != "" || len(aggregate.Seats) != 4 {
-				return match.ErrState
-			}
-			activeCount := 0
-			for _, participant := range aggregate.Participants {
-				if participant.LeftAt == nil {
-					activeCount++
-				}
-			}
-			if activeCount != 4 {
-				return match.ErrInvalid
-			}
-			room := match.Open
-			if aggregate.ID == state.ClosedTableID {
-				room = match.Closed
-			}
-			for _, assignment := range state.Assignments {
-				if assignment.Room != room {
-					continue
-				}
-				seat := aggregate.Seats[assignment.Seat]
-				found := false
-				for _, participant := range aggregate.Participants {
-					if participant.ID == seat.ParticipantID && participant.SessionID == assignment.ParticipantID && participant.LeftAt == nil {
-						found = true
-					}
-				}
-				if !found || seat.IsBot || seat.Ready != slices.Contains(state.Ready, assignment.ParticipantID) {
-					return match.ErrInvalid
-				}
-			}
-		}
-		ownerIsTableOwner := slices.ContainsFunc(tables, func(aggregate table.Aggregate) bool { return aggregate.OwnerSessionID == state.OwnerID })
-		if !ownerIsTableOwner {
-			return match.ErrForbidden
-		}
-		if err := queries.CreateMatch(ctx, dbgen.CreateMatchParams{ID: state.ID, OwnerSessionID: state.OwnerID, BoardCount: int32(len(state.BoardIDs)), CreationHash: creationHash[:], CreatedAt: timestamptz(occurredAt)}); err != nil {
-			return err
-		}
-		for _, room := range []struct {
-			name    match.Room
-			tableID string
-		}{{match.Open, state.OpenTableID}, {match.Closed, state.ClosedTableID}} {
-			if err := queries.InsertMatchRoom(ctx, dbgen.InsertMatchRoomParams{MatchID: state.ID, Room: string(room.name), TableID: room.tableID}); err != nil {
-				return err
-			}
-		}
-		for _, assignment := range state.Assignments {
-			if err := queries.InsertMatchAssignment(ctx, dbgen.InsertMatchAssignmentParams{MatchID: state.ID, Room: string(assignment.Room), Seat: string(assignment.Seat), SessionID: assignment.ParticipantID, Ready: slices.Contains(state.Ready, assignment.ParticipantID)}); err != nil {
-				return err
-			}
-		}
-		for _index, boardID := range state.BoardIDs {
-			if err := queries.InsertMatchBoard(ctx, dbgen.InsertMatchBoardParams{MatchID: state.ID, ID: boardID, BoardNumber: int32(_index + 1)}); err != nil {
-				return err
-			}
+	tables, err := lockMatchTables(ctx, queries, []string{state.OpenTableID, state.ClosedTableID})
+	if err != nil {
+		return err
+	}
+	existing, err := queries.LoadMatch(ctx, state.ID)
+	if err == nil {
+		if !bytes.Equal(existing.CreationHash, creationHash[:]) {
+			return match.ErrState
 		}
 		return nil
-	})
-	var postgresError *pgconn.PgError
-	if errors.As(err, &postgresError) && postgresError.Code == "23505" {
-		return match.ErrState
 	}
-	return err
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	for _, aggregate := range tables {
+		if aggregate.State != table.StateWaiting || aggregate.BoardID != "" || len(aggregate.Seats) != 4 {
+			return match.ErrState
+		}
+		activeCount := 0
+		for _, participant := range aggregate.Participants {
+			if participant.LeftAt == nil {
+				activeCount++
+			}
+		}
+		if activeCount != 4 {
+			return match.ErrInvalid
+		}
+		room := match.Open
+		if aggregate.ID == state.ClosedTableID {
+			room = match.Closed
+		}
+		for _, assignment := range state.Assignments {
+			if assignment.Room != room {
+				continue
+			}
+			seat := aggregate.Seats[assignment.Seat]
+			found := false
+			for _, participant := range aggregate.Participants {
+				if participant.ID == seat.ParticipantID && participant.SessionID == assignment.ParticipantID && participant.LeftAt == nil {
+					found = true
+				}
+			}
+			if !found || seat.IsBot || seat.Ready != slices.Contains(state.Ready, assignment.ParticipantID) {
+				return match.ErrInvalid
+			}
+		}
+	}
+	ownerIsTableOwner := slices.ContainsFunc(tables, func(aggregate table.Aggregate) bool { return aggregate.OwnerSessionID == state.OwnerID })
+	if !ownerIsTableOwner {
+		return match.ErrForbidden
+	}
+	if err := queries.CreateMatch(ctx, dbgen.CreateMatchParams{ID: state.ID, OwnerSessionID: state.OwnerID, BoardCount: int32(len(state.BoardIDs)), CreationHash: creationHash[:], CreatedAt: timestamptz(occurredAt)}); err != nil {
+		return err
+	}
+	for _, room := range []struct {
+		name    match.Room
+		tableID string
+	}{{match.Open, state.OpenTableID}, {match.Closed, state.ClosedTableID}} {
+		if err := queries.InsertMatchRoom(ctx, dbgen.InsertMatchRoomParams{MatchID: state.ID, Room: string(room.name), TableID: room.tableID}); err != nil {
+			return err
+		}
+	}
+	for _, assignment := range state.Assignments {
+		if err := queries.InsertMatchAssignment(ctx, dbgen.InsertMatchAssignmentParams{MatchID: state.ID, Room: string(assignment.Room), Seat: string(assignment.Seat), SessionID: assignment.ParticipantID, Ready: slices.Contains(state.Ready, assignment.ParticipantID)}); err != nil {
+			return err
+		}
+	}
+	for _index, boardID := range state.BoardIDs {
+		if err := queries.InsertMatchBoard(ctx, dbgen.InsertMatchBoardParams{MatchID: state.ID, ID: boardID, BoardNumber: int32(_index + 1)}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // LoadMatch returns private recovery state from a consistent database snapshot, never an HTTP response.
-func (postgres *Postgres) LoadMatch(ctx context.Context, matchID string) (StoredMatch, error) {
+func (postgres *Postgres) LoadMatch(ctx context.Context, matchID string) (match.Stored, error) {
 	tx, err := postgres.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := postgres.queries.WithTx(tx)
 	row, err := queries.LoadMatch(ctx, matchID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return match.Stored{}, match.ErrNotFound
+	}
 	if err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	result, err := hydrateMatch(ctx, queries, row)
 	if err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	return result, nil
 }
 
 // StartMatch commits the shared deals and both first-board snapshots together. Returned batches may be published only after success.
-func (postgres *Postgres) StartMatch(ctx context.Context, matchID, actorID string, expectedRevision int64, occurredAt time.Time) (StartedMatch, error) {
-	var result StartedMatch
+func (postgres *Postgres) StartMatch(ctx context.Context, matchID, actorID string, expectedRevision int64, occurredAt time.Time) (match.Started, error) {
+	var result match.Started
 	err := pgx.BeginFunc(ctx, postgres.pool, func(tx pgx.Tx) error {
 		queries := postgres.queries.WithTx(tx)
 		rooms, err := queries.ListMatchRooms(ctx, matchID)
@@ -192,8 +185,11 @@ func (postgres *Postgres) StartMatch(ctx context.Context, matchID, actorID strin
 		if err != nil {
 			return err
 		}
+		if row.Status == string(match.Cancelled) {
+			return match.ErrState
+		}
 		if row.Status != string(match.Waiting) {
-			result = StartedMatch{StoredMatch: stored, Duplicate: true}
+			result = match.Started{Stored: stored, Duplicate: true}
 			return nil
 		}
 		if row.Revision != expectedRevision {
@@ -244,11 +240,11 @@ func (postgres *Postgres) StartMatch(ctx context.Context, matchID, actorID strin
 			return err
 		}
 		stored.Revision++
-		result.StoredMatch = stored
+		result.Stored = stored
 		return nil
 	})
 	if err != nil {
-		return StartedMatch{}, err
+		return match.Started{}, err
 	}
 	return result, nil
 }
@@ -271,13 +267,13 @@ func lockMatchTables(ctx context.Context, queries *dbgen.Queries, tableIDs []str
 	return aggregates, nil
 }
 
-func hydrateMatch(ctx context.Context, queries *dbgen.Queries, row dbgen.BridgeyokTeamMatch) (StoredMatch, error) {
+func hydrateMatch(ctx context.Context, queries *dbgen.Queries, row dbgen.BridgeyokTeamMatch) (match.Stored, error) {
 	rooms, err := queries.ListMatchRooms(ctx, row.ID)
 	if err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	if len(rooms) != 2 {
-		return StoredMatch{}, match.ErrInvalid
+		return match.Stored{}, match.ErrInvalid
 	}
 	state := match.Snapshot{ID: row.ID, OwnerID: row.OwnerSessionID, Status: match.Status(row.Status)}
 	for _, room := range rooms {
@@ -289,7 +285,7 @@ func hydrateMatch(ctx context.Context, queries *dbgen.Queries, row dbgen.Bridgey
 	}
 	assignments, err := queries.ListMatchAssignments(ctx, row.ID)
 	if err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	for _, assignment := range assignments {
 		state.Assignments = append(state.Assignments, match.Assignment{ParticipantID: assignment.SessionID, Room: match.Room(assignment.Room), Seat: bridge.Seat(assignment.Seat)})
@@ -299,60 +295,60 @@ func hydrateMatch(ctx context.Context, queries *dbgen.Queries, row dbgen.Bridgey
 	}
 	boards, err := queries.ListMatchBoards(ctx, row.ID)
 	if err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	if len(boards) != int(row.BoardCount) {
-		return StoredMatch{}, match.ErrInvalid
+		return match.Stored{}, match.ErrInvalid
 	}
 	for _index, board := range boards {
 		if int(board.BoardNumber) != _index+1 {
-			return StoredMatch{}, match.ErrInvalid
+			return match.Stored{}, match.ErrInvalid
 		}
 		state.BoardIDs = append(state.BoardIDs, board.ID)
-		if state.Status == match.Waiting {
+		if state.Status == match.Waiting || state.Status == match.Cancelled {
 			if board.SourceRecord != nil {
-				return StoredMatch{}, match.ErrInvalid
+				return match.Stored{}, match.ErrInvalid
 			}
 			continue
 		}
 		metadata, err := bridge.MetadataForBoard(int(board.BoardNumber))
 		if err != nil {
-			return StoredMatch{}, err
+			return match.Stored{}, err
 		}
 		var source deal.Result
 		if err := json.Unmarshal(board.SourceRecord, &source); err != nil {
-			return StoredMatch{}, fmt.Errorf("decode match board source")
+			return match.Stored{}, fmt.Errorf("decode match board source")
 		}
 		state.Boards = append(state.Boards, match.Board{ID: board.ID, Metadata: metadata, Source: source})
 	}
 	results, err := queries.ListMatchResults(ctx, row.ID)
 	if err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	for _, result := range results {
 		state.Results = append(state.Results, match.Result{BoardID: result.BoardID, Room: match.Room(result.Room), ScoreNS: int(result.ScoreNs)})
 	}
 	candidate, err := match.Restore(state)
 	if err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	comparisons, total := candidate.Comparisons()
 	persisted, err := queries.ListMatchComparisons(ctx, row.ID)
 	if err != nil {
-		return StoredMatch{}, err
+		return match.Stored{}, err
 	}
 	if total != int(row.TotalImp) || len(comparisons) != len(persisted) {
-		return StoredMatch{}, fmt.Errorf("match comparison totals mismatch")
+		return match.Stored{}, fmt.Errorf("match comparison totals mismatch")
 	}
 	for _index, comparison := range comparisons {
 		if persisted[_index].BoardID != comparison.BoardID || int(persisted[_index].TeamAImp) != comparison.TeamAIMP {
-			return StoredMatch{}, fmt.Errorf("match comparison mismatch")
+			return match.Stored{}, fmt.Errorf("match comparison mismatch")
 		}
 	}
-	return StoredMatch{Match: candidate, Revision: row.Revision}, nil
+	return match.Stored{Match: candidate, Revision: row.Revision}, nil
 }
 
-func saveMatchProgress(ctx context.Context, queries *dbgen.Queries, stored StoredMatch, occurredAt time.Time) error {
+func saveMatchProgress(ctx context.Context, queries *dbgen.Queries, stored match.Stored, occurredAt time.Time) error {
 	state := stored.Match.PrivateSnapshot()
 	_, total := stored.Match.Comparisons()
 	affected, err := queries.UpdateMatch(ctx, dbgen.UpdateMatchParams{ID: state.ID, Status: string(state.Status), TotalImp: int32(total), UpdatedAt: timestamptz(occurredAt), Revision: stored.Revision})

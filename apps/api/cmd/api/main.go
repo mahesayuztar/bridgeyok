@@ -15,6 +15,7 @@ import (
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpapi"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpserver"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/match"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/observability"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/realtime"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
@@ -113,6 +114,11 @@ func main() {
 		logger.Error("analysis service initialization failed")
 		os.Exit(1)
 	}
+	matchService, err := match.NewService(postgres, actorRegistry, realtimeServer, logger, time.Now)
+	if err != nil {
+		logger.Error("match initialization failed")
+		os.Exit(1)
+	}
 	handler := httpapi.NewRouter(httpapi.Options{
 		Logger:         logger,
 		AllowedOrigins: appConfig.AllowedOrigins,
@@ -123,6 +129,7 @@ func main() {
 		Analysis:       analysisService,
 		Replay:         postgres,
 		Accounts:       postgres,
+		Match:          matchService,
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

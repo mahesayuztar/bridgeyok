@@ -16,6 +16,18 @@ import (
 
 // CreateTable persists a waiting table and its owner in one transaction.
 func (postgres *Postgres) CreateTable(ctx context.Context, record table.CreateRecord) error {
+	err := pgx.BeginFunc(ctx, postgres.pool, func(tx pgx.Tx) error { return createTable(ctx, postgres.queries.WithTx(tx), record) })
+	var postgresError *pgconn.PgError
+	if errors.As(err, &postgresError) && postgresError.Code == "23505" {
+		return table.ErrInviteCollision
+	}
+	if err != nil {
+		return fmt.Errorf("create table transaction: %w", err)
+	}
+	return nil
+}
+
+func createTable(ctx context.Context, queries *dbgen.Queries, record table.CreateRecord) error {
 	if err := record.Aggregate.Validate(); err != nil {
 		return fmt.Errorf("validate table record: %w", err)
 	}
@@ -29,36 +41,25 @@ func (postgres *Postgres) CreateTable(ctx context.Context, record table.CreateRe
 	if owner.ID == "" {
 		return fmt.Errorf("validate table record: owner participant is missing")
 	}
-	err := pgx.BeginFunc(ctx, postgres.pool, func(tx pgx.Tx) error {
-		queries := postgres.queries.WithTx(tx)
-		if err := queries.CreateTable(ctx, dbgen.CreateTableParams{
-			ID:             record.Aggregate.ID,
-			OwnerSessionID: record.Aggregate.OwnerSessionID,
-			InviteCodeHash: record.InviteCodeHash,
-			CreatedAt:      timestamptz(record.CreatedAt),
-		}); err != nil {
-			return fmt.Errorf("insert table: %w", err)
-		}
-		if err := queries.CreateTableParticipant(ctx, dbgen.CreateTableParticipantParams{
-			ID:        owner.ID,
-			TableID:   record.Aggregate.ID,
-			SessionID: owner.SessionID,
-			Role:      string(owner.Role),
-			JoinedAt:  timestamptz(owner.JoinedAt),
-		}); err != nil {
-			return fmt.Errorf("insert owner participant: %w", err)
-		}
-		if err := upsertPrivateSnapshot(ctx, queries, record.Aggregate, record.CreatedAt); err != nil {
-			return err
-		}
-		return nil
-	})
-	var postgresError *pgconn.PgError
-	if errors.As(err, &postgresError) && postgresError.Code == "23505" {
-		return table.ErrInviteCollision
+	if err := queries.CreateTable(ctx, dbgen.CreateTableParams{
+		ID:             record.Aggregate.ID,
+		OwnerSessionID: record.Aggregate.OwnerSessionID,
+		InviteCodeHash: record.InviteCodeHash,
+		CreatedAt:      timestamptz(record.CreatedAt),
+	}); err != nil {
+		return fmt.Errorf("insert table: %w", err)
 	}
-	if err != nil {
-		return fmt.Errorf("create table transaction: %w", err)
+	if err := queries.CreateTableParticipant(ctx, dbgen.CreateTableParticipantParams{
+		ID:        owner.ID,
+		TableID:   record.Aggregate.ID,
+		SessionID: owner.SessionID,
+		Role:      string(owner.Role),
+		JoinedAt:  timestamptz(owner.JoinedAt),
+	}); err != nil {
+		return fmt.Errorf("insert owner participant: %w", err)
+	}
+	if err := upsertPrivateSnapshot(ctx, queries, record.Aggregate, record.CreatedAt); err != nil {
+		return err
 	}
 	return nil
 }
@@ -215,6 +216,28 @@ type tableRow struct {
 }
 
 func loadTableAggregate(ctx context.Context, queries *dbgen.Queries, row tableRow) (table.Aggregate, error) {
+	aggregate, err := loadTableAggregateState(ctx, queries, row)
+	if err != nil {
+		return aggregate, err
+	}
+	room, err := queries.FindTableMatch(ctx, row.id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return aggregate, nil
+	}
+	if err != nil {
+		return table.Aggregate{}, fmt.Errorf("load table match context: %w", err)
+	}
+	matchRow, err := queries.LoadMatch(ctx, room.MatchID)
+	if err != nil {
+		return table.Aggregate{}, fmt.Errorf("load match board count: %w", err)
+	}
+	aggregate.MatchComplete = matchRow.Status == "COMPLETE"
+	aggregate.MatchID = room.MatchID
+	aggregate.MatchBoardCount = int(matchRow.BoardCount)
+	return aggregate, nil
+}
+
+func loadTableAggregateState(ctx context.Context, queries *dbgen.Queries, row tableRow) (table.Aggregate, error) {
 	snapshot, err := queries.LoadGameSnapshot(ctx, row.id)
 	if err == nil {
 		var aggregate table.Aggregate

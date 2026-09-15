@@ -426,3 +426,27 @@ func TestProject(t *testing.T) {
 		}
 	}
 }
+
+func TestCancel(t *testing.T) {
+	t.Parallel()
+	waiting := waitingMatch(t)
+	if err := waiting.Cancel("outsider"); !errors.Is(err, ErrForbidden) {
+		t.Fatal(err)
+	}
+	if err := waiting.Cancel("p7"); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := Restore(waiting.PrivateSnapshot())
+	if err != nil || recovered.PrivateSnapshot().Status != Cancelled {
+		t.Fatal("cancel recovery", err)
+	}
+	if err := recovered.Cancel("p7"); err != nil {
+		t.Fatal("duplicate cancel", err)
+	}
+	if err := recovered.Start(t.Context(), "p0", &testSource{}); !errors.Is(err, ErrState) {
+		t.Fatal("cancelled start", err)
+	}
+	if err := activeMatch(t).Cancel("p7"); !errors.Is(err, ErrState) {
+		t.Fatal("active cancellation", err)
+	}
+}

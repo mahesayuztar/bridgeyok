@@ -20,6 +20,7 @@ const (
 	Waiting   Status = "WAITING"
 	Active    Status = "ACTIVE"
 	Complete  Status = "COMPLETE"
+	Cancelled Status = "CANCELLED"
 	MaxBoards        = 32
 )
 
@@ -274,10 +275,11 @@ func Restore(state Snapshot) (*Match, error) {
 			return nil, err
 		}
 	}
-	if state.Status == Waiting {
+	if state.Status == Waiting || state.Status == Cancelled {
 		if len(state.Boards) != 0 || len(state.Results) != 0 {
 			return nil, ErrInvalid
 		}
+		match.state.Status = state.Status
 		return match, nil
 	}
 	if (state.Status != Active && state.Status != Complete) || len(state.Ready) != 8 || len(state.Boards) != len(state.BoardIDs) {
@@ -357,4 +359,19 @@ func (match *Match) Project(participantID string) (View, error) {
 		view.Comparisons, view.TeamAIMP = match.Comparisons()
 	}
 	return view, nil
+}
+
+// Cancel lets any assigned participant decline a waiting match without changing active game results.
+func (match *Match) Cancel(actorID string) error {
+	if !slices.ContainsFunc(match.state.Assignments, func(assignment Assignment) bool { return assignment.ParticipantID == actorID }) {
+		return ErrForbidden
+	}
+	if match.state.Status == Cancelled {
+		return nil
+	}
+	if match.state.Status != Waiting {
+		return ErrState
+	}
+	match.state.Status = Cancelled
+	return nil
 }
