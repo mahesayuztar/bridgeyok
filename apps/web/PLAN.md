@@ -995,3 +995,10 @@ Referensi: tiga screenshot pengguna pada 6 September 2026. Perubahan ini menggan
 ADR 0018 supersedes the previous guest-only web entry and friend-list exclusion. The web product now uses username/password registration, predefined avatars, mutual-follow Friends, and server-leased presence. Public landing/login/signup reverse-guard to Play; each app route validates the account before rendering. Four real capabilities are shown, with only Casual Game usable. No fifth feature or Team Match implementation is introduced.
 
 Main app pages share a desktop sidebar and mobile bottom navigation with Play centered. Gameplay retains its dedicated viewport; participant profile/follow and online-gated invite extend its existing menus. Profile Settings is the only Settings section. Offline/empty/loading/error and coming-soon states are covered in account browser tests. Final evidence is recorded in the root PLAN refinement checklist.
+
+
+## Phase 5 Team Match UI checkpoint — 15 September 2026
+
+Team Match is now enabled from Play. Authenticated `/match` and `/match/[matchId]` reuse account search and guards for eight-player setup, explicit consent, owner start, waiting cancellation, room navigation, independent board progress and final IMP. The setup creator occupies Open North; the API supports all fixed positions. Table context prevents unavailable casual lifecycle actions and premature replay/DDS; returning to the match preserves the seat.
+
+Playwright eight-account, two-room happy path PASS with create/ready/start/passed-out/finish/final reload and real pointer interaction. Setup, table and result geometry checked at 320/390/768/1024/1440/1920 px with screenshots. Web unit tests (67), TypeScript, contract tests, production build PASS; ESLint zero errors, two pre-existing aria-description warnings. AI/VS Robot remains unchanged. Closed-beta operational and independent bridge review gates remain in root PLAN.md.

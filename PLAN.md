@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 fondasi domain berjalan
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor dan UI lokal selesai; closed-beta gates pending
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1330,8 +1330,8 @@ Phase 5 dimulai. ADR 0020 mencatat orientasi tim, 1–32 shared boards, progres 
 - [x] Law 78B IMP boundary/sign tests, paired comparisons and aggregate totals, including zero/passed-out scores.
 - [x] Validated private snapshot hydration and defensive-copy tests; participant projection omits deals and withholds detailed results until match completion.
 - [x] PostgreSQL schema/repository, shared board binding, transactionally sealed table results, unique paired-result persistence, reopened-repository recovery and concurrent retry evidence (15 September 2026).
-- [ ] Match lifecycle API, owner controls, table actor integration, and match-aware replay/DDS/history/privacy guards.
-- [ ] Team Match UI, eight-client integration, responsive Playwright happy path.
+- [x] Match lifecycle API, owner controls, table actor integration, and match-aware replay/DDS/history/privacy guards (15 September 2026).
+- [x] Team Match UI, eight-client integration, responsive Playwright happy path (15 September 2026).
 - [ ] Closed-beta hardening, restart drills, capacity pilot, independent WBF sign-off, and supported single-instance production hosting.
 
 Initial domain evidence: API race suite, Go vet, and API lint (0 issues) pass; domain tests achieve 98.4% statement coverage.
@@ -1578,3 +1578,14 @@ Explicit request authorizes private Friends chat (90 days), active table chat (1
 - [ ] Promote the hardened revision and perform authenticated production chat/gameplay checks.
 
 Deployment remains BLOCKED for an unrestricted multi-instance API. Existing connection maps, table actors and broadcasts are process-local. Evidence, configuration and resumption steps: `docs/vercel-chat-deployment.md`. No production deployment was triggered or application code pushed by this follow-up.
+
+
+### Phase 5 API/actor and UI checkpoint — 15 September 2026
+
+Authenticated lifecycle creates two fresh rooms from eight registered accounts, all initially unready. Account-locked request deduplication, capacity limit, explicit readiness, owner start, and participant waiting cancellation are durable. Existing actors refresh recipient snapshots after commit; notification failure returns `syncPending`, and retry/reconnect restores current state without duplicate deals. Table projections expose match context for fixed-seat/board-limit/replay capabilities.
+
+The Play Team Match entry now opens setup and the participant's own match list. `/match/[matchId]` provides readiness/start/cancel, own-room navigation, independent progress, and final signed IMP comparisons. Existing account search, same-origin authenticated proxy, canonical table/cards, design tokens and gameplay engine remain in use. Returning to match retains the seat. The setup UI currently fixes its creator at Open North. VS Robot/AI is untouched.
+
+Verification: API race suite, Go vet, API lint (0 issues), migration validation, 67 web unit tests, contract tests, TypeScript and production web build PASS. PostgreSQL match suite with race detector PASS (21.198s); eight-client HTTP/WebSocket privacy and actor-recovery test PASS (47.383s). Real Playwright eight-account create/ready/start/two-room passed-out/finish/final-reload smoke PASS (final run 1.9m), with pointer interactions and overflow/screenshots at 320, 390, 768, 1024, 1440 and 1920 px. Web lint reports zero errors and two existing `aria-description` warnings. Browser evidence is in `apps/web/test-results`; the first run's incorrect card selector was fixed before the passing run.
+
+Remaining Phase 5: operational restart/failure/security/capacity drills, pilot closed beta, independent WBF review, and supported single-instance hosting. No production migration or deployment. See ADR 0020 and `docs/operations/phase5-postgres.md` before continuing; do not start AI work.

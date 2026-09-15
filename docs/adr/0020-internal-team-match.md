@@ -1,7 +1,7 @@
 # ADR 0020 — Internal Team Match
 
 Date: 14 September 2026
-Status: accepted; domain and PostgreSQL integration implemented, lifecycle API/UI pending
+Status: accepted; domain, PostgreSQL, authenticated API/actor integration and minimum UI implemented
 
 ## Decision
 
@@ -27,7 +27,7 @@ Migration 00010 adds normalized match/table bindings, fixed assignments, immutab
 
 `CreateMatch` is a trusted repository operation accepting a validated waiting domain snapshot and two existing waiting tables with exactly eight matching human seats. Its assignment `ParticipantID` values are stable guest/session identity IDs, not room-local `table_participants.id`. The caller-facing lifecycle service must establish owner/participant authorization and explicit match consent before exposing this operation. Configuration hashes distinguish identical create retries from conflicting reuse of a match ID. Ready changes use the existing revision/request-fenced table command path and update match readiness atomically.
 
-`StartMatch` checks owner and expected match revision, generates the complete set, then commits both first-board engine snapshots and their distinct room-board IDs together. Once started, retries return recovered match state without regenerating or republishing initial events. The service must route the returned committed table batches through existing actor/realtime publication and recover missed delivery through snapshots; no endpoint invokes start yet.
+`StartMatch` checks owner and expected match revision, generates the complete set, then commits both first-board engine snapshots and their distinct room-board IDs together. Once started, retries return recovered match state without regenerating or republishing initial events. The service must route the returned committed table batches through existing actor/realtime publication and recover missed delivery through snapshots; the authenticated start endpoint refreshes both actors after commit.
 
 Lock order is sorted table row(s), then match row. Final result writers from the two rooms serialize on the match row. Readers use a repeatable-read transaction, reconstruct through domain validation, and compare persisted IMP rows and total against recalculation. No source/score input from a client is used to collect results. PostgreSQL integration covers concurrent start/finalization, retry, reopened repository recovery, and transaction failure rollback.
 
@@ -41,6 +41,17 @@ The mutable domain object is owned by one serialized application operation. Work
 4. Minimal Team Match UI and eight-client/browser validation.
 5. Capacity/restart/failure/security drills and closed-beta pilot, retaining the pending independent WBF review and single-instance hosting release gates.
 
-Steps 1–2 are implemented as of 15 September 2026. Existing table command persistence now selects shared next boards, seals final results, and rejects casual start/lineup/early-finish/extra-board mutations for bound rooms. REST join rejects other-room/new participants and leave cannot change the fixed lineup. Match rooms are excluded from casual inactivity expiry pending a match-level recovery/cancellation policy.
+Steps 1–4 are implemented as of 15 September 2026; current verification evidence is recorded in the runbook. Existing table command persistence now selects shared next boards, seals final results, and rejects casual start/lineup/early-finish/extra-board mutations for bound rooms. REST join rejects other-room/new participants and leave cannot change the fixed lineup. Match rooms are excluded from casual inactivity expiry pending a match-level recovery/cancellation policy.
 
-Replay, completed archive, and DDS query authorization additionally require the whole match to be complete, while retaining original room membership checks. The remaining API/UI/actor integration must surface these capabilities correctly and audit snapshot/chat/participant routes before release. No new lifecycle endpoint, UI, or production deployment is enabled. Runbook and verification: `docs/operations/phase5-postgres.md`.
+Replay, completed archive, and DDS query authorization additionally require the whole match to be complete, while retaining original room membership checks. The table projection carries match identity, board limit, and completion entitlement for client controls. Production deployment remains pending. Runbook and verification: `docs/operations/phase5-postgres.md`.
+
+
+## Authenticated lifecycle and UI
+
+`POST /v1/matches` accepts eight registered user IDs, fixed room/seat assignments and 1–32 boards. It creates two fresh rooms atomically; existing casual tables are never captured. Every participant, including the creator, starts unready and explicitly consents. Sorted account row locks serialize request deduplication and a maximum of four pending/active matches per invited account. Reusing an owner/request ID with changed input is rejected. The UI fixes the creator at Open North and lets them choose the other seven seats using existing account search.
+
+`GET /v1/matches` lists only the participant's latest twenty matches. `GET /v1/matches/{id}` exposes their own assignment and public progress. Ready uses the existing table actor command and expected table revision; start uses the match revision and owner authorization. Any assigned participant may cancel a waiting match; cancellation atomically closes both rooms. Active cancellation, substitutions, owner succession, and inactivity expiry remain unavailable.
+
+After committed start/ready/cancel, the service refreshes both existing table actors and publishes recipient-scoped snapshots. A bounded context independent of HTTP cancellation attempts both rooms. Failed publication returns durable success with `syncPending`; retry/reconnect refreshes current state without regenerating boards or replaying stale start events. Detailed comparisons remain withheld until completion. The UI retains a create request identity for unchanged retries and rejects late poll responses across mutations.
+
+Migration 00011 adds cancellation status and durable create request deduplication. The authenticated web proxy forwards only allowlisted match paths with same-origin mutation checks. Team Match routes reuse account guards, account search, server capabilities, existing table gameplay, and design tokens. Returning to the match keeps the fixed seat. DDS and replay remain unavailable during the match; replay entitlement is refreshed on table re-entry after completion.
