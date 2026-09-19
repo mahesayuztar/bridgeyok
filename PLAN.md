@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending; Phase 6 direncanakan
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1340,6 +1340,27 @@ Initial domain evidence: API race suite, Go vet, and API lint (0 issues) pass; d
 **PostgreSQL integration — 15 September 2026:** migration 00010 and sqlc queries persist normalized rooms, assignments/readiness, immutable shared sources, distinct room-board bindings, archive-backed results, comparisons, and totals. Start commits both initial table snapshots and the complete source set atomically. Next-board/finish uses the existing command transaction to seal/archive the old board and collect its match result. Row locking and unique constraints prevent duplicate comparison; consistent reads validate reconstructed state against stored totals. Casual lifecycle guards preserve the board set/lineup; replay and DDS are withheld until match completion and retain room authorization.
 
 Validation: isolated PostgreSQL 17 migration up/down/up PASS; uncached database integration with race detector PASS (35.144s), final targeted match suite PASS (11.272s), realtime integration PASS (1.205s), API race suite, Go vet, lint, and migration validation PASS. Scenarios cover eight concurrent starts (one generated set), 16 simultaneous/retried finalizations (one comparison), readiness/revision fencing, independent two-board progress, nonzero signed IMP totals, passed-out results, pre-final undo, reopened repository recovery, archive redelivery, missing-binding rejection, partial-start/failed-comparison rollback, immutable results, cross-room access, and RLS/readiness. This is database/repository evidence; eight-client lifecycle/actor publication and browser validation remain pending. No production migration or deployment was performed. Details and rollback limits: `docs/operations/phase5-postgres.md`.
+
+### Phase 6 — Persistent Table & Human-Centered Application UX — PLANNED
+
+**Objective:** table menjadi persistent application session. Friends, Settings, History dan informasi match mengganti workspace tanpa leave, socket restart, subscription baru, atau full game-state refetch ketika state lokal masih valid.
+
+Plan engineering/product lengkap: [Phase 6 implementation plan](docs/product/phase6-persistent-table-ux.md). Audit source dan browser lokal: [Phase 6 evidence](docs/product/phase6-audit.md), baseline `9738c90`, 19 September 2026.
+
+**Scope:** shared AppShell/GameSession ownership; workspace routing dan Back/Forward; satu realtime owner untuk table/account/chat; icon-first desktop dan compact mobile navigation; history/score context, readability, accessibility, responsive geometry dan safe background interactions. Reuse reducer, canonical cards, replay, Friends/chat, dan Team Match existing. Tidak mengulang GUX/ENG, mengubah core bridge rules, atau membuat protokol/state framework baru.
+
+**Urutan work:** P6-01 baseline → P6-02 session/realtime owner → P6-03 persistent routing → P6-04 navigation; P6-05 background gameplay/readability, P6-06 auction/trick reader, dan P6-07 History/score dapat dikerjakan pada boundary terpisah → P6-08 accessibility/responsive gate → P6-09 regression evidence. Ownership refactor tidak dirilis tanpa safety background dan regression gates.
+
+**Objective of Done ringkas** (acceptance terperinci dan dependencies ada di plan Phase 6):
+
+- [ ] Table → Friends → Settings → History → Table serta Back/Forward mempertahankan session/socket/subscription; no full table GET atau loading splash akibat navigation.
+- [ ] Remote events dan pending ACK/event tetap reconcile; refresh/reconnect/rotation/leave/logout mengikuti lifecycle eksplisit.
+- [ ] Table tetap primary surface; mobile satu-tap return, readable cards/history dan touch targets, tanpa duplicate banner atau placeholder navigation.
+- [ ] History/score reuse sumber authorized; recipient-scoped trick history dan Team Match replay/privacy tetap berlaku.
+- [ ] Timeout/klik workspace tidak memajukan board; Next board eksplisit. Hidden table tidak menangkap input workspace.
+- [ ] Desktop/tablet/320–390 px, zoom, keyboard, pointer/touch, loading/error/reconnect dan existing gameplay regression terverifikasi dengan artifacts.
+
+Status: **planning only**, belum ada implementasi Phase 6. Pending release gates Phase 4/5 tetap terpisah dan tidak dianggap selesai oleh penambahan plan ini.
 
 ### Deferred outside this roadmap
 

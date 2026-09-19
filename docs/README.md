@@ -197,3 +197,10 @@ DDS is distributed separately under its original license. See:
 ```text
 bin/dds-LICENSE
 ```
+
+
+## Product and engineering roadmap
+
+- [Main implementation roadmap](../PLAN.md)
+- [Phase 6 — Persistent Table & Human-Centered Application UX](product/phase6-persistent-table-ux.md)
+- [Phase 6 current-state audit and browser evidence](product/phase6-audit.md)
