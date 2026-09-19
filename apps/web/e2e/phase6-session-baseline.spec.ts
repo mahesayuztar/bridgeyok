@@ -105,6 +105,7 @@ function delta(telemetry: SessionTelemetry, baseline: ReturnType<typeof marker>)
     appSocketOpenCount: telemetry.appSocketOpenCount - baseline.appSocketOpenCount,
     appSocketCloseCount: telemetry.appSocketCloseCount - baseline.appSocketCloseCount,
     tableGetCount: telemetry.tableGetCount - baseline.tableGetCount,
+    subscribeCount: frames.filter(frame => frame.direction === "sent" && frame.name === "table.subscribe").length,
     resumeCount: frames.filter(frame => frame.direction === "sent" && frame.name === "table.resume").length,
     takeoverCount: frames.filter(frame => frame.direction === "sent" && frame.name === "table.takeover").length,
   };
@@ -122,7 +123,7 @@ async function softNavigate(page: Page, path: string) {
   }, path);
 }
 
-test("table to workspace navigation characterizes the current session restart contract", async ({ page }, testInfo) => {
+test("table to workspace navigation preserves the shared game session", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const telemetry = observeSession(page);
   await page.goto("/signup");
@@ -146,24 +147,28 @@ test("table to workspace navigation characterizes the current session restart co
   await softNavigate(page, "/friends");
   await expect(page).toHaveURL(/\/friends$/);
   await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
-  await expect.poll(() => delta(telemetry, navigationBaseline).appSocketOpenCount).toBe(1);
-  await expect.poll(() => delta(telemetry, navigationBaseline).appSocketCloseCount).toBe(1);
+  await expect.poll(() => delta(telemetry, navigationBaseline).appSocketOpenCount).toBe(0);
+  await expect.poll(() => delta(telemetry, navigationBaseline).appSocketCloseCount).toBe(0);
 
   await page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: "Settings", exact: true }).click();
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
-  expect(delta(telemetry, navigationBaseline).appSocketOpenCount).toBe(1);
-  expect(delta(telemetry, navigationBaseline).appSocketCloseCount).toBe(1);
+  await page.getByLabel("Nama di meja").fill("P6 Updated");
+  await page.getByRole("button", { name: "Simpan profile" }).click();
+  await expect(page.getByRole("status")).toContainText("Profile tersimpan.");
+  expect(delta(telemetry, navigationBaseline).appSocketOpenCount).toBe(0);
+  expect(delta(telemetry, navigationBaseline).appSocketCloseCount).toBe(0);
 
   await softNavigate(page, tablePath);
   await expect(page).toHaveURL(/\/table\//);
   await waitForTableConnection(page);
   await expect.poll(() => delta(telemetry, navigationBaseline)).toEqual({
-    appSocketOpenCount: 2,
-    appSocketCloseCount: 2,
-    tableGetCount: 1,
-    resumeCount: 1,
-    takeoverCount: 1,
+    appSocketOpenCount: 0,
+    appSocketCloseCount: 0,
+    tableGetCount: 0,
+    subscribeCount: 0,
+    resumeCount: 0,
+    takeoverCount: 0,
   });
   await expect.poll(() => telemetry.pendingRequestIds.size).toBe(0);
   const navigationDelta = delta(telemetry, navigationBaseline);
@@ -175,17 +180,45 @@ test("table to workspace navigation characterizes the current session restart co
     appSocketOpenCount: 1,
     appSocketCloseCount: 0,
     tableGetCount: 1,
+    subscribeCount: 0,
     resumeCount: 1,
     takeoverCount: 1,
   });
   await expect.poll(() => telemetry.pendingRequestIds.size).toBe(0);
   const restoreDelta = delta(telemetry, restoreBaseline);
 
+  const leaveBaseline = marker(telemetry);
+  await page.getByRole("button", { name: "Keluar", exact: true }).click();
+  await expect(page).toHaveURL(/\/lobby$/);
+  await expect(page.getByRole("heading", { name: /^Halo,/ })).toBeVisible();
+  await expect.poll(() => delta(telemetry, leaveBaseline)).toEqual({
+    appSocketOpenCount: 1,
+    appSocketCloseCount: 1,
+    tableGetCount: 0,
+    subscribeCount: 0,
+    resumeCount: 0,
+    takeoverCount: 0,
+  });
+  const leaveDelta = delta(telemetry, leaveBaseline);
+
+  const accountNavigationBaseline = marker(telemetry);
+  await softNavigate(page, "/friends");
+  await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
+  await expect.poll(() => delta(telemetry, accountNavigationBaseline)).toEqual({
+    appSocketOpenCount: 0,
+    appSocketCloseCount: 0,
+    tableGetCount: 0,
+    subscribeCount: 0,
+    resumeCount: 0,
+    takeoverCount: 0,
+  });
+
   const report = {
     route: { tablePath, workspacePath: "/friends", settingsPath: "/settings" },
     hmrAndOtherWebSocketsIgnored: telemetry.ignoredWebSocketCount,
     navigation: navigationDelta,
     restore: restoreDelta,
+    leaveToAccountRealtime: leaveDelta,
     final: {
       appSocketOpenCount: telemetry.appSocketOpenCount,
       appSocketCloseCount: telemetry.appSocketCloseCount,
