@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending; Phase 6 berjalan dengan P6-01 PASS
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending; Phase 6 berjalan dengan P6-01–P6-02 PASS
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1353,6 +1353,8 @@ Plan engineering/product lengkap: [Phase 6 implementation plan](docs/product/pha
 
 **P6-01 checkpoint — PASS, 19 September 2026:** commit `e600153` menambah deterministic recipient-scoped fixtures untuk auction/opening lead/middle trick Dummy dan defender/scored/match ACTIVE-COMPLETE, unit privacy contract, dan browser characterization dengan metadata frame ter-redaksi. PostgreSQL 17 disposable membuktikan navigation baseline 2 app socket open/2 close/1 table GET/1 resume/1 takeover dan restore 1 open/1 GET/1 resume/1 takeover; HMR dipisahkan berdasarkan pathname tepat `/v1/ws`. Raw-frame privacy, leave, takeover, claim/undo, replay, dan chat ditetapkan sebagai regression suite wajib. Keputusan route tetap URL existing + shared `(app)` lifetime boundary + satu GameSession owner; implementasinya dimulai P6-02/P6-03.
 
+**P6-02 checkpoint — PASS, 20 September 2026:** commits `54a4ef6` dan `d7e9dbe` memusatkan identity, reducer, credential refresh, heartbeat, chat attachment, serta account/table WebSocket pada satu `GameSessionProvider`. Browser gate membuktikan table → Friends → Settings/profile refresh → table menghasilkan 0 socket/GET/resume/takeover churn, sedangkan explicit leave mengganti tepat satu table socket menjadi account realtime tanpa subscription table. Generation fence menolak completion identity, table request, dan connection lama; chat, multi-tab leave, privacy/takeover/claim/undo, replay, unit, typecheck, lint, dan production build tetap terverifikasi. Evidence rinci dicatat pada plan Phase 6.
+
 **Objective of Done ringkas** (acceptance terperinci dan dependencies ada di plan Phase 6):
 
 - [ ] Table → Friends → Settings → History → Table serta Back/Forward mempertahankan session/socket/subscription; no full table GET atau loading splash akibat navigation.
@@ -1362,7 +1364,7 @@ Plan engineering/product lengkap: [Phase 6 implementation plan](docs/product/pha
 - [ ] Timeout/klik workspace tidak memajukan board; Next board eksplisit. Hidden table tidak menangkap input workspace.
 - [ ] Desktop/tablet/320–390 px, zoom, keyboard, pointer/touch, loading/error/reconnect dan existing gameplay regression terverifikasi dengan artifacts.
 
-Status: **P6-01 PASS; P6-02–09 pending**. Pending release gates Phase 4/5 tetap terpisah dan tidak dianggap selesai oleh checkpoint ini.
+Status: **P6-01–P6-02 PASS; P6-03–09 pending**. Pending release gates Phase 4/5 tetap terpisah dan tidak dianggap selesai oleh checkpoint ini.
 
 ### Deferred outside this roadmap
 

@@ -292,11 +292,15 @@ Tujuan: table tidak bergantung lifecycle page.
 Scope: provider, refactor hook account/table connection, consumer lobby/table/presence; single heartbeat/chat attach.
 Dependency: P6-01. Parallelization: P6-05/06 dapat bekerja pada presentational components; file hook/provider dimiliki satu work item.
 
-- [ ] Satu authenticated shell memiliki maksimal satu settled app socket dan satu subscription table aktif.
-- [ ] Mount ulang consumer, profile update, dan workspace state change tidak membuat socket/pending reducer baru.
-- [ ] No-table chat/social → join/subscribe → explicit leave kembali account realtime berfungsi tanpa competing attach.
-- [ ] Stale async completion, strict effect cleanup, logout error, credential refresh, account switch dan storage-clear ditangani deterministik.
-- [ ] Reducer/game protocol behaviour existing tetap lulus; route switching bukan trigger controller takeover.
+- [x] Satu authenticated shell memiliki maksimal satu settled app socket dan satu subscription table aktif.
+- [x] Mount ulang consumer, profile update, dan workspace state change tidak membuat socket/pending reducer baru.
+- [x] No-table chat/social → join/subscribe → explicit leave kembali account realtime berfungsi tanpa competing attach.
+- [x] Stale async completion, strict effect cleanup, logout error, credential refresh, account switch dan storage-clear ditangani deterministik.
+- [x] Reducer/game protocol behaviour existing tetap lulus; route switching bukan trigger controller takeover.
+
+Evidence P6-02, 20 September 2026: commits `54a4ef6` dan `d7e9dbe`. `GameSessionProvider` pada root layout sekarang menjadi satu-satunya owner identity, reducer, credential refresh single-flight, heartbeat akun 15 detik, chat attachment, socket account/table, reconnect/backoff, dan rotation 285 detik. `AccountPresence`, lobby, table, serta settings hanya menjadi consumer; profile `router.refresh()` tidak mengganti provider. Generation fence identity, table request, dan connection mencegah ticket/GET/refresh lama menulis setelah leave, switch, logout, account change, atau storage clear.
+
+Browser gate PostgreSQL 17 membuktikan table → Friends → Settings/profile refresh → table menghasilkan 0 socket open, 0 close, 0 GET table, 0 subscribe/resume, dan 0 takeover, dengan pending kembali 0. Refresh tetap melakukan tepat 1 GET, 1 socket, 1 resume, dan 1 takeover. Explicit leave melakukan tepat 1 close/open menuju account realtime tanpa subscribe/resume/takeover; navigasi account berikutnya tetap 0 churn. `chat.spec.ts` dan `table-leave.spec.ts` lulus 6/6, termasuk recipient scope, reconnect/history, geometry, pointer path, storage synchronization, dan leave confirmation. Unit web lulus 69/69, typecheck, lint tanpa error, dan production build lulus. `phase3.spec.ts` lulus stale recovery, four-account privacy/takeover/claim/undo, dan completed replay; bot-consensus sempat melewati timeout helper saat full run lalu lulus rerun terisolasi 1/1 tanpa perubahan implementasi.
 
 ### P6-03 — Persistent AppShell dan workspace routing
 
