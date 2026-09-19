@@ -5,7 +5,7 @@ import type { LoadPositionAnalysis, PositionAnalysis } from "./use-position-anal
 
 import type { components } from "@bridgeyok/contracts/openapi";
 import type { MutationCommandEnvelope } from "@bridgeyok/contracts/realtime";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { normalizeBoardReplay, type BoardReplay } from "./board-replay";
 import { issueFromFailure, issueFromServer, type ClientIssue } from "./client-issue";
 import { canSendTableCommand } from "./gameplay-capabilities";
@@ -161,7 +161,9 @@ export type TableSession = {
   sendCommand: (name: CommandName, payload?: Record<string, unknown>) => void;
 };
 
-export function useTableSession({ connectOnRestore = true }: { connectOnRestore?: boolean } = {}): TableSession {
+const GameSessionContext = createContext<TableSession | null>(null);
+
+function useGameSessionState(): TableSession {
   const [tableState, dispatch] = useReducer(reduceTableState, undefined, createEmptyTableState);
   const projectedTable = useMemo(() => projectedTableState(tableState), [tableState]);
   const [initializing, setInitializing] = useState(true);
@@ -175,8 +177,10 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectionGenerationRef = useRef(0);
+  const identityGenerationRef = useRef(0);
+  const tableRequestGenerationRef = useRef(0);
   const refreshPromiseRef = useRef<Promise<GuestCredentials> | null>(null);
-  const beginConnectionRef = useRef<((tableId: string) => void) | null>(null);
+  const beginConnectionRef = useRef<((tableId: string | null) => void) | null>(null);
   const automaticTakeoverRevisionRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -187,7 +191,11 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     if (refreshPromiseRef.current !== null) {
       return refreshPromiseRef.current;
     }
-    const promise = accountRequest<{ credentials: GuestCredentials }>().then(result => result.credentials);
+    const generation = identityGenerationRef.current;
+    const promise = accountRequest<{ credentials: GuestCredentials }>().then(result => {
+      if (identityGenerationRef.current !== generation) throw new DOMException("Stale identity", "AbortError");
+      return result.credentials;
+    });
     refreshPromiseRef.current = promise;
     try {
       const credentials = await promise;
@@ -196,7 +204,7 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
       setNickname(credentials.nickname);
       return credentials;
     } finally {
-      refreshPromiseRef.current = null;
+      if (refreshPromiseRef.current === promise) refreshPromiseRef.current = null;
     }
   }, []);
 
@@ -275,7 +283,8 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     socketRef.current = null;
   }, []);
 
-  const clearTable = useCallback((nextRecoveryState: TableRecoveryState = "SESSION_ONLY") => {
+  const clearTable = useCallback((nextRecoveryState: TableRecoveryState = "SESSION_ONLY", cancelRequests = true) => {
+    if (cancelRequests) tableRequestGenerationRef.current += 1;
     stopConnection();
     removeStoredValue(browserStorage("local"), TABLE_KEY);
     setInviteCode(null);
@@ -284,11 +293,14 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     dispatch({ type: "clear" });
   }, [stopConnection]);
 
-  const clearIdentity = useCallback((issue: ClientIssue | null = null) => {
+  const clearIdentity = useCallback((issue: ClientIssue | null = null, removeIdentity = true) => {
+    identityGenerationRef.current += 1;
+    refreshPromiseRef.current = null;
     clearTable("NO_SESSION");
     credentialsRef.current = null;
-    removeStoredValue(browserStorage("local"), IDENTITY_KEY);
+    if (removeIdentity) removeStoredValue(browserStorage("local"), IDENTITY_KEY);
     removeStoredValue(browserStorage("session"), ACCESS_KEY);
+    chatStore.identify("");
     setNickname(null);
     if (issue !== null) {
       dispatch({ type: "issue", issue });
@@ -313,7 +325,7 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
   }, []);
 
   const openConnection = useCallback(
-    async function connect(tableId: string, generation: number, attempt: number): Promise<void> {
+    async function connect(tableId: string | null, generation: number, attempt: number): Promise<void> {
       if (connectionGenerationRef.current !== generation) {
         return;
       }
@@ -331,20 +343,24 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
         let rotationTimer: ReturnType<typeof setTimeout> | null = null;
         socketRef.current = socket;
         socket.onopen = () => {
- chatStore.attach(socket);
- window.dispatchEvent(new Event("chat-connected"));
           if (connectionGenerationRef.current !== generation) {
             socket.close(1000, "stale connection");
             return;
           }
+          chatStore.attach(socket);
+          window.dispatchEvent(new Event("chat-connected"));
           automaticTakeoverRevisionRef.current = null;
-          dispatch({ type: "controllerSyncStarted" });
-          setConnectionState("syncing");
           rotationTimer = setTimeout(() => {
             plannedDisconnect = true;
             setConnectionState("syncing");
             socket.close(4000, "connection rotation");
           }, REALTIME_CONNECTION_ROTATION_MS);
+          if (tableId === null) {
+            setConnectionState("connected");
+            return;
+          }
+          dispatch({ type: "controllerSyncStarted" });
+          setConnectionState("syncing");
           const lastSeenSeq = tableStateRef.current.activeTableId === tableId ? tableStateRef.current.lastSeenSeq : 0;
           socket.send(
             JSON.stringify({
@@ -369,6 +385,18 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
             return;
           }
           if (chatStore.receive(envelope, socket)) return;
+          if (tableId === null) {
+            if (envelope.kind === "control" && envelope.name === "server.draining") {
+              plannedDisconnect = true;
+              setConnectionState("syncing");
+            } else if (envelope.kind === "error") {
+              const code = typeof envelope.code === "string" ? envelope.code : undefined;
+              if (code === "SESSION_INACTIVE" || code === "SESSION_INVALID") {
+                clearIdentity(issueFromServer({ code, source: "websocket" }));
+              }
+            }
+            return;
+          }
           if (envelope.table_id !== undefined && envelope.table_id !== tableId) {
             return;
           }
@@ -452,13 +480,14 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
             dispatch({ type: "presenceChanged", tableId, participant });
           } else if (envelope.kind === "control" && envelope.name === "table.access_revoked") {
             clearTable("TABLE_EXPIRED");
+            beginConnectionRef.current?.(null);
           } else if (envelope.kind === "control" && envelope.name === "server.draining") {
             plannedDisconnect = true;
             setConnectionState("syncing");
           }
         };
         socket.onclose = (event) => {
- chatStore.detach(socket);
+          chatStore.detach(socket);
           if (rotationTimer !== null) {
             clearTimeout(rotationTimer);
           }
@@ -493,7 +522,7 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
   );
 
   const beginConnection = useCallback(
-    (tableId: string) => {
+    (tableId: string | null) => {
       stopConnection();
       const generation = connectionGenerationRef.current;
       void openConnection(tableId, generation, 0);
@@ -511,37 +540,44 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
   useEffect(() => {
     let active = true;
     async function restoreSession() {
+      const identityGeneration = identityGenerationRef.current;
       const local = browserStorage("local");
       try {
-        const result = await accountRequest<{ credentials: GuestCredentials }>();
+        const result = await accountRequest<{ credentials: GuestCredentials; profile: { id: string } }>();
+        if (!active || identityGenerationRef.current !== identityGeneration) return;
         const previousIdentity = readStoredValue<StoredIdentity>(local, IDENTITY_KEY);
         if (previousIdentity && previousIdentity.sessionId !== result.credentials.sessionId) removeStoredValue(local, TABLE_KEY);
         credentialsRef.current = result.credentials;
         persistCredentials(result.credentials);
         setNickname(result.credentials.nickname);
+        chatStore.identify(result.profile.id);
         const storedTable = readStoredValue<StoredTable>(local, TABLE_KEY);
         if (storedTable !== null && active) {
+          const tableRequestGeneration = tableRequestGenerationRef.current;
           const table = normalizeLiveTableProjection(await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(storedTable.tableId)}`));
+          if (!active || identityGenerationRef.current !== identityGeneration || tableRequestGenerationRef.current !== tableRequestGeneration) return;
           if (table !== null) {
             setInviteCode(storedTable.inviteCode ?? null);
             dispatch({ type: "enter", table });
             setRecoveryState("TABLE_ACTIVE");
-            if (connectOnRestore) {
-              beginConnection(table.tableId);
-            }
+            beginConnection(table.tableId);
           } else {
             removeStoredValue(local, TABLE_KEY);
             setRecoveryState("TABLE_EXPIRED");
+            beginConnection(null);
           }
         } else if (active) {
           setRecoveryState("SESSION_ONLY");
+          beginConnection(null);
         }
       } catch (error) {
+        if (!active || identityGenerationRef.current !== identityGeneration) return;
         if (isSessionFailure(error)) {
           clearIdentity(issueForError(error));
         } else if (error instanceof ApiError && error.code === "TABLE_NOT_FOUND") {
           removeStoredValue(local, TABLE_KEY);
           setRecoveryState("TABLE_EXPIRED");
+          beginConnection(null);
         } else {
           dispatch({ type: "issue", issue: issueForError(error) });
         }
@@ -556,33 +592,67 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
       active = false;
       stopConnection();
     };
-  }, [authenticatedRequest, beginConnection, clearIdentity, connectOnRestore, refreshCredentials, stopConnection]);
+  }, [authenticatedRequest, beginConnection, clearIdentity, stopConnection]);
+
+  useEffect(() => {
+    if (nickname === null) return;
+    const controller = new AbortController();
+    let running = false;
+    async function heartbeat() {
+      if (running) return;
+      running = true;
+      try {
+        await accountRequest("/heartbeat", { method: "POST", signal: controller.signal });
+      } catch (error) {
+        if (!controller.signal.aborted && isSessionFailure(error)) clearIdentity(issueForError(error));
+      } finally {
+        running = false;
+      }
+    }
+    void heartbeat();
+    const interval = setInterval(() => void heartbeat(), 15_000);
+    window.addEventListener("online", heartbeat);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+      window.removeEventListener("online", heartbeat);
+    };
+  }, [clearIdentity, nickname]);
 
   useEffect(() => {
     function handleStorage(event: StorageEvent) {
-      if (event.storageArea !== browserStorage("local") || event.newValue !== null) {
-        return;
-      }
-      if (event.key === TABLE_KEY) {
+      if (event.storageArea !== browserStorage("local")) return;
+      if (event.key === TABLE_KEY && event.newValue === null) {
         clearTable("TABLE_EXPIRED");
+        if (credentialsRef.current !== null) beginConnection(null);
       } else if (event.key === IDENTITY_KEY) {
-        clearIdentity();
+        if (event.newValue === null) {
+          clearIdentity();
+          return;
+        }
+        try {
+          const identity = JSON.parse(event.newValue) as Partial<StoredIdentity>;
+          if (identity.sessionId !== credentialsRef.current?.sessionId) {
+            clearIdentity(null, false);
+            window.location.reload();
+          }
+        } catch {
+          clearIdentity();
+        }
       }
     }
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, [clearIdentity, clearTable]);
+  }, [beginConnection, clearIdentity, clearTable]);
 
   useEffect(() => {
     function handleOnline() {
       const tableId = tableStateRef.current.activeTableId;
-      if (tableId !== null) {
-        beginConnection(tableId);
-      }
+      if (credentialsRef.current !== null) beginConnection(tableId);
     }
     function handleOffline() {
       setConnectionState("offline");
-      if (tableStateRef.current.activeTableId !== null) {
+      if (credentialsRef.current !== null) {
         dispatch({ type: "connectionLost", issue: issueFromFailure(new TypeError("browser offline"), "websocket") });
       }
       socketRef.current?.close();
@@ -604,13 +674,13 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
       }
     } catch {
     } finally {
-      chatStore.identify("");
       clearIdentity();
       setBusy(false);
     }
   }, [clearIdentity, clearTable]);
 
   const createTable = useCallback(async () => {
+    const requestGeneration = ++tableRequestGenerationRef.current;
     setBusy(true);
     try {
       const created = await authenticatedRequest<CreateTableResponse>("/v1/tables", { method: "POST" });
@@ -618,22 +688,22 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
       if (table === null) {
         throw new ApiError(issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "rest" }), "INVALID_TABLE_PROJECTION");
       }
-      clearTable();
+      if (requestGeneration !== tableRequestGenerationRef.current) return null;
+      clearTable("SESSION_ONLY", false);
       writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: table.tableId, inviteCode: created.inviteCode });
       setInviteCode(created.inviteCode);
       dispatch({ type: "enter", table });
       setRecoveryState("TABLE_ACTIVE");
-      if (connectOnRestore) {
-        beginConnection(table.tableId);
-      }
+      beginConnection(table.tableId);
       return table.tableId;
     } catch (error) {
+      if (requestGeneration !== tableRequestGenerationRef.current) return null;
       dispatch({ type: "issue", issue: issueForError(error) });
       return null;
     } finally {
-      setBusy(false);
+      if (requestGeneration === tableRequestGenerationRef.current) setBusy(false);
     }
-  }, [authenticatedRequest, beginConnection, clearTable, connectOnRestore]);
+  }, [authenticatedRequest, beginConnection, clearTable]);
 
   const joinTable = useCallback(
     async (rawInviteCode: string) => {
@@ -653,82 +723,88 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
         return null;
       }
       setBusy(true);
+      const requestGeneration = ++tableRequestGenerationRef.current;
       try {
         const table = normalizeLiveTableProjection(await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(normalizedInviteCode)}/join`, { method: "POST" }));
         if (table === null) {
           throw new ApiError(issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "rest" }), "INVALID_TABLE_PROJECTION");
         }
-        clearTable();
+        if (requestGeneration !== tableRequestGenerationRef.current) return null;
+        clearTable("SESSION_ONLY", false);
         writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: table.tableId, inviteCode: normalizedInviteCode });
         setInviteCode(normalizedInviteCode);
         dispatch({ type: "enter", table });
         setRecoveryState("TABLE_ACTIVE");
-        if (connectOnRestore) {
-          beginConnection(table.tableId);
-        }
+        beginConnection(table.tableId);
         return table.tableId;
       } catch (error) {
+        if (requestGeneration !== tableRequestGenerationRef.current) return null;
         dispatch({ type: "issue", issue: issueForError(error) });
         return null;
       } finally {
-        setBusy(false);
+        if (requestGeneration === tableRequestGenerationRef.current) setBusy(false);
       }
     },
-    [authenticatedRequest, beginConnection, clearTable, connectOnRestore]
+    [authenticatedRequest, beginConnection, clearTable]
   );
 
   const openTable = useCallback(async (tableId: string) => {
     if (tableStateRef.current.activeTableId === tableId && tableStateRef.current.table !== null) {
       return true;
     }
+    const requestGeneration = ++tableRequestGenerationRef.current;
     setBusy(true);
     try {
       const table = normalizeLiveTableProjection(await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(tableId)}`));
       if (table === null) {
         throw new ApiError(issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "rest" }), "INVALID_TABLE_PROJECTION");
       }
-      clearTable();
+      if (requestGeneration !== tableRequestGenerationRef.current) return false;
+      clearTable("SESSION_ONLY", false);
       writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId });
       dispatch({ type: "enter", table });
       setRecoveryState("TABLE_ACTIVE");
       beginConnection(table.tableId);
       return true;
     } catch (error) {
+      if (requestGeneration !== tableRequestGenerationRef.current) return false;
       dispatch({ type: "issue", issue: issueForError(error) });
       return false;
     } finally {
-      setBusy(false);
+      if (requestGeneration === tableRequestGenerationRef.current) setBusy(false);
     }
   }, [authenticatedRequest, beginConnection, clearTable]);
 
   const leaveTable = useCallback(async () => {
     const table = tableStateRef.current.table;
     if (table === null) {
-      clearTable();
       return true;
     }
     setBusy(true);
+    const requestGeneration = ++tableRequestGenerationRef.current;
     try {
       if (table.state === "FINISHED") {
-        clearTable();
+        if (requestGeneration !== tableRequestGenerationRef.current) return false;
+        clearTable("SESSION_ONLY", false);
       } else {
         await authenticatedRequest<void>(`/v1/tables/${encodeURIComponent(table.tableId)}/leave`, { method: "POST" });
-        clearTable();
+        if (requestGeneration !== tableRequestGenerationRef.current) return false;
+        clearTable("SESSION_ONLY", false);
       }
+      beginConnection(null);
       return true;
     } catch (error) {
+      if (requestGeneration !== tableRequestGenerationRef.current) return false;
       dispatch({ type: "issue", issue: issueForError(error) });
       return false;
     } finally {
-      setBusy(false);
+      if (requestGeneration === tableRequestGenerationRef.current) setBusy(false);
     }
-  }, [authenticatedRequest, clearTable]);
+  }, [authenticatedRequest, beginConnection, clearTable]);
 
   const reconnect = useCallback(() => {
     const tableId = tableStateRef.current.activeTableId;
-    if (tableId !== null) {
-      beginConnection(tableId);
-    }
+    if (credentialsRef.current !== null) beginConnection(tableId);
   }, [beginConnection]);
 
   const resync = useCallback(() => {
@@ -837,4 +913,15 @@ export function useTableSession({ connectOnRestore = true }: { connectOnRestore?
     loadBoardReplay,
     loadPositionAnalysis
   };
+}
+
+export function GameSessionProvider({ children }: { children: ReactNode }) {
+  const session = useGameSessionState();
+  return createElement(GameSessionContext, { value: session }, children);
+}
+
+export function useTableSession() {
+  const session = useContext(GameSessionContext);
+  if (session === null) throw new Error("useTableSession must be used within GameSessionProvider");
+  return session;
 }

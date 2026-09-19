@@ -8,7 +8,7 @@ import { useTableSession } from "../use-table-session";
 
 export default function LobbyClient({ initialInviteCode = "" }: { initialInviteCode?: string }) {
   const router = useRouter();
-  const session = useTableSession({ connectOnRestore: false });
+  const session = useTableSession();
   const [joinCode, setJoinCode] = useState(initialInviteCode.trim().toUpperCase());
 
   useEffect(() => {

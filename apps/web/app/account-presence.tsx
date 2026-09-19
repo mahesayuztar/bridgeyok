@@ -3,127 +3,25 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { accountRequest, type Profile } from "./account-types";
+import { type Profile } from "./account-types";
 import { ProfileAvatar } from "./profile-avatar";
 import { ChatPanel } from "./chat-panel";
-import { chatStore } from "./chat-store";
 import { type ChatMessage, type ChatTarget } from "./chat-state";
+import { useTableSession } from "./use-table-session";
 
 export function AccountPresence({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
+  const session = useTableSession();
   const [privateProfile, setPrivateProfile] = useState<Profile | null>(null);
   const [socialNotice, setSocialNotice] = useState<{
     name: string;
     sender: Profile;
     inviteCode?: string;
   } | null>(null);
-  const [error, setError] = useState(false);
   const [notice, setNotice] = useState<{
     message: ChatMessage;
     target: ChatTarget;
   } | null>(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    let running = false;
-    let socket: WebSocket | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let rotationTimer: ReturnType<typeof setTimeout> | undefined;
-    let token = "";
-    async function connect() {
-      if (controller.signal.aborted || compact) return;
-      try {
-        const base =
-          process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
-        const response = await fetch(new URL("/v1/realtime/tickets", base), {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("ticket failed");
-        const ticket = (await response.json()) as { ticket: string };
-        if (controller.signal.aborted) return;
-        const url = new URL("/v1/ws", base);
-        url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-        url.searchParams.set("ticket", ticket.ticket);
-        const next = new WebSocket(url);
-        socket = next;
-        next.onopen = () => {
-          chatStore.attach(next);
-          setError(false);
-          window.dispatchEvent(new Event("chat-connected"));
-          rotationTimer = setTimeout(
-            () => next.close(4000, "rotation"),
-            285000,
-          );
-        };
-        next.onmessage = (event) => {
-          try {
-            chatStore.receive(
-              JSON.parse(String(event.data)) as Record<string, unknown>,
-              next,
-            );
-          } catch {}
-        };
-        next.onclose = () => {
-          chatStore.detach(next);
-          clearTimeout(rotationTimer);
-          if (!controller.signal.aborted) {
-            setError(true);
-            retryTimer = setTimeout(
-              () => void connect(),
-              2000 + Math.random() * 1000,
-            );
-          }
-        };
-      } catch {
-        if (!controller.signal.aborted) {
-          setError(true);
-          retryTimer = setTimeout(() => void connect(), 4000);
-        }
-      }
-    }
-    async function update() {
-      if (running) return;
-      running = true;
-      try {
-        await accountRequest("/heartbeat", {
-          method: "POST",
-          signal: controller.signal,
-        });
-      } catch {
-        if (!controller.signal.aborted) setError(true);
-      } finally {
-        running = false;
-      }
-    }
-    void accountRequest<{
-      profile: Profile;
-      credentials: { accessToken: string };
-    }>("", { signal: controller.signal })
-      .then((account) => {
-        if (controller.signal.aborted) return;
-        chatStore.identify(account.profile.id);
-        token = account.credentials.accessToken;
-        void connect();
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setError(true);
-      });
-    void update();
-    const interval = setInterval(() => void update(), 15000);
-    window.addEventListener("online", update);
-    return () => {
-      controller.abort();
-      clearInterval(interval);
-      clearTimeout(retryTimer);
-      clearTimeout(rotationTimer);
-      if (socket) {
-        chatStore.detach(socket);
-        socket.close(1000, "page left");
-      }
-      window.removeEventListener("online", update);
-    };
-  }, [compact]);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     function incoming(event: Event) {
@@ -159,7 +57,7 @@ export function AccountPresence({ compact = false }: { compact?: boolean }) {
   }, []);
   return (
     <div className={compact ? "account-presence-compact" : "account-presence"}>
-      {error ? (
+      {session.nickname !== null && (session.connectionState === "degraded" || session.connectionState === "offline") ? (
         <p role="status" className="form-error">
           Koneksi akun terputus. Menghubungkan kembali…
         </p>
