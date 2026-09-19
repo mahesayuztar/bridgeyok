@@ -259,7 +259,7 @@ Standardisasi loading/empty/error mengikuti pola satu area status + relevant act
 
 ## Work Items
 
-Semua acceptance di bawah adalah **belum dikerjakan**. Setiap item dapat menjadi issue/PR. Pisahkan commit sesuai boundary; pesan hanya `+ action: description`, tanpa attribution trailer.
+Acceptance yang belum dicentang masih belum dikerjakan. Setiap item dapat menjadi issue/PR. Pisahkan commit sesuai boundary; pesan hanya `+ action: description`, tanpa attribution trailer.
 
 ### P6-01 — Kunci regression baseline dan session contract
 
@@ -267,10 +267,24 @@ Tujuan: membuat perubahan ownership dapat dibandingkan dengan behaviour existing
 Scope: characterization tests untuk route, socket/frame count, restore dan lifecycle; dokumentasikan route/ownership decision ini pada roadmap.
 Dependency: tidak ada. Parallelization: fixture UX P6-05–07 boleh disiapkan setelah contract agreed; tidak perlu menunggu refactor selesai untuk audit fixtures.
 
-- [ ] Test existing memperlihatkan table → workspace menyebabkan close/reopen/GET; pisahkan HMR socket dari `/v1/ws`.
-- [ ] Fixture deterministic mencakup auction, opening lead, middle trick, Dummy/defender, scored, match active/complete.
-- [ ] Rekam identity/revision/seq/pending dan connection count tanpa credential atau hidden hand dalam output umum.
-- [ ] Tetapkan baseline raw-frame privacy, leave, takeover, claim/undo, replay dan chat yang wajib tetap lulus.
+- [x] Test existing memperlihatkan table → workspace menyebabkan close/reopen/GET; pisahkan HMR socket dari `/v1/ws`.
+- [x] Fixture deterministic mencakup auction, opening lead, middle trick, Dummy/defender, scored, match active/complete.
+- [x] Rekam identity/revision/seq/pending dan connection count tanpa credential atau hidden hand dalam output umum.
+- [x] Tetapkan baseline raw-frame privacy, leave, takeover, claim/undo, replay dan chat yang wajib tetap lulus.
+
+Evidence P6-01, 19 September 2026: commit `e600153`. Characterization browser pada PostgreSQL 17 disposable membuktikan table → Friends → Settings → table menghasilkan 2 app socket open, 2 close, 1 GET table, 1 `table.resume`, dan 1 `table.takeover`; refresh menghasilkan 1 open, 1 GET, 1 resume, dan 1 takeover. Close saat document reload tidak dipakai sebagai assertion karena Playwright tidak menjamin event close dari document lama. Instrumentasi hanya menerima URL dengan pathname tepat `/v1/ws`; HMR/Dev WebSocket dihitung terpisah. Artifact attachment hanya memuat route/table/request identity, nama frame, revision, seq, pending count, dan connection counters—tidak memuat ticket, token, payload projection, hand, atau raw frame.
+
+Fixture test-only recipient-scoped mengunci auction, opening lead, middle trick untuk Dummy dan defender, board scored, serta Team Match ACTIVE/COMPLETE. `normalizeLiveTableProjection` menerima semua fixture; live fixture menolak `fullDeal`, defender tidak menerima `dummyHand`, dan scored fixture menyediakan 52 kartu hanya pada state yang berhak.
+
+Contract regression wajib selama P6-02–09:
+
+- `phase6-session-baseline.spec.ts` untuk route/socket/GET/restore/request identity dan pending convergence.
+- `phase3.spec.ts` four-account dan bot-consensus untuk raw-frame privacy, takeover, claim, dan undo.
+- `table-leave.spec.ts` untuk explicit leave, recovery marker, dan sinkronisasi tab.
+- `phase3.spec.ts` completed-board replay serta `board-replay-browser.spec.ts` untuk replay authorization/interaction.
+- `chat.spec.ts` untuk private/table chat, recipient scope, reconnect/history, dan gameplay geometry.
+
+Keputusan route/ownership tetap: URL existing dipertahankan; `(app)` menjadi shared authenticated lifetime boundary, `GameSessionProvider` menjadi satu owner account/table realtime, dan `AppShell` menjaga satu table mount di luar workspace route slot. P6-01 hanya mengunci current-state contract dan tidak memindahkan ownership tersebut lebih awal.
 
 ### P6-02 — Satukan GameSession dan realtime owner
 

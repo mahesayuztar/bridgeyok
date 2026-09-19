@@ -1004,7 +1004,7 @@ Team Match is now enabled from Play. Authenticated `/match` and `/match/[matchId
 Playwright eight-account, two-room happy path PASS with create/ready/start/passed-out/finish/final reload and real pointer interaction. Setup, table and result geometry checked at 320/390/768/1024/1440/1920 px with screenshots. Web unit tests (67), TypeScript, contract tests, production build PASS; ESLint zero errors, two pre-existing aria-description warnings. AI/VS Robot remains unchanged. Closed-beta operational and independent bridge review gates remain in root PLAN.md.
 
 
-## Phase 6 — Persistent Table & Human-Centered Application UX — PLANNED (19 September 2026)
+## Phase 6 — Persistent Table & Human-Centered Application UX — IN PROGRESS (19 September 2026)
 
 Lanjutan frontend mengikuti [plan Phase 6](../../docs/product/phase6-persistent-table-ux.md), dengan [audit source/browser](../../docs/product/phase6-audit.md). Dokumen itu menjadi detail work item P6-01–09; bagian GUX/ENG dan evidence historis di atas tetap dipertahankan.
 
@@ -1012,7 +1012,7 @@ Audit menemukan route table berada di luar shared account layout, hook session d
 
 Keputusan lanjutan: shared authenticated layout dengan persistent GameSessionProvider/AppShell, satu realtime owner dan satu mounted table di luar workspace route slot. URL existing dipertahankan; Friends/Settings/History/Match menjadi secondary workspace. Tidak mengulang canonical card, reducer/optimistic projection, engine, DDS atau Team Match. Desktop/mobile memakai composition yang berbeda dengan lifetime session sama.
 
-- [ ] P6-01: baseline counters dan contract lifetime.
+- [x] P6-01: baseline counters dan contract lifetime. Characterization browser mengunci delta navigation 2 open/2 close/1 GET/1 resume/1 takeover, restore 1 open/1 GET/1 resume/1 takeover, metadata frame aman, fixture recipient-scoped, dan regression suite wajib; commit `e600153`.
 - [ ] P6-02: session/realtime owner shared, account/chat tetap berfungsi.
 - [ ] P6-03: persistent shell, route activation, Back/Forward/refresh dan workspace state.
 - [ ] P6-04: navigation/More/utilities/copy tanpa placeholder primary destination.
@@ -1022,4 +1022,4 @@ Keputusan lanjutan: shared authenticated layout dengan persistent GameSessionPro
 - [ ] P6-08: accessibility, zoom, responsive dan real pointer/touch gate.
 - [ ] P6-09: persistence/privacy/gameplay regression dan evidence handoff.
 
-Ini plan, bukan checkpoint implementation PASS. Browser audit terbatas dijelaskan di evidence; seluruh validation matrix dan Objective of Done Phase 6 masih pending.
+P6-01 PASS; P6-02–09 dan seluruh Objective of Done Phase 6 masih pending. Browser audit awal tetap dijelaskan di evidence.

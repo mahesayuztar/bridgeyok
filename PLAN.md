@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending; Phase 6 direncanakan
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending; Phase 6 berjalan dengan P6-01 PASS
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1341,7 +1341,7 @@ Initial domain evidence: API race suite, Go vet, and API lint (0 issues) pass; d
 
 Validation: isolated PostgreSQL 17 migration up/down/up PASS; uncached database integration with race detector PASS (35.144s), final targeted match suite PASS (11.272s), realtime integration PASS (1.205s), API race suite, Go vet, lint, and migration validation PASS. Scenarios cover eight concurrent starts (one generated set), 16 simultaneous/retried finalizations (one comparison), readiness/revision fencing, independent two-board progress, nonzero signed IMP totals, passed-out results, pre-final undo, reopened repository recovery, archive redelivery, missing-binding rejection, partial-start/failed-comparison rollback, immutable results, cross-room access, and RLS/readiness. This is database/repository evidence; eight-client lifecycle/actor publication and browser validation remain pending. No production migration or deployment was performed. Details and rollback limits: `docs/operations/phase5-postgres.md`.
 
-### Phase 6 — Persistent Table & Human-Centered Application UX — PLANNED
+### Phase 6 — Persistent Table & Human-Centered Application UX — IN PROGRESS
 
 **Objective:** table menjadi persistent application session. Friends, Settings, History dan informasi match mengganti workspace tanpa leave, socket restart, subscription baru, atau full game-state refetch ketika state lokal masih valid.
 
@@ -1350,6 +1350,8 @@ Plan engineering/product lengkap: [Phase 6 implementation plan](docs/product/pha
 **Scope:** shared AppShell/GameSession ownership; workspace routing dan Back/Forward; satu realtime owner untuk table/account/chat; icon-first desktop dan compact mobile navigation; history/score context, readability, accessibility, responsive geometry dan safe background interactions. Reuse reducer, canonical cards, replay, Friends/chat, dan Team Match existing. Tidak mengulang GUX/ENG, mengubah core bridge rules, atau membuat protokol/state framework baru.
 
 **Urutan work:** P6-01 baseline → P6-02 session/realtime owner → P6-03 persistent routing → P6-04 navigation; P6-05 background gameplay/readability, P6-06 auction/trick reader, dan P6-07 History/score dapat dikerjakan pada boundary terpisah → P6-08 accessibility/responsive gate → P6-09 regression evidence. Ownership refactor tidak dirilis tanpa safety background dan regression gates.
+
+**P6-01 checkpoint — PASS, 19 September 2026:** commit `e600153` menambah deterministic recipient-scoped fixtures untuk auction/opening lead/middle trick Dummy dan defender/scored/match ACTIVE-COMPLETE, unit privacy contract, dan browser characterization dengan metadata frame ter-redaksi. PostgreSQL 17 disposable membuktikan navigation baseline 2 app socket open/2 close/1 table GET/1 resume/1 takeover dan restore 1 open/1 GET/1 resume/1 takeover; HMR dipisahkan berdasarkan pathname tepat `/v1/ws`. Raw-frame privacy, leave, takeover, claim/undo, replay, dan chat ditetapkan sebagai regression suite wajib. Keputusan route tetap URL existing + shared `(app)` lifetime boundary + satu GameSession owner; implementasinya dimulai P6-02/P6-03.
 
 **Objective of Done ringkas** (acceptance terperinci dan dependencies ada di plan Phase 6):
 
@@ -1360,7 +1362,7 @@ Plan engineering/product lengkap: [Phase 6 implementation plan](docs/product/pha
 - [ ] Timeout/klik workspace tidak memajukan board; Next board eksplisit. Hidden table tidak menangkap input workspace.
 - [ ] Desktop/tablet/320–390 px, zoom, keyboard, pointer/touch, loading/error/reconnect dan existing gameplay regression terverifikasi dengan artifacts.
 
-Status: **planning only**, belum ada implementasi Phase 6. Pending release gates Phase 4/5 tetap terpisah dan tidak dianggap selesai oleh penambahan plan ini.
+Status: **P6-01 PASS; P6-02–09 pending**. Pending release gates Phase 4/5 tetap terpisah dan tidak dianggap selesai oleh checkpoint ini.
 
 ### Deferred outside this roadmap
 
