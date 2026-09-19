@@ -56,3 +56,9 @@ Subsequent live checks returned Vercel FUNCTION_INVOCATION_FAILED (500) from API
 The frontend route is an intentional same-origin account proxy for cookie handling. The API environment screenshot includes a trailing slash. Replaced string concatenation in both the proxy and server account lookup with URL construction, avoiding `//v1/account`. A local Next.js HTTP smoke test with an upstream stub verifies POST method, request body, query and upstream 401 are preserved with a trailing-slash base URL.
 
 The strict 32 KB minimum added in the deployment follow-up was also revised: a valid legacy 8 KB setting is now upgraded automatically, rather than aborting startup. The supplied API runtime logs confirm the strict check caused the production incident. Fix 3d20bb1 restores compatibility; alternatively, set REALTIME_READ_LIMIT_BYTES=32768 in the API project and redeploy the current revision. Font visibility warnings are unrelated to the API invocation failure. No production deploy was performed by the assistant.
+
+## Schema incident follow-up — 20 September 2026
+
+Production API startup failed with `database schema is not migrated` after application revisions requiring the team-match schema were deployed while production remained at migration 00009. `make migrate-status` confirmed that only `00010_team_matches.sql` and `00011_match_lifecycle.sql` were pending. Both forward migrations were applied through the configured production migration URL, advancing Goose to version 11. Production `/health/live` and `/health/ready` immediately returned 200 afterward.
+
+Future API promotions that introduce migrations must run `make migrate-status`, apply `make migrate-up`, and confirm `/health/ready` before the web release is treated as available. The API readiness guard must remain strict; bypassing it would allow requests to reach code whose required schema is absent.
