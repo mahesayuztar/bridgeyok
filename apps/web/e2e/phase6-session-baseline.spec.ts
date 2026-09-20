@@ -143,10 +143,60 @@ test("table to workspace navigation preserves the shared game session", async ({
   await expect.poll(() => telemetry.pendingRequestIds.size).toBe(0);
 
   const tablePath = new URL(page.url()).pathname;
+  const tableMountId = await page.locator(".persistent-table-workspace").evaluate(element => {
+    const mountId = crypto.randomUUID();
+    element.setAttribute("data-test-mount-id", mountId);
+    return mountId;
+  });
+
+  const switchBaseline = marker(telemetry);
+  const failedSwitchTableId = "00000000-0000-4000-8000-000000000001";
+  await page.route(`**/v1/tables/${failedSwitchTableId}`, async route => {
+    const currentTableUrl = new URL(route.request().url());
+    currentTableUrl.pathname = `/v1/tables/${tablePath.split("/").at(-1)}`;
+    const response = await route.fetch({ url: currentTableUrl.href });
+    const projection = await response.json() as Record<string, unknown>;
+    await route.fulfill({ response, json: { ...projection, tableId: failedSwitchTableId } });
+  });
+  await page.route(`**/v1/tables/${tablePath.split("/").at(-1)}/leave`, route => route.fulfill({
+    status: 503,
+    contentType: "application/problem+json",
+    body: JSON.stringify({ code: "SERVICE_UNAVAILABLE", retryable: true }),
+  }));
+  await softNavigate(page, `/table/${failedSwitchTableId}`);
+  await expect(page.getByRole("heading", { name: "Pindah meja?" })).toBeVisible();
+  await page.getByRole("button", { name: "Tinggalkan dan pindah" }).click();
+  await expect(page.locator(".workspace-switch .issue-notice")).toContainText("Layanan meja sedang bermasalah");
+  await expect.poll(() => delta(telemetry, switchBaseline).appSocketOpenCount).toBe(0);
+  await expect.poll(() => delta(telemetry, switchBaseline).appSocketCloseCount).toBe(0);
+  expect(delta(telemetry, switchBaseline).subscribeCount).toBe(0);
+  expect(delta(telemetry, switchBaseline).resumeCount).toBe(0);
+  expect(delta(telemetry, switchBaseline).takeoverCount).toBe(0);
+  await page.unrouteAll({ behavior: "wait" });
+  await page.getByRole("button", { name: "Tetap di meja ini" }).click();
+  await expect(page).toHaveURL(new RegExp(`${tablePath}$`));
+  await waitForTableConnection(page);
+
+  await softNavigate(page, "/friends");
+  await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Tutup workspace dan kembali ke meja" }).click();
+  await expect(page).toHaveURL(new RegExp(`${tablePath}$`));
+  await waitForTableConnection(page);
+
   const navigationBaseline = marker(telemetry);
   await softNavigate(page, "/friends");
   await expect(page).toHaveURL(/\/friends$/);
   await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
+  await page.getByLabel("Cari pemain").fill("state tetap");
+  await page.getByLabel("Friends saja").uncheck();
+  await expect(page.locator(`[data-test-mount-id="${tableMountId}"]`)).toBeAttached();
+  await expect(page.locator(`[data-test-mount-id="${tableMountId}"]`)).toBeHidden();
+  await testInfo.attach("friends-workspace-desktop", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.getByRole("button", { name: "Tutup workspace dan kembali ke meja" })).toBeVisible();
+  await testInfo.attach("friends-workspace-mobile", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await expect.poll(() => delta(telemetry, navigationBaseline).appSocketOpenCount).toBe(0);
   await expect.poll(() => delta(telemetry, navigationBaseline).appSocketCloseCount).toBe(0);
 
@@ -154,6 +204,17 @@ test("table to workspace navigation preserves the shared game session", async ({
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
   await page.getByLabel("Nama di meja").fill("P6 Updated");
+  await softNavigate(page, "/history");
+  await expect(page.getByRole("heading", { name: "History", exact: true })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Nama di meja")).toHaveValue("P6 Updated");
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Cari pemain")).toHaveValue("state tetap");
+  await expect(page.getByLabel("Friends saja")).not.toBeChecked();
+  await page.goForward();
+  await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Simpan profile" }).click();
   await expect(page.getByRole("status")).toContainText("Profile tersimpan.");
   expect(delta(telemetry, navigationBaseline).appSocketOpenCount).toBe(0);
@@ -162,6 +223,7 @@ test("table to workspace navigation preserves the shared game session", async ({
   await softNavigate(page, tablePath);
   await expect(page).toHaveURL(/\/table\//);
   await waitForTableConnection(page);
+  await expect(page.locator(`[data-test-mount-id="${tableMountId}"]`)).toBeVisible();
   await expect.poll(() => delta(telemetry, navigationBaseline)).toEqual({
     appSocketOpenCount: 0,
     appSocketCloseCount: 0,
@@ -173,9 +235,12 @@ test("table to workspace navigation preserves the shared game session", async ({
   await expect.poll(() => telemetry.pendingRequestIds.size).toBe(0);
   const navigationDelta = delta(telemetry, navigationBaseline);
 
+  await softNavigate(page, "/settings");
+  await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
   const restoreBaseline = marker(telemetry);
   await page.reload();
-  await waitForTableConnection(page);
+  await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
+  await expect.poll(() => page.locator(".persistent-table-workspace").count()).toBe(1);
   await expect.poll(() => delta(telemetry, restoreBaseline)).toEqual({
     appSocketOpenCount: 1,
     appSocketCloseCount: 0,
@@ -186,6 +251,9 @@ test("table to workspace navigation preserves the shared game session", async ({
   });
   await expect.poll(() => telemetry.pendingRequestIds.size).toBe(0);
   const restoreDelta = delta(telemetry, restoreBaseline);
+
+  await softNavigate(page, tablePath);
+  await waitForTableConnection(page);
 
   const leaveBaseline = marker(telemetry);
   await page.getByRole("button", { name: "Keluar", exact: true }).click();

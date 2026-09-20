@@ -107,6 +107,7 @@ test("table chat preserves gameplay geometry and pointer actions across viewport
   await signup(page, name);
   await page.goto("/lobby");
   await page.getByRole("button", { name: "Buat meja", exact: true }).click();
+  await expect(page).toHaveURL(/\/table\//);
   await expect(page.locator(".connection-status")).toContainText("Terhubung");
   await page.getByRole("button", { name: "Buka menu kursi kosong N" }).click();
   await page.getByRole("button", { name: "Duduk", exact: true }).click();
@@ -272,6 +273,7 @@ test("social toast actions and table chat stay scoped to authorized recipients",
   ).toBeVisible();
   await alice.goto("/lobby");
   await alice.getByRole("button", { name: "Buat meja", exact: true }).click();
+  await expect(alice).toHaveURL(/\/table\//);
   await expect(alice.locator(".connection-status")).toContainText("Terhubung");
   const tableURL = alice.url();
   const tableId = tableURL.split("/").at(-1)!;

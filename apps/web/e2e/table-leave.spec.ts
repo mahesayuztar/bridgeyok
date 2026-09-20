@@ -37,6 +37,7 @@ test("active navbar stays usable across viewport sizes and confirms leaving", as
   await page.getByRole("link", { name: /Casual Game/ }).click();
   await expect(page).toHaveURL(/\/lobby/);
   await page.getByRole("button", { name: "Buat meja" }).click();
+  await expect(page).toHaveURL(/\/table\//);
   await expect(page.locator(".connection-status")).toContainText("Terhubung");
   await page.getByRole("button", { name: "Buka menu kursi kosong N" }).click();
   await page.getByRole("button", { name: "Duduk", exact: true }).click();
