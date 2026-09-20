@@ -26,6 +26,11 @@ UPDATE bridgeyok.guest_sessions
 SET status = 'EXPIRED',
     last_seen_at = $1
 WHERE status = 'ACTIVE'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM bridgeyok.users
+      WHERE users.session_id = guest_sessions.id
+  )
   AND id IN (
       SELECT session_id
       FROM bridgeyok.table_participants

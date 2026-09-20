@@ -33,6 +33,7 @@ type commandTestEnvironment struct {
 	processor    *table.CommandProcessor
 	sessions     []identity.Session
 	tableID      string
+	inviteCode   string
 	logs         *lockedBuffer
 }
 
@@ -284,8 +285,33 @@ func TestCommandRepositoryPersistsOwnerTransfer(t *testing.T) {
 	}
 }
 
-func TestCommandRepositoryExpiresTableSessionsAtomically(t *testing.T) {
+func TestCommandRepositoryExpiresOnlyGuestTableSessionsAtomically(t *testing.T) {
 	environment := newCommandTestEnvironment(t, 2)
+	identityService, err := identity.NewService(environment.postgres, []byte(strings.Repeat("command-identity-pepper", 2)), rand.Reader, time.Now)
+	if err != nil {
+		t.Fatalf("identity.NewService() error = %v", err)
+	}
+	account, err := identityService.Register(environment.ctx, "expiry_"+strings.ReplaceAll(uuid.NewString()[:8], "-", ""), "correct horse bridge", "Account Player", "spade")
+	if err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		if _, cleanupErr := environment.postgres.Pool().Exec(cleanupCtx, "DELETE FROM bridgeyok.users WHERE id = $1", account.Profile.ID); cleanupErr != nil {
+			t.Errorf("cleanup account: %v", cleanupErr)
+		}
+		if _, cleanupErr := environment.postgres.Pool().Exec(cleanupCtx, "DELETE FROM bridgeyok.guest_sessions WHERE id = $1", account.SessionID); cleanupErr != nil {
+			t.Errorf("cleanup account session: %v", cleanupErr)
+		}
+	})
+	accountSession, err := identityService.Authenticate(environment.ctx, account.Token)
+	if err != nil {
+		t.Fatalf("Authenticate() before expiry error = %v", err)
+	}
+	if _, err := environment.tableService.Join(environment.ctx, environment.inviteCode, accountSession); err != nil {
+		t.Fatalf("Join() account error = %v", err)
+	}
 	aggregate, err := environment.postgres.FindTable(environment.ctx, environment.tableID)
 	if err != nil {
 		t.Fatalf("FindTable() error = %v", err)
@@ -302,6 +328,13 @@ func TestCommandRepositoryExpiresTableSessionsAtomically(t *testing.T) {
 		if _, err := environment.postgres.FindActiveSession(environment.ctx, session.ID, time.Now().UTC()); !errors.Is(err, identity.ErrSessionInactive) {
 			t.Fatalf("FindActiveSession(%s) error = %v, want %v", session.ID, err, identity.ErrSessionInactive)
 		}
+	}
+	activeAccountSession, err := identityService.Authenticate(environment.ctx, account.Token)
+	if err != nil {
+		t.Fatalf("Authenticate() account after table expiry error = %v", err)
+	}
+	if _, _, err := identityService.IssueTicket(environment.ctx, activeAccountSession); err != nil {
+		t.Fatalf("IssueTicket() account after table expiry error = %v", err)
 	}
 }
 
@@ -627,7 +660,7 @@ func newCommandTestEnvironment(t *testing.T, participantCount int) commandTestEn
 	}
 	return commandTestEnvironment{
 		ctx: ctx, postgres: postgres, tableService: tableService, processor: processor,
-		sessions: sessions, tableID: created.Projection.TableID, logs: logs,
+		sessions: sessions, tableID: created.Projection.TableID, inviteCode: created.InviteCode, logs: logs,
 	}
 }
 
