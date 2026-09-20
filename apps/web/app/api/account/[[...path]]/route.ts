@@ -3,6 +3,12 @@ import { NextResponse } from "next/server";
 import { ACCOUNT_API_URL, ACCOUNT_COOKIE } from "../../../account-server";
 import type { AccountLogin } from "../../../account-types";
 
+function loggedOutResponse() {
+  const response = new NextResponse(null, { status: 204 });
+  response.cookies.delete(ACCOUNT_COOKIE);
+  return response;
+}
+
 async function handle(request: Request, context: { params: Promise<{ path?: string[] }> }) {
   const path = (await context.params).path?.join("/") ?? "";
   const allowed = /^(signup|login|logout|heartbeat|profile|users|invitations|chat|matches|matches\/[a-f0-9-]+(?:\/(?:ready|start|cancel))?|users\/[a-f0-9-]+\/follow|tables\/[a-f0-9-]+\/(participants|invites))?$/;
@@ -11,6 +17,8 @@ async function handle(request: Request, context: { params: Promise<{ path?: stri
   const cookieStore = await cookies();
   const token = cookieStore.get(ACCOUNT_COOKIE)?.value;
   const isLogin = path === "signup" || path === "login";
+  const isLogout = path === "logout";
+  if (isLogout && !token) return loggedOutResponse();
   if (!isLogin && !token) return NextResponse.json({ code: "INVALID_CREDENTIAL" }, { status: 401 });
   try {
     const body = request.method === "GET" ? undefined : await request.text();
@@ -20,8 +28,8 @@ async function handle(request: Request, context: { params: Promise<{ path?: stri
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       ...(body === undefined ? {} : { body }), cache: "no-store", signal: AbortSignal.timeout(8000)
     });
+    if (isLogout) return loggedOutResponse();
     if (!response.ok) return new Response(await response.text(), { status: response.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
-    if (path === "logout") cookieStore.delete(ACCOUNT_COOKIE);
     if (response.status === 204) return new Response(null, { status: 204 });
     if (isLogin || path === "") {
       const account = await response.json() as AccountLogin;
@@ -30,6 +38,7 @@ async function handle(request: Request, context: { params: Promise<{ path?: stri
     }
     return new Response(await response.text(), { headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" } });
   } catch {
+    if (isLogout) return loggedOutResponse();
     return NextResponse.json({ code: "SERVICE_UNAVAILABLE" }, { status: 503 });
   }
 }
