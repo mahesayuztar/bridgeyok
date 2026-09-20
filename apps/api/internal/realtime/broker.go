@@ -69,6 +69,18 @@ func (broker *broker) unsubscribe(client *connection) {
 	client.setSubscription("", "")
 }
 
+func (broker *broker) unsubscribeTable(client *connection, tableID string) bool {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	currentTableID, _ := client.subscriptionInfo()
+	if currentTableID != tableID {
+		return false
+	}
+	broker.removeLocked(client, tableID)
+	client.setSubscription("", "")
+	return true
+}
+
 func (broker *broker) publishResult(ctx context.Context, result table.CommandResult) error {
 	if result.Duplicate || result.Outcome.Status != table.CommandStatusAccepted || len(result.Events) == 0 {
 		return nil

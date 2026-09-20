@@ -287,7 +287,7 @@ func (server *Server) TableOfflineSince(tableID string) (time.Time, bool) {
 	return server.broker.tableOfflineSince(tableID)
 }
 
-// TableExpired publishes the terminal event and closes every connection backed by an invalidated participant session.
+// TableExpired publishes the terminal event, invalidates guests, and detaches registered accounts from the table.
 func (server *Server) TableExpired(ctx context.Context, result table.CommandResult) {
 	if err := server.broker.publishResult(ctx, result); err != nil {
 		server.options.Logger.ErrorContext(ctx, "realtime_lifecycle_publish_failed", "table_id", result.Aggregate.ID, "result_code", "PROJECTION_ERROR")
@@ -307,6 +307,12 @@ func (server *Server) TableExpired(ctx context.Context, result table.CommandResu
 	}
 	server.mutex.Unlock()
 	for _, connection := range connections {
+		if len(connection.session.AccountTokenHash) > 0 {
+			if server.broker.unsubscribeTable(connection, result.Aggregate.ID) {
+				connection.sendControl("table.access_revoked", "", result.Aggregate.ID, map[string]any{})
+			}
+			continue
+		}
 		connection.sendErrorAndClose(ClientEnvelope{}, "SESSION_INACTIVE", false, websocket.StatusPolicyViolation, "session inactive")
 	}
 }

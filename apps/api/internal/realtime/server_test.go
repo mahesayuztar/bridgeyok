@@ -238,10 +238,19 @@ func TestServerLogsDoNotExposeTicketOrGuestIdentity(t *testing.T) {
 	}
 }
 
-func TestServerTableExpiryInvalidatesEveryParticipantConnection(t *testing.T) {
+func TestServerTableExpiryPreservesAccountConnections(t *testing.T) {
 	t.Parallel()
 
 	aggregate := realtimeAggregate(t)
+	guest := table.Participant{
+		ID: "418e80c2-574e-45e9-bad9-a71267c1f69c", SessionID: "944d1d7b-425f-454f-82aa-dae40e000760",
+		Nickname: "Guest", Role: table.RoleParticipant, JoinedAt: time.Now().UTC(),
+	}
+	joined, domainError := table.Decide(aggregate, table.Command{Name: table.CommandJoinTable, Participant: &guest})
+	if domainError != nil {
+		t.Fatalf("join setup error = %v", domainError)
+	}
+	aggregate = joined.NextState
 	decision, domainError := table.Decide(aggregate, table.Command{
 		Name: table.CommandExpireTable, SessionID: aggregate.OwnerSessionID, OccurredAt: time.Now().UTC(),
 	})
@@ -258,13 +267,27 @@ func TestServerTableExpiryInvalidatesEveryParticipantConnection(t *testing.T) {
 	}
 	server.broker = newBroker(logger, time.Now)
 	t.Cleanup(server.broker.drain)
-	subscribed := projectedConnection(server, realtimeSessionID)
-	idle := projectedConnection(server, realtimeSessionID)
-	server.connections[subscribed] = struct{}{}
-	server.connections[idle] = struct{}{}
-	server.broker.subscribe(subscribed, aggregate.ID, nil, aggregate.Participants, realtimeParticipantID)
-	presenceFrame := <-subscribed.outbound
-	subscribed.releaseQueuedBytes(len(presenceFrame.message))
+	accountSubscribed := projectedConnection(server, realtimeSessionID)
+	accountSubscribed.session.AccountTokenHash = []byte("account-token-hash")
+	accountIdle := projectedConnection(server, realtimeSessionID)
+	accountIdle.session.AccountTokenHash = []byte("account-token-hash")
+	guestSubscribed := projectedConnection(server, guest.SessionID)
+	guestIdle := projectedConnection(server, guest.SessionID)
+	for _, connection := range []*connection{accountSubscribed, accountIdle, guestSubscribed, guestIdle} {
+		server.connections[connection] = struct{}{}
+	}
+	server.broker.subscribe(accountSubscribed, aggregate.ID, nil, aggregate.Participants, realtimeParticipantID)
+	server.broker.subscribe(guestSubscribed, aggregate.ID, nil, aggregate.Participants, guest.ID)
+	for _, connection := range []*connection{accountSubscribed, guestSubscribed} {
+		for draining := true; draining; {
+			select {
+			case frame := <-connection.outbound:
+				connection.releaseQueuedBytes(len(frame.message))
+			default:
+				draining = false
+			}
+		}
+	}
 
 	server.TableExpired(t.Context(), table.CommandResult{
 		Aggregate: expired,
@@ -277,18 +300,46 @@ func TestServerTableExpiryInvalidatesEveryParticipantConnection(t *testing.T) {
 		}},
 	})
 
-	eventFrame := <-subscribed.outbound
-	subscribed.releaseQueuedBytes(len(eventFrame.message))
-	var event wireEnvelope
-	if err := json.Unmarshal(eventFrame.message, &event); err != nil || event.Kind != "event" || event.Name != "table.expired" {
-		t.Fatalf("expiry event = %+v, error = %v", event, err)
+	accountEventFrame := <-accountSubscribed.outbound
+	accountSubscribed.releaseQueuedBytes(len(accountEventFrame.message))
+	var accountEvent wireEnvelope
+	if err := json.Unmarshal(accountEventFrame.message, &accountEvent); err != nil || accountEvent.Kind != "event" || accountEvent.Name != "table.expired" {
+		t.Fatalf("account expiry event = %+v, error = %v", accountEvent, err)
 	}
-	for connectionName, connection := range map[string]*connection{"subscribed": subscribed, "idle": idle} {
-		frame := <-connection.outbound
-		connection.releaseQueuedBytes(len(frame.message))
-		var envelope wireEnvelope
-		if err := json.Unmarshal(frame.message, &envelope); err != nil || envelope.Kind != "error" || envelope.Code != "SESSION_INACTIVE" || frame.closeStatus != websocket.StatusPolicyViolation {
-			t.Fatalf("%s expiry frame = %+v/%+v, error = %v", connectionName, envelope, frame, err)
+	accountControlFrame := <-accountSubscribed.outbound
+	accountSubscribed.releaseQueuedBytes(len(accountControlFrame.message))
+	var accountControl wireEnvelope
+	if err := json.Unmarshal(accountControlFrame.message, &accountControl); err != nil || accountControl.Kind != "control" || accountControl.Name != "table.access_revoked" || accountControlFrame.closeStatus != 0 {
+		t.Fatalf("account expiry control = %+v/%+v, error = %v", accountControl, accountControlFrame, err)
+	}
+	if accountSubscribed.subscription() != "" {
+		t.Fatalf("account subscription = %q, want empty", accountSubscribed.subscription())
+	}
+	select {
+	case frame := <-accountIdle.outbound:
+		accountIdle.releaseQueuedBytes(len(frame.message))
+		t.Fatalf("idle account received expiry frame %+v", frame)
+	default:
+	}
+	for connectionName, connection := range map[string]*connection{"subscribed guest": guestSubscribed, "idle guest": guestIdle} {
+		foundExpiryEvent := connection == guestIdle
+		foundSessionError := false
+		for len(connection.outbound) > 0 {
+			frame := <-connection.outbound
+			connection.releaseQueuedBytes(len(frame.message))
+			var envelope wireEnvelope
+			if err := json.Unmarshal(frame.message, &envelope); err != nil {
+				t.Fatalf("%s expiry frame decode error = %v", connectionName, err)
+			}
+			if envelope.Kind == "event" && envelope.Name == "table.expired" {
+				foundExpiryEvent = true
+			}
+			if envelope.Kind == "error" && envelope.Code == "SESSION_INACTIVE" && frame.closeStatus == websocket.StatusPolicyViolation {
+				foundSessionError = true
+			}
+		}
+		if !foundExpiryEvent || !foundSessionError {
+			t.Fatalf("%s expiry frames missing event/error: event=%v error=%v", connectionName, foundExpiryEvent, foundSessionError)
 		}
 	}
 }
