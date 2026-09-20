@@ -31,8 +31,10 @@ import { useTurnAudio } from "./use-turn-audio";
 
 export default function BridgeTable({
   expectedTableId,
+  visible = true,
 }: {
   expectedTableId: string;
+  visible?: boolean;
 }) {
   const router = useRouter();
   const session = useTableSession();
@@ -57,6 +59,7 @@ export default function BridgeTable({
   const turnAudio = useTurnAudio(session.tableState.table);
 
   useEffect(() => {
+    if (!visible) return;
     if (session.initializing) return;
     if (session.nickname === null && session.tableState.issue === null) {
       router.replace("/");
@@ -82,11 +85,13 @@ export default function BridgeTable({
     session.recoveryState,
     session.tableState.issue,
     table?.tableId,
+    visible,
   ]);
 
   useEffect(() => {
     function handleAuctionKeyboard(event: KeyboardEvent) {
       if (
+        !visible ||
         document.querySelector("dialog[open]") !== null ||
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLSelectElement ||
@@ -113,7 +118,7 @@ export default function BridgeTable({
     }
     window.addEventListener("keydown", handleAuctionKeyboard);
     return () => window.removeEventListener("keydown", handleAuctionKeyboard);
-  }, [canSendCommand, game, sendCommand, viewerTurn]);
+  }, [canSendCommand, game, sendCommand, viewerTurn, visible]);
 
   async function returnToLobby() {
     if (table?.matchId) { router.push(`/match/${table.matchId}`); return; }

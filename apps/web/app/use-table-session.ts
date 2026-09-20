@@ -152,6 +152,7 @@ export type TableSession = {
   createTable: () => Promise<string | null>;
   joinTable: (inviteCode: string) => Promise<string | null>;
   openTable: (tableId: string) => Promise<boolean>;
+  switchTable: (tableId: string) => Promise<boolean>;
   leaveTable: () => Promise<boolean>;
   reconnect: () => void;
   resync: () => void;
@@ -773,6 +774,37 @@ function useGameSessionState(): TableSession {
     }
   }, [authenticatedRequest, beginConnection, clearTable]);
 
+  const switchTable = useCallback(async (tableId: string) => {
+    const currentTable = tableStateRef.current.table;
+    if (currentTable === null) return openTable(tableId);
+    if (currentTable.tableId === tableId) return true;
+    const requestGeneration = ++tableRequestGenerationRef.current;
+    setBusy(true);
+    try {
+      const targetTable = normalizeLiveTableProjection(await authenticatedRequest<unknown>(`/v1/tables/${encodeURIComponent(tableId)}`));
+      if (targetTable === null) {
+        throw new ApiError(issueFromServer({ code: "INVALID_TABLE_PROJECTION", source: "rest" }), "INVALID_TABLE_PROJECTION");
+      }
+      if (requestGeneration !== tableRequestGenerationRef.current || tableStateRef.current.activeTableId !== currentTable.tableId) return false;
+      if (currentTable.state !== "FINISHED") {
+        await authenticatedRequest<void>(`/v1/tables/${encodeURIComponent(currentTable.tableId)}/leave`, { method: "POST" });
+      }
+      if (requestGeneration !== tableRequestGenerationRef.current) return false;
+      clearTable("SESSION_ONLY", false);
+      writeStoredValue(browserStorage("local"), TABLE_KEY, { tableId: targetTable.tableId });
+      dispatch({ type: "enter", table: targetTable });
+      setRecoveryState("TABLE_ACTIVE");
+      beginConnection(targetTable.tableId);
+      return true;
+    } catch (error) {
+      if (requestGeneration !== tableRequestGenerationRef.current) return false;
+      dispatch({ type: "issue", issue: issueForError(error) });
+      return false;
+    } finally {
+      if (requestGeneration === tableRequestGenerationRef.current) setBusy(false);
+    }
+  }, [authenticatedRequest, beginConnection, clearTable, openTable]);
+
   const leaveTable = useCallback(async () => {
     const table = tableStateRef.current.table;
     if (table === null) {
@@ -901,6 +933,7 @@ function useGameSessionState(): TableSession {
     createTable,
     joinTable,
     openTable,
+    switchTable,
     leaveTable,
     reconnect,
     resync,

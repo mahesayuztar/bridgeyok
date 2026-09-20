@@ -10,6 +10,7 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
   const router = useRouter();
   const session = useTableSession();
   const [joinCode, setJoinCode] = useState(initialInviteCode.trim().toUpperCase());
+  const [pendingSwitch, setPendingSwitch] = useState<"create" | "join" | null>(null);
 
   useEffect(() => {
     if (!session.initializing && session.nickname === null && session.tableState.issue === null) {
@@ -20,13 +21,31 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
   }, [initialInviteCode, router, session.initializing, session.nickname, session.recoveryState, session.tableState.activeTableId, session.tableState.issue]);
 
   async function createTable() {
+    if (session.tableState.activeTableId !== null) {
+      setPendingSwitch("create");
+      return;
+    }
     const tableId = await session.createTable();
     if (tableId) router.push(`/table/${tableId}`);
   }
 
   async function submitJoin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (session.tableState.activeTableId !== null) {
+      setPendingSwitch("join");
+      return;
+    }
     const tableId = await session.joinTable(joinCode);
+    if (tableId) router.push(`/table/${tableId}`);
+  }
+
+  async function confirmSwitch() {
+    const requestedAction = pendingSwitch;
+    if (requestedAction === null) return;
+    const left = await session.leaveTable();
+    if (!left) return;
+    setPendingSwitch(null);
+    const tableId = requestedAction === "create" ? await session.createTable() : await session.joinTable(joinCode);
     if (tableId) router.push(`/table/${tableId}`);
   }
 
@@ -66,6 +85,16 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
               <Link className="secondary-button link-button" href={`/table/${session.tableState.table.tableId}`}>Lanjutkan meja</Link>
             </div>
           )}
+          {pendingSwitch === null ? null : (
+            <section className="lobby-switch" aria-labelledby="lobby-switch-title">
+              <h2 id="lobby-switch-title">Tinggalkan meja aktif?</h2>
+              <p>{pendingSwitch === "join" ? "Untuk masuk ke meja undangan, kamu harus meninggalkan meja yang sedang aktif lebih dulu." : "Untuk membuat meja baru, kamu harus meninggalkan meja yang sedang aktif lebih dulu."}</p>
+              <div className="workspace-switch-actions">
+                <button className="primary-button" type="button" disabled={session.busy} onClick={() => void confirmSwitch()}>{session.busy ? "Memeriksa…" : "Tinggalkan dan lanjutkan"}</button>
+                <button type="button" disabled={session.busy} onClick={() => setPendingSwitch(null)}>Batal</button>
+              </div>
+            </section>
+          )}
           <div className="lobby-actions">
             <div className="lobby-option">
               <span className="option-number">01</span>
@@ -93,7 +122,8 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
                 } else if (action === "signInAgain") {
                   void logout();
                 } else if (action === "retry" && joinCode.length > 0) {
-                  void session.joinTable(joinCode);
+                  if (session.tableState.activeTableId !== null) void confirmSwitch();
+                  else void session.joinTable(joinCode);
                 }
               }}
             />

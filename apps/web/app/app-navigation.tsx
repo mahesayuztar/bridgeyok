@@ -8,7 +8,7 @@ import type { Profile } from "./account-types";
 
 const navigation = [
   { label: "Friends", icon: "♧", href: "/friends" },
-  { label: "History", icon: "◷", href: null },
+  { label: "History", icon: "◷", href: "/history" },
   { label: "Play", icon: "♠", href: "/play" },
   { label: "Deals", icon: "▤", href: null },
   { label: "Settings", icon: "⚙", href: "/settings" }

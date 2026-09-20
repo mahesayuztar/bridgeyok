@@ -4608,6 +4608,15 @@ button.physical-card.is-dragging {
 .nav-profile { display: flex; gap: .65rem; align-items: center; margin-top: auto; text-decoration: none; min-width: 0; }
 .nav-profile > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-content { min-width: 0; }
+.persistent-table-workspace { min-width: 0; }
+.secondary-workspace { position: relative; min-width: 0; min-height: 100svh; }
+.workspace-close { position: fixed; top: 1rem; right: 1rem; z-index: 30; width: 2.75rem; height: 2.75rem; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); background: var(--background); font-size: 1.5rem; line-height: 1; }
+.workspace-switch, .workspace-route-state { width: min(38rem, calc(100% - 2rem)); margin: 0 auto; padding: clamp(4rem, 10vw, 8rem) 0 2rem; }
+.workspace-switch h1 { margin: 0 0 1rem; font-size: clamp(1.75rem, 4vw, 2.5rem); }
+.workspace-switch p, .lobby-switch p { color: var(--muted); line-height: 1.6; }
+.workspace-switch-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+.lobby-switch { padding: 1rem 0 1.5rem; border-bottom: 1px solid var(--line); }
+.lobby-switch h2 { margin: 0; font-size: 1.2rem; }
 .account-main { padding: clamp(1.25rem, 4vw, 4rem); max-width: 80rem; margin: auto; }
 .account-main h1 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.15; margin: .75rem 0; overflow-wrap: anywhere; }
 .account-main > p:not(.eyebrow) { color: var(--muted); }
@@ -4648,6 +4657,7 @@ button.physical-card.is-dragging {
   .welcome-cards { justify-content: flex-start; }
   .welcome-cards .physical-card { width: clamp(3.2rem, 16vw, 5rem); }
   .account-shell { padding-left: 0; padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+  .workspace-close { top: .75rem; right: .75rem; }
   .account-navigation { inset: auto 0 0; width: auto; padding: .3rem .2rem calc(.3rem + env(safe-area-inset-bottom)); border: 0; border-top: 1px solid var(--line); gap: 0; }
   .account-navigation > .wordmark, .account-navigation > .nav-profile { display: none; }
   .account-navigation nav { flex-direction: row; gap: 0; }

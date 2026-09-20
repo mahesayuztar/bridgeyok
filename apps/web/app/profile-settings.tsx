@@ -5,19 +5,38 @@ import { useRouter } from "next/navigation";
 import { accountRequest, avatars, type Avatar, type Profile } from "./account-types";
 import { ProfileAvatar } from "./profile-avatar";
 import { useTableSession } from "./use-table-session";
+import { useWorkspacePresentation } from "./workspace-state";
 
 export function ProfileSettings({ profile }: { profile: Profile }) {
   const router = useRouter();
   const session = useTableSession();
-  const [name, setName] = useState(profile.displayName);
-  const [avatar, setAvatar] = useState<Avatar>(profile.avatar);
+  const workspace = useWorkspacePresentation();
+  const savedDraft = workspace?.settingsDraft?.profileId === profile.id ? workspace.settingsDraft : null;
+  const [localName, setLocalName] = useState(savedDraft?.name ?? profile.displayName);
+  const [localAvatar, setLocalAvatar] = useState<Avatar>(savedDraft?.avatar ?? profile.avatar);
+  const name = savedDraft?.name ?? localName;
+  const avatar = savedDraft?.avatar ?? localAvatar;
+  const setName = (value: string) => {
+    setLocalName(value);
+    workspace?.setSettingsDraft({ profileId: profile.id, name: value, avatar });
+  };
+  const setAvatar = (value: Avatar) => {
+    setLocalAvatar(value);
+    workspace?.setSettingsDraft({ profileId: profile.id, name, avatar: value });
+  };
   const [state, save, pending] = useActionState(async (_previous: { error: boolean; message: string }, form: FormData) => {
     try {
       await accountRequest<Profile>("/profile", { method: "PUT", body: JSON.stringify({ displayName: form.get("displayName"), avatar: form.get("avatar") }) });
+      workspace?.setSettingsDraft(null);
+      workspace?.setSettingsStatus({ error: false, message: "Profile tersimpan." });
       router.refresh();
       return { error: false, message: "Profile tersimpan." };
-    } catch (error) { return { error: true, message: error instanceof Error ? error.message : "Koneksi terputus." }; }
-  }, { error: false, message: "" });
+    } catch (error) {
+      const result = { error: true, message: error instanceof Error ? error.message : "Koneksi terputus." };
+      workspace?.setSettingsStatus(result);
+      return result;
+    }
+  }, workspace?.settingsStatus ?? { error: false, message: "" });
   async function logout() {
     await session.logout();
     window.location.replace("/login");

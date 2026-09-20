@@ -1,5 +1,5 @@
-import { requireAccount } from "../account-server";
-import LobbyClient from "./lobby-client";
+import { requireAccount } from "../../account-server";
+import LobbyClient from "../../lobby/lobby-client";
 
 export default async function LobbyPage({ searchParams }: { searchParams: Promise<{ invite?: string | string[] }> }) {
   const inviteParameter = (await searchParams).invite;

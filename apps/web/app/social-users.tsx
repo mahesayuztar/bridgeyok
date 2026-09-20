@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { accountRequest, type Profile } from "./account-types";
 import { ChatPanel } from "./chat-panel";
 import { ProfileAvatar } from "./profile-avatar";
+import { useWorkspacePresentation } from "./workspace-state";
 
 export function FollowAction({ profile, viewerId, onChanged }: { profile: Profile; viewerId: string; onChanged: () => void }) {
   const [pending, setPending] = useState(false);
@@ -19,9 +20,15 @@ export function FollowAction({ profile, viewerId, onChanged }: { profile: Profil
 }
 
 export function SocialUsers({ viewerId, table, initialQuery = "", selection }: { selection?: { selectedIds: string[]; onSelect: (profile: Profile) => void }; initialQuery?: string; viewerId: string; table?: { id: string; inviteCode: string; disabled: boolean } }) {
+  const workspace = useWorkspacePresentation();
+  const persistentFriendsState = table === undefined && selection === undefined && initialQuery === "";
   const [chatProfile, setChatProfile] = useState<Profile | null>(null);
-  const [query, setQuery] = useState(initialQuery);
-  const [friendsOnly, setFriendsOnly] = useState(!table && !initialQuery && !selection);
+  const [localQuery, setLocalQuery] = useState(initialQuery);
+  const [localFriendsOnly, setLocalFriendsOnly] = useState(!table && !initialQuery && !selection);
+  const query = persistentFriendsState && workspace ? workspace.friendsQuery : localQuery;
+  const friendsOnly = persistentFriendsState && workspace ? workspace.friendsOnly : localFriendsOnly;
+  const setQuery = persistentFriendsState && workspace ? workspace.setFriendsQuery : setLocalQuery;
+  const setFriendsOnly = persistentFriendsState && workspace ? workspace.setFriendsOnly : setLocalFriendsOnly;
   const [state, setState] = useState<{ profiles: Profile[]; loading: boolean; error: string }>({ profiles: [], loading: true, error: "" });
   const [revision, setRevision] = useState(0);
   const [pendingId, setPendingId] = useState<string | null>(null);
