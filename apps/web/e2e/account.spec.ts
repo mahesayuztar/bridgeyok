@@ -13,6 +13,24 @@ async function noOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 }
 
+test("logout clears an invalid account cookie", async ({ context }) => {
+  await context.addCookies([{
+    name: "bridgeyok_account",
+    value: "acct_invalid",
+    domain: "localhost",
+    path: "/",
+    httpOnly: true,
+    sameSite: "Lax"
+  }]);
+
+  const response = await context.request.post("/api/account/logout", {
+    headers: { Origin: "http://localhost:3100" }
+  });
+
+  expect(response.status()).toBe(204);
+  expect((await context.cookies()).some(cookie => cookie.name === "bridgeyok_account")).toBe(false);
+});
+
 test("account guards, profile, navigation and responsive critical path", async ({ page }, testInfo) => {
   test.setTimeout(180000);
   await page.goto("/friends");
