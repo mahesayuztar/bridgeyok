@@ -298,6 +298,9 @@ func TestCommandRepositoryExpiresOnlyGuestTableSessionsAtomically(t *testing.T) 
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cleanupCancel()
+		if _, cleanupErr := environment.postgres.Pool().Exec(cleanupCtx, "DELETE FROM bridgeyok.tables WHERE id = $1", environment.tableID); cleanupErr != nil {
+			t.Errorf("cleanup account table: %v", cleanupErr)
+		}
 		if _, cleanupErr := environment.postgres.Pool().Exec(cleanupCtx, "DELETE FROM bridgeyok.users WHERE id = $1", account.Profile.ID); cleanupErr != nil {
 			t.Errorf("cleanup account: %v", cleanupErr)
 		}
