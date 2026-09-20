@@ -1,6 +1,6 @@
 # Phase 6 — Persistent Table & Human-Centered Application UX
 
-Status: **PLANNED — belum diimplementasikan**. Audit: 19 September 2026, baseline `9738c90`.
+Status: **IN PROGRESS — P6-01–P6-03 PASS**. Audit: 19 September 2026, baseline `9738c90`.
 Pemilik: product/engineering. Roadmap induk: [PLAN.md](../../PLAN.md); baseline frontend: [apps/web/PLAN.md](../../apps/web/PLAN.md).
 
 ## Objective
@@ -308,11 +308,17 @@ Tujuan: satu table surface bertahan di seluruh authenticated route.
 Scope: shared layout, pemindahan route files tanpa ganti URL, table activation boundary, slot workspace dan per-workspace presentation state, error boundaries.
 Dependency: P6-02. Parallelization: navigation visual P6-04 setelah interface shell/session stabil.
 
-- [ ] Table → Friends → Settings → History → Table tidak mengganti table mount identity, socket, subscription atau bootstrap GET.
-- [ ] Back/Forward, direct link Settings+active marker, close workspace dan refresh mengikuti lifecycle table di atas.
-- [ ] Scroll/filter/draft/selected trick/board pulih bila masih valid; board/permission changes menghapus state yang invalid.
-- [ ] Workspace fetch/error/loading tidak merusak table; profile `router.refresh()` tidak reset provider.
-- [ ] Invite/table lain meminta explicit switch; failure leave tidak menghilangkan meja lama.
+- [x] Table → Friends → Settings → History → Table tidak mengganti table mount identity, socket, subscription atau bootstrap GET.
+- [x] Back/Forward, direct link Settings+active marker, close workspace dan refresh mengikuti lifecycle table di atas.
+- [x] Scroll/filter/draft/selected trick/board pulih bila masih valid; board/permission changes menghapus state yang invalid.
+- [x] Workspace fetch/error/loading tidak merusak table; profile `router.refresh()` tidak reset provider.
+- [x] Invite/table lain meminta explicit switch; failure leave tidak menghilangkan meja lama.
+
+Evidence P6-03, 20 September 2026: commits `90f3b33` dan `fcbbad2`. Lobby dan table dipindah ke route group `(app)` tanpa mengubah URL. `AppShell` mempertahankan satu `BridgeTable` dan `TableSocialProvider` di luar slot workspace; table tersembunyi memakai `hidden`/`inert`, tetap menerima reconciliation, dan tidak menjalankan route activation atau shortcut auction ketika tidak visible. Error/loading workspace berada di bawah shared layout. State presentasi bounded mempertahankan Friends query/filter, Settings draft/status, scroll per path, sedangkan selected trick/board tetap dimiliki table boundary yang tidak remount.
+
+Browser gate pada PostgreSQL 17 disposable membuktikan Table → Friends → Settings → History → Table, Back/Forward, close workspace, dan profile save mempertahankan DOM mount marker yang sama dengan delta 0 socket open/close, GET table, subscribe, resume, dan takeover. Refresh langsung di Settings dengan active marker tetap menampilkan Settings dan melakukan tepat 1 socket, 1 GET, 1 resume, serta 1 takeover. Simulasi target table valid dengan leave 503 mempertahankan meja lama dan menghasilkan 0 socket churn; invite/create juga meminta konfirmasi sebelum leave. Capture 1280×720 dan 390×844 tidak overflow, table hidden tidak menjadi landmark aktif, dan close workspace tetap tersedia.
+
+Web unit lulus 69/69, strict typecheck dan lint tanpa error, production build lulus. `phase6-session-baseline.spec.ts` lulus 1/1, `table-leave.spec.ts` 2/2, dan empat skenario `chat.spec.ts` lulus termasuk recipient scope, reconnect/history, geometry, serta pointer path. Combined dev-server run sempat memicu panic internal Turbopack setelah dua test chat; suite yang terputus lulus ketika dijalankan pada proses pendek terisolasi tanpa perubahan implementasi.
 
 ### P6-04 — Navigation, utilities dan copy
 
