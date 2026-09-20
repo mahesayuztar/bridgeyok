@@ -669,9 +669,7 @@ function useGameSessionState(): TableSession {
     setBusy(true);
     clearTable("NO_SESSION");
     try {
-      if (credentialsRef.current !== null) {
-        await accountRequest("/logout", { method: "POST" });
-      }
+      await accountRequest("/logout", { method: "POST" });
     } catch {
     } finally {
       clearIdentity();

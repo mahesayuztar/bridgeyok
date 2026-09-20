@@ -20,8 +20,7 @@ export function ProfileSettings({ profile }: { profile: Profile }) {
   }, { error: false, message: "" });
   async function logout() {
     await session.logout();
-    router.replace("/login");
-    router.refresh();
+    window.location.replace("/login");
   }
   return <><form className="account-form profile-form" action={save} aria-busy={pending}>
     <div className="profile-preview"><ProfileAvatar avatar={avatar} online={profile.online} /><div><strong>{name || profile.username}</strong><p>@{profile.username}</p></div></div>

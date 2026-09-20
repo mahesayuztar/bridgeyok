@@ -32,7 +32,7 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
 
   async function logout() {
     await session.logout();
-    router.replace("/login");
+    window.location.replace("/login");
   }
 
   if (session.initializing || session.nickname === null) {
