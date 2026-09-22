@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending; Phase 6 berjalan dengan P6-01–P6-05 PASS
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending; Phase 6 berjalan dengan P6-01–P6-04 PASS
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
@@ -1359,8 +1359,6 @@ Plan engineering/product lengkap: [Phase 6 implementation plan](docs/product/pha
 
 **P6-04 checkpoint — PASS, 22 September 2026:** commits `d254dbc` dan `a6b1c40` membuat desktop rail icon-first dan mobile empat item menuju Table/Play, Friends, History, dan More. History memakai score sheet meja aktif serta daftar Team Match authorized; More memakai profile/settings, bantuan, dan preferensi suara yang sama dengan meja. Placeholder navigasi/Play dihapus, copy berulang dipangkas, logout failure tidak lagi membersihkan session. Browser PostgreSQL 17 dan web checks memverifikasi responsive navigation, invite, settings, logout, serta delta persistence tanpa socket/GET/subscribe/resume/takeover baru. Detail dan batas P6-07 dicatat di plan Phase 6.
 
-**P6-05 checkpoint — PASS, 22 September 2026:** commits `662a333`, `3122c23`, dan `111eed2` menjaga input, cue audio, dan motion hanya saat table visible; hasil board tetap sampai pemilik meja menekan Next board di status bar. Card exposure mobile, ruang navbar, dan trick 2×2 pada lebar sempit menjaga geometri tanpa overlap. Browser empat akun PostgreSQL 17 membuktikan shortcut/klik hidden mengirim nol command, remote call/play pulih tanpa cue atau gerak tertunda, click/touch/drag masing-masing tepat satu command, dan klik/waktu pada hasil board tidak memajukan permainan. Unit 69/69, typecheck, lint tanpa error, build, serta baseline session lulus; evidence rinci ada di plan Phase 6.
-
 **Objective of Done ringkas** (acceptance terperinci dan dependencies ada di plan Phase 6):
 
 - [ ] Table → Friends → Settings → History → Table serta Back/Forward mempertahankan session/socket/subscription; no full table GET atau loading splash akibat navigation.
@@ -1370,7 +1368,7 @@ Plan engineering/product lengkap: [Phase 6 implementation plan](docs/product/pha
 - [ ] Timeout/klik workspace tidak memajukan board; Next board eksplisit. Hidden table tidak menangkap input workspace.
 - [ ] Desktop/tablet/320–390 px, zoom, keyboard, pointer/touch, loading/error/reconnect dan existing gameplay regression terverifikasi dengan artifacts.
 
-Status: **P6-01–P6-05 PASS; P6-06–09 pending**. Pending release gates Phase 4/5 tetap terpisah dan tidak dianggap selesai oleh checkpoint ini.
+Status: **P6-01–P6-04 PASS; P6-05–09 pending**. Pending release gates Phase 4/5 tetap terpisah dan tidak dianggap selesai oleh checkpoint ini.
 
 ### Deferred outside this roadmap
 

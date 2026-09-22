@@ -3694,6 +3694,11 @@ button.physical-card.is-dragging {
   transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+.board-result[data-exiting="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .board-result dl {
   grid-template-columns: repeat(3, 1fr);
 }
@@ -4737,76 +4742,6 @@ button.physical-card.is-dragging {
 }
 .dummy-hand:not(.completed-deal-hand) .hand-card-group[data-density="tight"] {
   --side-dummy-card-exposure: .875rem;
-}
-
-.board-result {
-  animation: board-result-arrive 180ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-.board-next-button {
-  min-height: 2.5rem;
-  padding: .35rem .6rem;
-  border: 1px solid var(--accent-strong);
-  background: var(--accent-strong);
-  color: var(--card);
-  font-size: .78rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color 150ms ease-out, transform 150ms ease-out;
-}
-
-.board-next-button:hover:not(:disabled) { background: var(--accent); }
-.board-next-button:active:not(:disabled) { transform: scale(.97); }
-.board-next-button:disabled { opacity: .55; cursor: default; }
-
-@keyframes board-result-arrive {
-  from { opacity: .7; transform: translate(-50%, -48%); }
-  to { opacity: 1; transform: translate(-50%, -50%); }
-}
-
-@media (max-width: 48rem) {
-  .own-hand .hand-cards {
-    justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scrollbar-width: thin;
-  }
-  .own-hand .hand-card-slot,
-  .own-hand .hand-card-slot:last-child {
-    flex: 0 0 clamp(2.75rem, 14vw, 3.25rem);
-    width: clamp(2.75rem, 14vw, 3.25rem);
-    min-width: clamp(2.75rem, 14vw, 3.25rem);
-  }
-  .own-hand button.physical-card:not(:disabled) { touch-action: pan-x; }
-}
-@media (max-width: 767px) {
-  .persistent-table-workspace .table-client {
-    min-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom));
-  }
-  .persistent-table-workspace .active-table-client {
-    height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom));
-  }
-}
-@media (max-width: 25rem) {
-  .current-trick,
-  .current-trick[data-dummy-position="top"],
-  .current-trick[data-dummy-position="right"],
-  .current-trick[data-dummy-position="bottom"],
-  .current-trick[data-dummy-position="left"] {
-    width: calc(var(--card-trick-width) * 2 + .35rem);
-    height: calc(var(--card-trick-width) * 2.8 + .35rem);
-  }
-  .current-trick .trick-top,
-  .current-trick .trick-right,
-  .current-trick .trick-bottom,
-  .current-trick .trick-left {
-    transform: none;
-  }
-  .current-trick .trick-top { top: 0; right: auto; bottom: auto; left: 0; }
-  .current-trick .trick-right { top: 0; right: 0; bottom: auto; left: auto; }
-  .current-trick .trick-bottom { top: auto; right: 0; bottom: 0; left: auto; }
-  .current-trick .trick-left { top: auto; right: auto; bottom: 0; left: 0; }
 }
 
 @media (max-width: 22rem) {

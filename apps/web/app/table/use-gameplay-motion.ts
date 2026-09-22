@@ -18,14 +18,13 @@ export type GameplayMotionFrame = {
 
 const emptyTrick: Trick = { plays: [] };
 
-export function useGameplayMotion(game: GameProjection | undefined, visible = true) {
+export function useGameplayMotion(game: GameProjection | undefined) {
   const [frame, setFrame] = useState<GameplayMotionFrame>({
     trick: game?.currentTrick ?? emptyTrick,
     stage: "idle",
   });
   const [isAnimating, setIsAnimating] = useState(false);
   const previousGameRef = useRef(game);
-  const wasVisibleRef = useRef(visible);
   const previousKeyRef = useRef(game === undefined ? null : gameplayMotionKey(game));
   const queueRef = useRef<GameplayMotionEvent[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -35,7 +34,6 @@ export function useGameplayMotion(game: GameProjection | undefined, visible = tr
   const runNextRef = useRef<() => void>(() => undefined);
 
   const runNext = useCallback(() => {
-    if (!visible) return;
     if (timerRef.current !== null) return;
     const event = queueRef.current.shift();
     if (event === undefined) {
@@ -84,7 +82,7 @@ export function useGameplayMotion(game: GameProjection | undefined, visible = tr
     };
     finishRef.current = finish;
     timerRef.current = setTimeout(finish, duration);
-  }, [visible]);
+  }, []);
 
   useEffect(() => {
     runNextRef.current = runNext;
@@ -101,22 +99,6 @@ export function useGameplayMotion(game: GameProjection | undefined, visible = tr
   }, []);
 
   useEffect(() => {
-    if (!visible) {
-      wasVisibleRef.current = false;
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      timerRef.current = null;
-      finishRef.current = null;
-      activeEventKindRef.current = null;
-      queueRef.current = [];
-      previousGameRef.current = game;
-      previousKeyRef.current = game === undefined ? null : gameplayMotionKey(game);
-      return;
-    }
-    if (!wasVisibleRef.current) {
-      wasVisibleRef.current = true;
-      queueRef.current.push({ kind: "sync", trick: game?.currentTrick ?? emptyTrick });
-      queueMicrotask(() => runNextRef.current());
-    }
     if (game === undefined) {
       previousGameRef.current = undefined;
       previousKeyRef.current = null;
@@ -155,7 +137,7 @@ export function useGameplayMotion(game: GameProjection | undefined, visible = tr
       return;
     }
     queueMicrotask(() => runNextRef.current());
-  }, [game, visible]);
+  }, [game]);
 
   useEffect(
     () => () => {
@@ -174,9 +156,5 @@ export function useGameplayMotion(game: GameProjection | undefined, visible = tr
     finishRef.current();
   }
 
-  return {
-    frame: visible ? frame : { trick: game?.currentTrick ?? emptyTrick, stage: "idle" as const },
-    isAnimating: visible && isAnimating,
-    skipCurrent,
-  };
+  return { frame, isAnimating, skipCurrent };
 }

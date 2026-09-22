@@ -171,18 +171,18 @@ async function dragPlayableCard(
     });
     await expect(page.locator('.physical-card[data-dragging="true"]')).toHaveCount(1);
     await expect(preview).toHaveCount(1);
-    const pickupY = startY < endY ? startY + 24 : startY - 24;
+    const pickupX = startX < endX ? startX + 24 : startX - 24;
     await session.send("Input.dispatchTouchEvent", {
       type: "touchMove",
-      touchPoints: [{ x: startX, y: pickupY }],
+      touchPoints: [{ x: pickupX, y: startY }],
     });
     for (let _step = 1; _step <= 5; _step++) {
       await session.send("Input.dispatchTouchEvent", {
         type: "touchMove",
         touchPoints: [
           {
-            x: startX + ((endX - startX) * _step) / 5,
-            y: pickupY + ((endY - pickupY) * _step) / 5,
+            x: pickupX + ((endX - pickupX) * _step) / 5,
+            y: startY + ((endY - startY) * _step) / 5,
           },
         ],
       });
@@ -661,9 +661,9 @@ async function assertGameplayGeometry(page: Page) {
       .filter((card) => card.className.includes("card-trick"))
       .every((card) => card.width >= 49),
   ).toBe(true);
-  expect(geometry.ownCardExposure.every((exposure) => exposure >= (geometry.viewport.width <= 390 ? 44 : 18))).toBe(true);
+  expect(geometry.ownCardExposure.every((exposure) => exposure >= 18)).toBe(true);
   expect(geometry.ownCardRows).toBe(1);
-  if (geometry.viewport.width > 768) expect(geometry.ownHandScrollable).toBe(false);
+  expect(geometry.ownHandScrollable).toBe(false);
   expect(geometry.dummyHasExtras).toBe(false);
   expect(geometry.playedCardsOverlap).toBe(false);
   expect(geometry.sideParticipantWidths.every((width) => width <= 31)).toBe(true);
@@ -771,7 +771,7 @@ async function assertGameplayGeometry(page: Page) {
     expect(geometry.dummyPlacement.centerDelta).toBeLessThanOrEqual(1);
   }
   expect(geometry.dummyBlockedByTrick).toBe(false);
-  expect(geometry.dummyTrickOverlap, `dummy/trick at ${geometry.viewport.width}x${geometry.viewport.height}`).toBe(false);
+  expect(geometry.dummyTrickOverlap).toBe(false);
   expect(geometry.ownHandOverlapsSurface).toBe(false);
   expect(geometry.playZoneInsideSurface).toBe(true);
   expect(geometry.documentOverflow).toEqual({ x: false, y: false });
@@ -1141,33 +1141,14 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
   await expect.poll(() => east.page.evaluate(() =>
     (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
   )).toBe(1);
-  const hiddenInputBaseline = mutationFrameCount(east.sentFrames);
-  await east.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: "Friends" }).click();
-  await expect(east.page).toHaveURL(/\/friends$/);
-  for (const key of ["p", "x", "r", "Enter", "Escape"]) await east.page.keyboard.press(key);
-  await east.page.locator(".auction-workspace .call-actions button").first().dispatchEvent("click");
-  expect(mutationFrameCount(east.sentFrames)).toBe(hiddenInputBaseline);
-  await east.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: /^Table/ }).click();
-  await waitForConnection(east.page);
   await east.page.getByLabel("Buka menu meja").click();
-  await east.page.locator(".table-menu").getByLabel("Suara giliran").uncheck();
+  await east.page.getByLabel("Suara giliran").uncheck();
   await expect.poll(() => east.page.evaluate(() =>
     window.localStorage.getItem("bridgeyok.turnAudioMuted"),
   )).toBe("true");
   await east.page.getByLabel("Buka menu meja").click();
   await makeCall(east.page, /^Pass/);
-  const westCueBeforeWorkspace = await west.page.evaluate(() =>
-    (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
-  );
-  const westAuctionBeforeWorkspace = await west.page.locator(".auction-workspace .auction-table tbody").textContent();
-  await west.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: "Friends" }).click();
-  await expect(west.page).toHaveURL(/\/friends$/);
   await makeCall(south.page, /^Pass/);
-  await expect.poll(() => west.page.locator(".auction-workspace .auction-table tbody").textContent()).not.toBe(westAuctionBeforeWorkspace);
-  expect(await west.page.evaluate(() => (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0)).toBe(westCueBeforeWorkspace);
-  await west.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: /^Table/ }).click();
-  await waitForConnection(west.page);
-  expect(await west.page.evaluate(() => (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0)).toBe(westCueBeforeWorkspace);
   const auctionBeforeClose = await west.page.locator(".auction-workspace .auction-table tbody").textContent();
   const revisionBeforeClose = maxFrameRevision(west.frames);
   const receivedFrameCountBeforeClose = west.frames.length;
@@ -1237,23 +1218,8 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
       attributeFilter: ["data-motion-stage"],
     });
   });
-  await west.page.evaluate(() => {
-    const motionWindow = window as Window & { __hiddenMotionStages?: string[] };
-    const trick = document.querySelector(".current-trick");
-    motionWindow.__hiddenMotionStages = [];
-    if (trick === null) return;
-    new MutationObserver(() => {
-      motionWindow.__hiddenMotionStages?.push(trick.getAttribute("data-motion-stage") ?? "missing");
-    }).observe(trick, { attributeFilter: ["data-motion-stage"] });
-  });
-  await west.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: "Friends" }).click();
-  await expect(west.page).toHaveURL(/\/friends$/);
   await dragPlayableCard(east.page, "mouse");
   expect(mutationFrameCount(east.sentFrames)).toBe(eastFramesBeforeDrag + 1);
-  await expect(west.page.locator(".trick-slot .physical-card")).toHaveCount(1);
-  await west.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: /^Table/ }).click();
-  await waitForConnection(west.page);
-  expect(await west.page.evaluate(() => (window as Window & { __hiddenMotionStages?: string[] }).__hiddenMotionStages ?? [])).not.toContain("moving");
   await expect.poll(() => replacementTab.evaluate(() =>
     (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
   )).toBe(declarerCueBeforeLead + 1);
@@ -1562,10 +1528,11 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
   await replacementTab.locator(".board-play-zone").click({
     position: { x: 10, y: 10 },
   });
-  await replacementTab.clock.runFor(5_200);
-  await expect(replacementTab.locator(".board-result")).toBeVisible();
-  await expect(replacementTab.locator(".auction-workspace")).toHaveCount(0);
-  await replacementTab.getByRole("button", { name: "Board berikutnya" }).click();
+  await expect(replacementTab.locator(".board-result")).toHaveAttribute(
+    "data-exiting",
+    "true",
+  );
+  await replacementTab.clock.runFor(200);
   await replacementTab.clock.resume();
   await expect(replacementTab.locator(".board-result")).toHaveCount(0);
   assertPrivateFrames(north.frames, "latest");

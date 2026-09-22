@@ -212,19 +212,6 @@ export function ActiveTableStatusBar({
         onCommand={onCommand}
       />
       <div className="status-actions">
-        {table.viewerRole === "OWNER" && table.state === "BETWEEN_BOARDS" && (table.matchId === undefined || table.boardNumber !== table.matchBoardCount) ? (
-          <button
-            type="button"
-            className="board-next-button"
-            aria-label="Board berikutnya"
-            disabled={!canSendCommand("table.next_board")}
-            onClick={() => {
-              if (canSendCommand("table.next_board")) onCommand("table.next_board");
-            }}
-          >
-            <span>Lanjut</span>
-          </button>
-        ) : null}
         {table.matchId ? <Link href={`/match/${table.matchId}`}>Match</Link> : <TableChat tableId={table.tableId} />}
         <div
           className="connection-status"
