@@ -163,6 +163,77 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   });
 }
 
+const readerBundle = browserBundle(resolve(__dirname, "fixtures/phase6-reader-harness.tsx"));
+test("auction and trick readers preserve selection, privacy and focus", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.setContent(`<style>${stylesheet}</style><div id="root"></div>`);
+  await page.addScriptTag({ content: readerBundle });
+
+  const auctionTrigger = page.getByRole("button", { name: "Buka riwayat auction" });
+  await auctionTrigger.focus();
+  await page.keyboard.press("Enter");
+  const auction = page.getByRole("dialog", { name: "Auction", exact: true });
+  await expect(auction).toBeVisible();
+  await expect(auction.locator("caption")).toContainText("Dealer E");
+  await expect(auction.locator("caption")).toContainText("Kontrak 3♣ · Deklarer E");
+  await expect(auction.locator('th[data-dealer="true"]')).toContainText("Dealer");
+  await expect(auction.locator("tbody")).toContainText("Pass");
+  await expect(auction.locator("td").filter({ hasText: /^X$/ })).toHaveCount(1);
+  await expect(auction.locator("td").filter({ hasText: /^XX$/ })).toHaveCount(1);
+  const auctionTable = auction.locator(".auction-table-wrap");
+  await auctionTable.evaluate((element) => { element.scrollTop = 48; });
+  const auctionScroll = await auctionTable.evaluate((element) => element.scrollTop);
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("#remote-call")!.click());
+  expect(await auctionTable.evaluate((element) => element.scrollTop)).toBe(auctionScroll);
+  expect(await auction.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(auctionTrigger).toBeFocused();
+
+  const trickTrigger = page.getByRole("button", { name: /Buka riwayat trick/ });
+  await trickTrigger.click();
+  const trick = page.locator(".trick-history-popover");
+  await expect(trick).toBeVisible();
+  await expect(trick).toHaveAccessibleName("Trick 3");
+  await expect(trick.locator(".trick-history-outcome")).toContainText("Leader E");
+  await expect(trick.locator(".trick-history-outcome")).toContainText("Pemenang W");
+  await expect(trick.locator(".trick-history-order")).toHaveText(["1 · E", "2 · S", "3 · W", "4 · N"]);
+  await trick.getByRole("button", { name: "Trick sebelumnya" }).click();
+  await expect(trick.getByRole("heading")).toHaveText("Trick 2");
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("#remote-trick")!.click());
+  await expect(trick.getByRole("heading")).toHaveText("Trick 2");
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("#undo-to-one")!.click());
+  await expect(trick.getByRole("heading")).toHaveText("Trick 1");
+  expect(await trick.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("trick-reader-320x568.png") });
+  await page.keyboard.press("Escape");
+  await expect(trickTrigger).toBeFocused();
+
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("#next-board")!.click());
+  await page.getByRole("button", { name: /Buka riwayat trick/ }).click();
+  await expect(page.getByRole("dialog", { name: "Trick 1", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("#defender-view")!.click());
+  await page.getByRole("button", { name: /Buka riwayat trick/ }).click();
+  const latestOnly = page.getByRole("dialog", { name: "Trick 4", exact: true });
+  await expect(latestOnly).toHaveAttribute("data-history-policy", "latest");
+  await expect(latestOnly.locator(".trick-history-play")).toHaveCount(4);
+  await expect(latestOnly.getByRole("button", { name: "Trick sebelumnya" })).toBeDisabled();
+  await expect(latestOnly.getByRole("button", { name: "Trick berikutnya" })).toBeDisabled();
+  await latestOnly.getByRole("button", { name: "Tutup riwayat trick" }).click();
+  await expect(page.getByRole("button", { name: /Buka riwayat trick/ })).toBeFocused();
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await auctionTrigger.click();
+  await expect(auction).toBeVisible();
+  const auctionBounds = (await auction.boundingBox())!;
+  expect(auctionBounds.x).toBeGreaterThanOrEqual(0);
+  expect(auctionBounds.x + auctionBounds.width).toBeLessThanOrEqual(1440);
+  expect(auctionBounds.y + auctionBounds.height).toBeLessThanOrEqual(900);
+  await page.screenshot({ path: testInfo.outputPath("auction-reader-1440x900.png") });
+  await auction.getByRole("button", { name: "Tutup riwayat auction" }).click();
+  await expect(auctionTrigger).toBeFocused();
+});
+
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }, { width: 320, height: 568 }, { width: 568, height: 320 }]) {
   test(`replay mirrors canonical preview geometry at ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
