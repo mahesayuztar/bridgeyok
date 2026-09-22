@@ -326,11 +326,13 @@ Tujuan: table mudah dicapai tanpa chrome berlebihan.
 Scope: `AppNavigation`, More, profile link, contextual Match/Notifications/Help; reuse Friends/Settings forms dan chat.
 Dependency: P6-03 shell contract. Parallelization: P6-05/06/07 pada components berbeda; koordinasikan satu perubahan globals.css.
 
-- [ ] Desktop icon-first punya accessible names, tooltip focus/hover dan active workspace; mobile maksimal empat item dengan label.
-- [ ] History destination bekerja; Deals/Rankings/fitur kosong tidak memunculkan placeholder utama.
-- [ ] Table active/turn indicator cukup satu; tidak ada return banner duplikat.
-- [ ] Settings/Profile tidak duplikat; save/mute/logout memakai state dan lifecycle shared.
-- [ ] Tidak ada subtitle yang hanya mengulang heading; notices membuka workspace tanpa leave atau auto-join.
+- [x] Desktop icon-first punya accessible names, tooltip focus/hover dan active workspace; mobile maksimal empat item dengan label.
+- [x] History destination bekerja; Deals/Rankings/fitur kosong tidak memunculkan placeholder utama.
+- [x] Table active/turn indicator cukup satu; tidak ada return banner duplikat.
+- [x] Settings/Profile tidak duplikat; save/mute/logout memakai state dan lifecycle shared.
+- [x] Tidak ada subtitle yang hanya mengulang heading; notices membuka workspace tanpa leave atau auto-join.
+
+Evidence P6-04, 22 September 2026: commits `d254dbc` dan `a6b1c40`. Rail desktop memakai empat ikon bernama dengan tooltip hover/focus yang dapat ditutup dengan Escape; mobile memakai empat item berlabel dan target ≥44 px. Table/Play mengarah ke meja aktif tanpa rejoin dan menampilkan board/turn dari projection yang sama dengan turn cue; More memuat Settings/Profile, bantuan, mute bersama menu meja, dan logout. History menampilkan score sheet meja aktif dan daftar Team Match yang diotorisasi endpoint existing (maksimal 20 entri), tanpa mengklaim arsip casual setelah leave; detail reader/replay/score tetap P6-07. Destination kosong dan toast Coming soon utama dihapus. Logout HTTP failure mempertahankan identity/table dan menampilkan retry copy. Playwright pada PostgreSQL 17 disposable membuktikan navigation dan viewport 320, 390, 768, 1024, 1440, 1920 px; profile save, mute sync, logout failure/success, mobile touch, invite guard, dan session persistence. `phase6-session-baseline.spec.ts` tetap membuktikan delta navigation 0 socket/GET/subscribe/resume/takeover. Web unit 69/69, typecheck, lint tanpa error (dua warning aria-description lama), dan production build lulus. P6-05–09 tetap pending.
 
 ### P6-05 — Safe background gameplay dan readable table
 

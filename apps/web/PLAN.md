@@ -1013,13 +1013,13 @@ Audit menemukan route table berada di luar shared account layout, hook session d
 Keputusan lanjutan: shared authenticated layout dengan persistent GameSessionProvider/AppShell, satu realtime owner dan satu mounted table di luar workspace route slot. URL existing dipertahankan; Friends/Settings/History/Match menjadi secondary workspace. Tidak mengulang canonical card, reducer/optimistic projection, engine, DDS atau Team Match. Desktop/mobile memakai composition yang berbeda dengan lifetime session sama.
 
 - [x] P6-01: baseline counters dan contract lifetime. Characterization browser mengunci delta navigation 2 open/2 close/1 GET/1 resume/1 takeover, restore 1 open/1 GET/1 resume/1 takeover, metadata frame aman, fixture recipient-scoped, dan regression suite wajib; commit `e600153`.
-- [ ] P6-02: session/realtime owner shared, account/chat tetap berfungsi.
-- [ ] P6-03: persistent shell, route activation, Back/Forward/refresh dan workspace state.
-- [ ] P6-04: navigation/More/utilities/copy tanpa placeholder primary destination.
+- [x] P6-02: session/realtime owner shared, account/chat tetap berfungsi; commits `54a4ef6`, `d7e9dbe`.
+- [x] P6-03: persistent shell, route activation, Back/Forward/refresh dan workspace state; commits `90f3b33`, `fcbbad2`.
+- [x] P6-04: navigation/More/utilities/copy tanpa placeholder primary destination; commits `d254dbc`, `a6b1c40`.
 - [ ] P6-05: safe hidden input/motion, explicit board progression dan card geometry.
 - [ ] P6-06: auction/trick reader readable dan recipient-scoped.
 - [ ] P6-07: History workspace/score context/authorized match completion refresh.
 - [ ] P6-08: accessibility, zoom, responsive dan real pointer/touch gate.
 - [ ] P6-09: persistence/privacy/gameplay regression dan evidence handoff.
 
-P6-01 PASS; P6-02–09 dan seluruh Objective of Done Phase 6 masih pending. Browser audit awal tetap dijelaskan di evidence.
+P6-01–P6-04 PASS; P6-05–09 dan seluruh Objective of Done Phase 6 masih pending. Browser audit awal tetap dijelaskan di evidence.
