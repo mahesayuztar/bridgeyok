@@ -6,7 +6,7 @@ export type AccountLogin = components["schemas"]["AccountLogin"];
 export type Invitation = components["schemas"]["PlayerInvitation"];
 
 export function safeReturnPath(value: string | null | undefined) {
-  if (!value || !/^\/(play|lobby|friends|settings|match(?:\/[^/?#]+)?|table\/[^/?#]+)(\?|$)/.test(value) || value.includes("\\") || /[\r\n]/.test(value)) return "/play";
+  if (!value || !/^\/(play|lobby|friends|history|settings|match(?:\/[^/?#]+)?|table\/[^/?#]+)(\?|$)/.test(value) || value.includes("\\") || /[\r\n]/.test(value)) return "/play";
   return value;
 }
 

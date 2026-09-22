@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { LiveTableProjection } from "./table-state";
 import {
   shouldPlayTurnCue,
@@ -10,16 +10,48 @@ import {
 } from "./turn-cue";
 
 const TURN_AUDIO_MUTED_KEY = "bridgeyok.turnAudioMuted";
+const soundPreferenceListeners = new Set<() => void>();
+
+function soundPreferenceSnapshot() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(TURN_AUDIO_MUTED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function subscribeToSoundPreference(listener: () => void) {
+  function handleStorage(event: StorageEvent) {
+    if (event.key === TURN_AUDIO_MUTED_KEY) listener();
+  }
+  soundPreferenceListeners.add(listener);
+  window.addEventListener("storage", handleStorage);
+  return () => {
+    soundPreferenceListeners.delete(listener);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+export function useTurnSoundPreference() {
+  const muted = useSyncExternalStore(
+    subscribeToSoundPreference,
+    soundPreferenceSnapshot,
+    () => false,
+  );
+
+  function setMuted(nextMuted: boolean) {
+    try {
+      window.localStorage.setItem(TURN_AUDIO_MUTED_KEY, String(nextMuted));
+    } catch {}
+    soundPreferenceListeners.forEach((listener) => listener());
+  }
+
+  return { muted, setMuted };
+}
 
 export function useTurnAudio(table: LiveTableProjection | null) {
-  const [muted, setMutedState] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return window.localStorage.getItem(TURN_AUDIO_MUTED_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
+  const { muted, setMuted } = useTurnSoundPreference();
   const interactedRef = useRef(false);
   const previousStateRef = useRef<ReturnType<typeof turnCueState>>(null);
 
@@ -76,15 +108,6 @@ export function useTurnAudio(table: LiveTableProjection | null) {
       return;
     }
   }, [muted, table]);
-
-  function setMuted(nextMuted: boolean) {
-    setMutedState(nextMuted);
-    try {
-      window.localStorage.setItem(TURN_AUDIO_MUTED_KEY, String(nextMuted));
-    } catch {
-      return;
-    }
-  }
 
   return { muted, setMuted };
 }

@@ -148,7 +148,7 @@ export type TableSession = {
   inviteCode: string | null;
   tableState: TableClientState;
   projectedTable: LiveTableProjection | null;
-  logout: () => Promise<void>;
+  logout: () => Promise<boolean>;
   createTable: () => Promise<string | null>;
   joinTable: (inviteCode: string) => Promise<string | null>;
   openTable: (tableId: string) => Promise<boolean>;
@@ -668,12 +668,14 @@ function useGameSessionState(): TableSession {
 
   const logout = useCallback(async () => {
     setBusy(true);
-    clearTable("NO_SESSION");
     try {
       await accountRequest("/logout", { method: "POST" });
-    } catch {
-    } finally {
+      clearTable("NO_SESSION");
       clearIdentity();
+      return true;
+    } catch {
+      return false;
+    } finally {
       setBusy(false);
     }
   }, [clearIdentity, clearTable]);

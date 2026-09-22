@@ -234,7 +234,7 @@ export default function BridgeTable({
               else if (action === "retry") session.reconnect();
               else if (action === "backToLobby") void returnToLobby();
               else if (action === "signInAgain")
-                void session.logout().then(() => window.location.replace("/login"));
+                void session.logout().then((loggedOut) => { if (loggedOut) window.location.replace("/login"); });
             }}
           />
         )}

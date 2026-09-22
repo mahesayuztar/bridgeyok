@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AccountPresence } from "./account-presence";
 import type { Profile } from "./account-types";
-import { AppNavigation, AppNotices } from "./app-navigation";
+import { AppNavigation } from "./app-navigation";
 import BridgeTable from "./bridge-table";
 import IssueNotice from "./issue-notice";
 import { TableSocialProvider } from "./table/table-social";
@@ -63,8 +63,7 @@ export function AppShell({ children, profile }: { children: ReactNode; profile: 
 
   return (
     <WorkspacePresentationProvider>
-      <AppNotices>
-        <div className="account-shell">
+      <div className="account-shell">
           <AppNavigation profile={profile} />
           <div className="account-content">
             <AccountPresence />
@@ -111,8 +110,7 @@ export function AppShell({ children, profile }: { children: ReactNode; profile: 
               </div>
             )}
           </div>
-        </div>
-      </AppNotices>
+      </div>
     </WorkspacePresentationProvider>
   );
 }

@@ -11,6 +11,7 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
   const session = useTableSession();
   const [joinCode, setJoinCode] = useState(initialInviteCode.trim().toUpperCase());
   const [pendingSwitch, setPendingSwitch] = useState<"create" | "join" | null>(null);
+  const [logoutError, setLogoutError] = useState(false);
 
   useEffect(() => {
     if (!session.initializing && session.nickname === null && session.tableState.issue === null) {
@@ -50,8 +51,9 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
   }
 
   async function logout() {
-    await session.logout();
-    window.location.replace("/login");
+    setLogoutError(false);
+    if (await session.logout()) window.location.replace("/login");
+    else setLogoutError(true);
   }
 
   if (session.initializing || session.nickname === null) {
@@ -71,9 +73,8 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
         <section className="lobby" aria-labelledby="lobby-title">
           <div className="lobby-heading">
             <div>
-              <p className="eyebrow">Lobby pribadi</p>
               <h1 id="lobby-title">Halo, {session.nickname}</h1>
-              <p>Pilih cara duduk di meja. Kamu dapat membuat undangan baru atau memakai kode dari teman.</p>
+              <p>Buat meja baru atau gunakan kode undangan dari teman.</p>
             </div>
           </div>
           {session.tableState.table === null ? null : (
@@ -97,13 +98,11 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
           )}
           <div className="lobby-actions">
             <div className="lobby-option">
-              <span className="option-number">01</span>
               <h2>Meja baru</h2>
               <p>Jadilah pemilik meja dan bagikan undangan kepada tiga teman.</p>
               <button className="primary-button" type="button" disabled={session.busy} onClick={() => void createTable()}>Buat meja</button>
             </div>
             <form className="lobby-option" onSubmit={submitJoin}>
-              <span className="option-number">02</span>
               <h2>Masuk meja</h2>
               <label htmlFor="invite-code">Kode undangan</label>
               <input id="invite-code" name="inviteCode" autoCapitalize="characters" autoComplete="off" spellCheck={false} required value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase())} />
@@ -128,6 +127,7 @@ export default function LobbyClient({ initialInviteCode = "" }: { initialInviteC
               }}
             />
           )}
+          {logoutError ? <p className="form-error" role="alert">Logout gagal. Sesi dan meja tetap aktif; coba lagi.</p> : null}
         </section>
       </main>
     </div>
