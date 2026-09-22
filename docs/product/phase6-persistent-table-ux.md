@@ -354,11 +354,13 @@ Tujuan: sequence, leader, winner dan turn dapat dipahami pada mobile/desktop.
 Scope: AuctionTable scroll policy, TrickIndicator presentation/selection, mobile panel dan current trick cue; tanpa perubahan entitlement.
 Dependency: P6-01 fixtures, P6-03 integration. Parallelization: dapat dikerjakan terpisah dari score P6-07.
 
-- [ ] Dealer/order/Pass/X/XX/contract/declarer dapat diakses tanpa prose panjang atau color-only cue.
-- [ ] Mobile trick detail menampilkan nomor, seat tiap kartu, leader, play order dan authoritative winner tanpa horizontal scrolling.
-- [ ] Dummy dapat prev/next authorized history; non-Dummy tidak menerima/menyimpan/reconstruct unauthorized older tricks.
-- [ ] Incoming call/trick tidak mencuri reader scroll/selection; undo/board change melakukan clamp/reset yang tepat.
-- [ ] Open/close/Escape/focus return berjalan pada keyboard/touch tanpa nested modal stack.
+- [x] Dealer/order/Pass/X/XX/contract/declarer dapat diakses tanpa prose panjang atau color-only cue.
+- [x] Mobile trick detail menampilkan nomor, seat tiap kartu, leader, play order dan authoritative winner tanpa horizontal scrolling.
+- [x] Dummy dapat prev/next authorized history; non-Dummy tidak menerima/menyimpan/reconstruct unauthorized older tricks.
+- [x] Incoming call/trick tidak mencuri reader scroll/selection; undo/board change melakukan clamp/reset yang tepat.
+- [x] Open/close/Escape/focus return berjalan pada keyboard/touch tanpa nested modal stack.
+
+Evidence P6-06, 23 September 2026: commits `e90ac1c` dan `12cfb0e`. Auction reader menampilkan dealer, urutan W/N/E/S, giliran, kontrak termasuk doubling, declarer, serta call Pass/X/XX dengan cue teks dan bentuk; reader tidak lagi auto-scroll ketika remote call masuk. Trick reader tetap memakai `PlayingCard` canonical, menampilkan nomor, urutan main, seat, leader dan winner authoritative tanpa overflow horizontal. Pilihan trick dipatok ketika reader dibuka, tetap stabil saat remote trick masuk, di-clamp setelah undo, dan di-reset melalui board identity. Dummy tetap dapat prev/next seluruh projection authorized; non-Dummy hanya merender latest-only projection dan tidak membentuk ulang history. Popover memindahkan fokus ke close lalu mengembalikannya ke trigger pada close/Escape/light-dismiss tanpa modal bertumpuk; button/popover path yang sama melayani pointer, touch dan keyboard. Browser harness lulus 6/6 pada 1440×900, 768×1024, 390×844, 320×568, dan landscape 568×320, termasuk incoming call/trick, undo, board change, privacy policy, geometry, keyboard dan focus return. Web unit 69/69, strict typecheck, production build, dan lint tanpa error (dua warning `aria-description` lama) lulus.
 
 ### P6-07 — History workspace dan score context
 
