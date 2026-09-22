@@ -50,7 +50,7 @@ export function useTurnSoundPreference() {
   return { muted, setMuted };
 }
 
-export function useTurnAudio(table: LiveTableProjection | null) {
+export function useTurnAudio(table: LiveTableProjection | null, visible = true) {
   const { muted, setMuted } = useTurnSoundPreference();
   const interactedRef = useRef(false);
   const previousStateRef = useRef<ReturnType<typeof turnCueState>>(null);
@@ -71,7 +71,7 @@ export function useTurnAudio(table: LiveTableProjection | null) {
     const currentState = table === null ? null : turnCueState(table);
     const shouldPlay = shouldPlayTurnCue(previousStateRef.current, currentState);
     previousStateRef.current = currentState;
-    if (!shouldPlay || muted || !interactedRef.current) return;
+    if (!shouldPlay || !visible || document.visibilityState !== "visible" || muted || !interactedRef.current) return;
 
     try {
       const AudioContextClass = window.AudioContext;
@@ -107,7 +107,7 @@ export function useTurnAudio(table: LiveTableProjection | null) {
     } catch {
       return;
     }
-  }, [muted, table]);
+  }, [muted, table, visible]);
 
   return { muted, setMuted };
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePositionAnalysis } from "./use-position-analysis";
 import IssueNotice from "./issue-notice";
 import {
@@ -26,8 +26,17 @@ import {
 import { TableSurface } from "./table/table-surface";
 import { useGameplayMotion } from "./table/use-gameplay-motion";
 import { WaitingRoom } from "./table/waiting-room";
-import { useTableSession } from "./use-table-session";
+import { useTableSession, type TableSession } from "./use-table-session";
 import { useTurnAudio } from "./use-turn-audio";
+
+function subscribeDocumentVisibility(listener: () => void) {
+  document.addEventListener("visibilitychange", listener);
+  return () => document.removeEventListener("visibilitychange", listener);
+}
+
+function documentVisible() {
+  return document.visibilityState === "visible";
+}
 
 export default function BridgeTable({
   expectedTableId,
@@ -38,7 +47,14 @@ export default function BridgeTable({
 }) {
   const router = useRouter();
   const session = useTableSession();
+  const documentIsVisible = useSyncExternalStore(subscribeDocumentVisibility, documentVisible, () => true);
+  const presentationVisible = visible && documentIsVisible;
   const { canSendCommand, openTable, sendCommand } = session;
+  const canSendVisibleCommand: TableSession["canSendCommand"] = (name, payload) =>
+    presentationVisible && canSendCommand(name, payload);
+  const sendVisibleCommand: TableSession["sendCommand"] = (name, payload) => {
+    if (canSendVisibleCommand(name, payload)) sendCommand(name, payload);
+  };
   const attemptedTableIdRef = useRef<string | null>(null);
   const table = session.projectedTable;
   const game = table?.game;
@@ -55,8 +71,8 @@ export default function BridgeTable({
   const analysis = usePositionAnalysis(session.loadPositionAnalysis, table?.boardId,
     String(table?.revision), doubleDummy && analysisHand !== null && (game?.phase === "PLAY" || game?.phase === "OPENING_LEAD") && Object.keys(session.tableState.pending).length === 0);
   const viewerTurn = game?.turn === table?.viewerSeat;
-  const motion = useGameplayMotion(game);
-  const turnAudio = useTurnAudio(session.tableState.table);
+  const motion = useGameplayMotion(game, presentationVisible);
+  const turnAudio = useTurnAudio(session.tableState.table, presentationVisible);
 
   useEffect(() => {
     if (!visible) return;
@@ -91,7 +107,12 @@ export default function BridgeTable({
   useEffect(() => {
     function handleAuctionKeyboard(event: KeyboardEvent) {
       if (
-        !visible ||
+        !presentationVisible ||
+        event.repeat ||
+        (event.target instanceof HTMLElement && event.target.isContentEditable) ||
+        (event.target instanceof Element &&
+          event.target.closest(".persistent-table-workspace, .table-client") === null &&
+          event.target !== document.body) ||
         document.querySelector("dialog[open]") !== null ||
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLSelectElement ||
@@ -118,7 +139,7 @@ export default function BridgeTable({
     }
     window.addEventListener("keydown", handleAuctionKeyboard);
     return () => window.removeEventListener("keydown", handleAuctionKeyboard);
-  }, [canSendCommand, game, sendCommand, viewerTurn, visible]);
+  }, [canSendCommand, game, presentationVisible, sendCommand, viewerTurn]);
 
   async function returnToLobby() {
     if (table?.matchId) { router.push(`/match/${table.matchId}`); return; }
@@ -185,9 +206,9 @@ export default function BridgeTable({
           orientation={orientation}
           presence={session.tableState.presence}
           inviteCode={session.inviteCode}
-          canSendCommand={session.canSendCommand}
+          canSendCommand={canSendVisibleCommand}
           onLeaveTable={() => void returnToLobby()}
-          onCommand={session.sendCommand}
+          onCommand={sendVisibleCommand}
         />
       </main>
     );
@@ -214,8 +235,8 @@ export default function BridgeTable({
         table={table}
         connectionState={session.connectionState}
         inviteCode={session.inviteCode}
-        canSendCommand={session.canSendCommand}
-        onCommand={session.sendCommand}
+        canSendCommand={canSendVisibleCommand}
+        onCommand={sendVisibleCommand}
         analysisControl={table.matchId ? null : <button type="button" aria-pressed={doubleDummy} onClick={() => setDoubleDummy((value) => !value)} title="Predicted total tricks untuk pasangan yang sedang turn">DD {doubleDummy ? "ON" : "OFF"}</button>}
         soundMuted={turnAudio.muted}
         onSoundMutedChange={turnAudio.setMuted}
@@ -256,8 +277,8 @@ export default function BridgeTable({
         table={table}
         orientation={orientation}
         presence={session.tableState.presence}
-        canSendCommand={session.canSendCommand}
-        onCommand={session.sendCommand}
+        canSendCommand={canSendVisibleCommand}
+        onCommand={sendVisibleCommand}
         onBoardClick={motion.skipCurrent}
       >
         {game === undefined || !boardComplete ? null : (
@@ -269,8 +290,8 @@ export default function BridgeTable({
             <BiddingBox
               legalCalls={game.legalCalls ?? []}
               disabled={!viewerTurn}
-              canCall={(call) => session.canSendCommand("game.make_call", { call })}
-              onCall={(call) => session.sendCommand("game.make_call", { call })}
+              canCall={(call) => canSendVisibleCommand("game.make_call", { call })}
+              onCall={(call) => sendVisibleCommand("game.make_call", { call })}
             />
           </div>
         ) : null}
@@ -293,12 +314,12 @@ export default function BridgeTable({
                 playableCards={
                   legalPlay?.source === "dummy"
                     ? legalPlay.hand.filter((card) =>
-                        canSendCommand("game.play_card", { card }),
+                        canSendVisibleCommand("game.play_card", { card }),
                       )
                     : []
                 }
                 onPlay={(card) =>
-                  session.sendCommand("game.play_card", { card })
+                  sendVisibleCommand("game.play_card", { card })
                 }
               />
             )}
@@ -330,8 +351,6 @@ export default function BridgeTable({
         ) : (
           <BoardResult
             table={table}
-            canSendCommand={session.canSendCommand}
-            onCommand={session.sendCommand}
           />
         )}
       </TableSurface>
@@ -348,7 +367,7 @@ export default function BridgeTable({
           playableCards={
             legalPlay?.source === "own"
               ? legalPlay.hand.filter((card) =>
-                  canSendCommand("game.play_card", { card }),
+                  canSendVisibleCommand("game.play_card", { card }),
                 )
               : []
           }
@@ -356,7 +375,7 @@ export default function BridgeTable({
           {...(game.phase === "OPENING_LEAD" || game.phase === "PLAY"
             ? {
                 onPlay: (card: Card) =>
-                  session.sendCommand("game.play_card", { card }),
+                  sendVisibleCommand("game.play_card", { card }),
               }
             : {})}
         />
