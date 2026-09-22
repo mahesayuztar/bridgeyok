@@ -55,33 +55,39 @@ test("account guards, profile, navigation and responsive critical path", async (
     await noOverflow(page);
     const navigation = page.getByRole("navigation", { name: "Navigasi utama" });
     await expect(navigation.getByRole("link", { name: "Play", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(navigation.locator(".app-nav-item")).toHaveCount(4);
     if (width! < 768) {
       const play = await navigation.getByRole("link", { name: "Play", exact: true }).boundingBox();
-      expect(Math.abs(play!.x + play!.width / 2 - width! / 2)).toBeLessThan(2);
+      const navigationBox = await navigation.boundingBox();
+      expect(Math.abs(play!.x + play!.width / 2 - (navigationBox!.x + navigationBox!.width / 8))).toBeLessThan(2);
       expect(play!.height).toBeGreaterThanOrEqual(44);
     }
-    await page.getByRole("button", { name: /VS Robot/ }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Coming soon" })).toBeVisible();
-    await page.getByRole("button", { name: "Tutup pesan" }).click();
-    await navigation.getByRole("button", { name: "History" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Coming soon" })).toBeVisible();
-    await page.getByRole("button", { name: "Tutup pesan" }).click();
+    await expect(page.getByRole("link", { name: "Casual Game", exact: false })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Team Match", exact: false })).toBeVisible();
+    await navigation.getByRole("link", { name: "History", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "History", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Team Match", exact: true })).toBeVisible();
+    await navigation.getByRole("link", { name: "Play", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /^Halo,/ })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath(`play-${width}.png`) });
-    await navigation.getByRole("link", { name: "Settings", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
+    await navigation.getByRole("button", { name: "More", exact: true }).click();
+    await page.getByRole("link", { name: "Settings dan profile", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
     await noOverflow(page);
     await page.screenshot({ path: testInfo.outputPath(`profile-${width}.png`) });
     await navigation.getByRole("link", { name: "Play", exact: true }).click();
   }
-  await page.getByRole("button", { name: /Teacher Table/ }).click();
-  await page.getByRole("button", { name: /VS Robot/ }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Coming soon" })).toHaveCount(1);
-  await page.getByRole("button", { name: "Tutup pesan" }).click();
-  for (const route of ["/team-match", "/robot", "/teacher", "/history", "/deals"]) {
+  for (const route of ["/team-match", "/robot", "/teacher", "/deals"]) {
     const response = await page.goto(route);
     expect(response?.status()).toBe(404);
   }
   await page.goto("/settings");
+  await page.getByLabel("Bunyikan penanda giliran").uncheck();
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  await expect(page.getByLabel("Suara giliran")).not.toBeChecked();
+  await page.getByLabel("Suara giliran").check();
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("Bunyikan penanda giliran")).toBeChecked();
   await page.getByLabel("Nama di meja").fill("Updated Player");
   await page.getByRole("radio", { name: "fox", exact: true }).check();
   await page.getByRole("button", { name: "Simpan profile" }).click();
@@ -89,6 +95,12 @@ test("account guards, profile, navigation and responsive critical path", async (
   await page.reload();
   await expect(page.getByLabel("Nama di meja")).toHaveValue("Updated Player");
   await expect(page.getByRole("radio", { name: "fox", exact: true })).toBeChecked();
+  await page.route("**/api/account/logout", route => route.fulfill({ status: 503, contentType: "application/json", body: '{"code":"SERVICE_UNAVAILABLE"}' }));
+  await page.getByRole("button", { name: "Logout", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Logout gagal" })).toBeVisible();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByLabel("Nama di meja")).toHaveValue("Updated Player");
+  await page.unroute("**/api/account/logout");
   await page.getByRole("button", { name: "Logout", exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto("/table/00000000-0000-4000-8000-000000000000");
@@ -150,11 +162,11 @@ test("mutual friends, participant follow and online invite preserve table author
   }
   await alice.getByRole("button", { name: "Invite", exact: true }).click();
   await expect(alice.getByRole("status").filter({ hasText: "Undangan terkirim" })).toBeVisible();
-  await expect(bob.getByRole("link", { name: "Lihat meja" })).toBeVisible({ timeout: 20000 });
+  await expect(bob.getByRole("link", { name: "Join", exact: true })).toBeVisible({ timeout: 20000 });
   await alice.getByRole("button", { name: "Tutup invite" }).click();
   await expect(alice.getByRole("button", { name: "Invite player", exact: true })).toBeFocused();
   await expect(alice.getByText("1/4 pemain sudah masuk.", { exact: false })).toBeVisible();
-  await bob.getByRole("link", { name: "Lihat meja" }).click();
+  await bob.getByRole("link", { name: "Join", exact: true }).click();
   await bob.getByRole("button", { name: "Masuk", exact: true }).click();
   await expect(bob).toHaveURL(tableURL);
   await bob.getByRole("button", { name: "Buka menu kursi kosong E" }).click();
@@ -193,14 +205,12 @@ test("mobile touch navigation, search states and keyboard recovery", async ({ br
   await page.getByRole("searchbox").fill(username);
   await expect(page.getByText("Kamu", { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("friends-touch-390.png") });
-  await navigation.getByRole("link", { name: "Settings", exact: true }).tap();
+  await navigation.getByRole("button", { name: "More", exact: true }).tap();
+  await page.getByRole("link", { name: "Settings dan profile", exact: true }).tap();
   await page.getByRole("radio", { name: "heart", exact: true }).check();
   await page.getByRole("button", { name: "Simpan profile" }).tap();
   await expect(page.getByRole("status").filter({ hasText: "Profile tersimpan" })).toBeVisible();
   await navigation.getByRole("link", { name: "Play", exact: true }).tap();
-  await page.getByRole("button", { name: /Teacher Table/ }).tap();
-  await expect(page.getByRole("status").filter({ hasText: "Coming soon" })).toBeVisible();
-  await page.getByRole("button", { name: "Tutup pesan" }).tap();
   await navigation.getByRole("link", { name: "Friends", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/friends$/);
