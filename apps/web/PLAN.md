@@ -1016,10 +1016,10 @@ Keputusan lanjutan: shared authenticated layout dengan persistent GameSessionPro
 - [x] P6-02: session/realtime owner shared, account/chat tetap berfungsi; commits `54a4ef6`, `d7e9dbe`.
 - [x] P6-03: persistent shell, route activation, Back/Forward/refresh dan workspace state; commits `90f3b33`, `fcbbad2`.
 - [x] P6-04: navigation/More/utilities/copy tanpa placeholder primary destination; commits `d254dbc`, `a6b1c40`.
-- [ ] P6-05: safe hidden input/motion, explicit board progression dan card geometry.
+- [x] P6-05: safe hidden input/motion, explicit board progression dan card geometry; commits `662a333`, `3122c23`, `111eed2`, browser empat akun dan session baseline lulus pada PostgreSQL 17 disposable.
 - [ ] P6-06: auction/trick reader readable dan recipient-scoped.
 - [ ] P6-07: History workspace/score context/authorized match completion refresh.
 - [ ] P6-08: accessibility, zoom, responsive dan real pointer/touch gate.
 - [ ] P6-09: persistence/privacy/gameplay regression dan evidence handoff.
 
-P6-01–P6-04 PASS; P6-05–09 dan seluruh Objective of Done Phase 6 masih pending. Browser audit awal tetap dijelaskan di evidence.
+P6-01–P6-05 PASS; P6-06–09 dan seluruh Objective of Done Phase 6 masih pending. Browser audit awal tetap dijelaskan di evidence.

@@ -340,11 +340,15 @@ Tujuan: table persistent tidak memicu input/motion/lifecycle tersembunyi.
 Scope: visibility/focus contract, shortcut, pointer capture, motion/audio, explicit Next board; geometry kartu/table di dalam shell.
 Dependency: P6-02; integrasi final sesudah P6-03/04. Parallelization: P6-06/07, karena engine/capabilities tetap shared existing.
 
-- [ ] P/X/R, Enter, Escape dan pointer pada workspace tidak mengirim gameplay command; visible table tetap bisa dimainkan ketika focus/pointer sah.
-- [ ] Satu click/tap/drag menghasilkan satu command; illegal/nonplayable known state mengirim nol command.
-- [ ] Remote actions diterima saat workspace terbuka; return tanpa stale motion backlog atau audio duplikat.
-- [ ] BoardResult tidak mengirim next_board dari 5-second timeout, klik dokumen atau perubahan visibility; Next board explicit capability-guarded.
-- [ ] Own hand/dummy/current trick/seat readable dan tidak overlap di semua target; card selection di narrow touch tidak mengandalkan strip kecil.
+- [x] P/X/R, Enter, Escape dan pointer pada workspace tidak mengirim gameplay command; visible table tetap bisa dimainkan ketika focus/pointer sah.
+- [x] Satu click/tap/drag menghasilkan satu command; illegal/nonplayable known state mengirim nol command.
+- [x] Remote actions diterima saat workspace terbuka; return tanpa stale motion backlog atau audio duplikat.
+- [x] BoardResult tidak mengirim next_board dari 5-second timeout, klik dokumen atau perubahan visibility; Next board explicit capability-guarded.
+- [x] Own hand/dummy/current trick/seat readable dan tidak overlap di semua target; card selection di narrow touch tidak mengandalkan strip kecil.
+
+Evidence P6-05, 22 September 2026: commits `662a333`, `3122c23`, dan `111eed2`. Visible/document visibility membatasi input, cue audio, dan antrean motion; hidden table tetap menerima projection tetapi kembali pada trick terkini tanpa animasi tertunda. BoardResult menjadi tampilan skor stabil, sedangkan pemilik meja mendapat tombol Next board capability-guarded di status bar. Gerak masuk hasil board memakai opacity/translate 180 ms dan mengikuti reduced motion. Hand mobile dapat digeser dengan eksposur kartu ≥44 px pada lebar ≤390 px; trick 320–400 px disusun 2×2 dan tinggi meja menyisakan ruang navbar bawah.
+
+Browser gate PostgreSQL 17 disposable menjalankan alur empat akun sampai dua board pada viewport 1920×1080, 1024×768, 768×1024, 390×844, dan 320×700: disabled card mengirim nol command, touch/mouse drag masing-masing satu command, kartu/trick/seat tidak overlap, dan dokumen tidak overflow. Saat Friends terbuka, P/X/R/Enter/Escape dan synthetic click mengirim nol gameplay command; call serta play remote tetap masuk, return tidak memutar cue atau motion backlog. Klik board dan 5,2 detik pada result tidak memajukan board; tombol eksplisit memajukan tepat satu board. `phase6-session-baseline.spec.ts` lulus tanpa socket/GET/subscription churn; web unit 69/69, typecheck, lint tanpa error (dua warning `aria-description` yang sudah ada), dan production build lulus.
 
 ### P6-06 — Auction dan trick history reader
 
