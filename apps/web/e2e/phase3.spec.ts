@@ -1141,8 +1141,16 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
   await expect.poll(() => east.page.evaluate(() =>
     (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
   )).toBe(1);
+  const hiddenInputBaseline = mutationFrameCount(east.sentFrames);
+  await east.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: "Friends" }).click();
+  await expect(east.page).toHaveURL(/\/friends$/);
+  for (const key of ["p", "x", "r", "Enter", "Escape"]) await east.page.keyboard.press(key);
+  await east.page.locator(".auction-workspace .call-actions button").first().dispatchEvent("click");
+  expect(mutationFrameCount(east.sentFrames)).toBe(hiddenInputBaseline);
+  await east.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: /^Table/ }).click();
+  await waitForConnection(east.page);
   await east.page.getByLabel("Buka menu meja").click();
-  await east.page.getByLabel("Suara giliran").uncheck();
+  await east.page.locator(".table-menu").getByLabel("Suara giliran").uncheck();
   await expect.poll(() => east.page.evaluate(() =>
     window.localStorage.getItem("bridgeyok.turnAudioMuted"),
   )).toBe("true");
@@ -1218,8 +1226,23 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
       attributeFilter: ["data-motion-stage"],
     });
   });
+  await west.page.evaluate(() => {
+    const motionWindow = window as Window & { __hiddenMotionStages?: string[] };
+    const trick = document.querySelector(".current-trick");
+    motionWindow.__hiddenMotionStages = [];
+    if (trick === null) return;
+    new MutationObserver(() => {
+      motionWindow.__hiddenMotionStages?.push(trick.getAttribute("data-motion-stage") ?? "missing");
+    }).observe(trick, { attributeFilter: ["data-motion-stage"] });
+  });
+  await west.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: "Friends" }).click();
+  await expect(west.page).toHaveURL(/\/friends$/);
   await dragPlayableCard(east.page, "mouse");
   expect(mutationFrameCount(east.sentFrames)).toBe(eastFramesBeforeDrag + 1);
+  await expect(west.page.locator(".trick-slot .physical-card")).toHaveCount(1);
+  await west.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: /^Table/ }).click();
+  await waitForConnection(west.page);
+  expect(await west.page.evaluate(() => (window as Window & { __hiddenMotionStages?: string[] }).__hiddenMotionStages ?? [])).not.toContain("moving");
   await expect.poll(() => replacementTab.evaluate(() =>
     (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
   )).toBe(declarerCueBeforeLead + 1);
@@ -1284,8 +1307,35 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
     }),
   ).toHaveCount(0);
   const westFramesBeforeDrag = mutationFrameCount(west.sentFrames);
-  await dragPlayableCard(west.page, "touch");
+  await west.page.setViewportSize({ width: 320, height: 700 });
+  await west.page.getByRole("button", { name: "Pilih kartu" }).click();
+  await expect(west.page.locator('.own-hand[data-expanded="true"]')).toBeVisible();
+  const expandedHandGeometry = await west.page.locator(".own-hand").evaluate((hand) => {
+    const cards = [...hand.querySelectorAll<HTMLElement>(".physical-card")].map((card) => {
+      const bounds = card.getBoundingClientRect();
+      return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom, width: bounds.width };
+    });
+    const overlaps = cards.some((card, _cardIndex) => cards.slice(_cardIndex + 1).some((otherCard) =>
+      card.left < otherCard.right - 1 && card.right > otherCard.left + 1 && card.top < otherCard.bottom - 1 && card.bottom > otherCard.top + 1,
+    ));
+    return {
+      cardCount: cards.length,
+      minimumWidth: Math.min(...cards.map((card) => card.width)),
+      overlaps,
+      documentOverflow: document.documentElement.scrollWidth > innerWidth,
+    };
+  });
+  expect(expandedHandGeometry).toEqual({
+    cardCount: 13,
+    minimumWidth: expect.any(Number),
+    overlaps: false,
+    documentOverflow: false,
+  });
+  expect(expandedHandGeometry.minimumWidth).toBeGreaterThanOrEqual(44);
+  await west.page.screenshot({ path: testInfo.outputPath("hand-picker-320x700.png"), fullPage: false });
+  await west.page.locator('.own-hand[data-expanded="true"] button[aria-label^="Mainkan "]:enabled').first().click();
   expect(mutationFrameCount(west.sentFrames)).toBe(westFramesBeforeDrag + 1);
+  await expect(west.page.locator('.own-hand[data-expanded="true"]')).toHaveCount(0);
   await playNextCard(activePages);
   await expect(east.page.locator(".current-trick")).toHaveAttribute(
     "data-motion-stage",
@@ -1446,6 +1496,10 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
     activePages.map((page) => expect(page.locator(".board-result")).toBeVisible()),
   );
   await Promise.all(activePages.map(assertCompletedDealGeometry));
+  await replacementTab.screenshot({
+    path: testInfo.outputPath("completed-deal-result-320x700.png"),
+    fullPage: false,
+  });
   await replacementTab.clock.pauseAt(await replacementTab.evaluate(() => Date.now() + 500));
 
   await replacementTab.getByRole("button", { name: "Buka skor meja" }).click();
@@ -1528,11 +1582,10 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
   await replacementTab.locator(".board-play-zone").click({
     position: { x: 10, y: 10 },
   });
-  await expect(replacementTab.locator(".board-result")).toHaveAttribute(
-    "data-exiting",
-    "true",
-  );
-  await replacementTab.clock.runFor(200);
+  await replacementTab.clock.runFor(5_200);
+  await expect(replacementTab.locator(".board-result")).toBeVisible();
+  await expect(replacementTab.locator(".auction-workspace")).toHaveCount(0);
+  await replacementTab.getByRole("button", { name: "Board berikutnya" }).click();
   await replacementTab.clock.resume();
   await expect(replacementTab.locator(".board-result")).toHaveCount(0);
   assertPrivateFrames(north.frames, "latest");

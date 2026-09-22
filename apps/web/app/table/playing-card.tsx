@@ -1,4 +1,6 @@
-import type { CSSProperties } from "react";
+"use client";
+
+import { useId, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { Card, Contract, VisualPosition } from "../table-state";
 import {
@@ -126,6 +128,8 @@ export function BridgeHand({
   contractStrain: Contract["strain"] | undefined;
   position?: VisualPosition;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const cardListId = useId();
   const playableKeys = new Set(playableCards.map(cardKey));
   const analysisKeys = new Set((analysisCards ?? playableCards).map(cardKey));
   const organizedCards = organizeCardsForContract(cards, contractStrain);
@@ -140,15 +144,33 @@ export function BridgeHand({
       ? { "--side-dummy-suit-count": Math.max(cardGroups.length, 1) }
       : {}),
   } as CSSProperties;
+
+  const canExpand =
+    variant === "hand" && onPlay !== undefined && playableCards.length > 0;
   return (
     <section
       className={`bridge-hand ${className}`}
       data-variant={variant}
       data-layout={sideDummy ? "suit-groups" : "fan"}
+      data-expanded={expanded}
       aria-label={title}
       style={style}
+      onKeyDown={(event) => {
+        if (expanded && event.key === "Escape") setExpanded(false);
+      }}
     >
-      <div className="hand-cards">
+      {canExpand ? (
+        <button
+          type="button"
+          className="hand-selection-toggle"
+          aria-controls={cardListId}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          {expanded ? "Tutup" : "Pilih kartu"}
+        </button>
+      ) : null}
+      <div className="hand-cards" id={cardListId}>
         {cardGroups.map((cardGroup, _cardGroupIndex) => (
           <div
             className={`hand-card-group${cardGroup.suit === undefined ? "" : " dummy-suit-group"}`}
@@ -181,7 +203,14 @@ export function BridgeHand({
                   prediction={analysisKeys.has(cardKey(card)) ? predictions?.find((entry) => cardKey(entry.card) === cardKey(card))?.tricks ?? (analysisPending ? "pending" : undefined) : undefined}
                   disabled={disabled}
                   playable={playableKeys.has(cardKey(card))}
-                  {...(onPlay === undefined ? {} : { onPlay })}
+                  {...(onPlay === undefined
+                    ? {}
+                    : {
+                        onPlay: (selectedCard: Card) => {
+                          setExpanded(false);
+                          onPlay(selectedCard);
+                        },
+                      })}
                 />
               </span>
             ))}
