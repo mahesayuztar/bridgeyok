@@ -1237,8 +1237,23 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
       attributeFilter: ["data-motion-stage"],
     });
   });
+  await west.page.evaluate(() => {
+    const motionWindow = window as Window & { __hiddenMotionStages?: string[] };
+    const trick = document.querySelector(".current-trick");
+    motionWindow.__hiddenMotionStages = [];
+    if (trick === null) return;
+    new MutationObserver(() => {
+      motionWindow.__hiddenMotionStages?.push(trick.getAttribute("data-motion-stage") ?? "missing");
+    }).observe(trick, { attributeFilter: ["data-motion-stage"] });
+  });
+  await west.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: "Friends" }).click();
+  await expect(west.page).toHaveURL(/\/friends$/);
   await dragPlayableCard(east.page, "mouse");
   expect(mutationFrameCount(east.sentFrames)).toBe(eastFramesBeforeDrag + 1);
+  await expect(west.page.locator(".trick-slot .physical-card")).toHaveCount(1);
+  await west.page.getByRole("navigation", { name: "Navigasi utama" }).getByRole("link", { name: /^Table/ }).click();
+  await waitForConnection(west.page);
+  expect(await west.page.evaluate(() => (window as Window & { __hiddenMotionStages?: string[] }).__hiddenMotionStages ?? [])).not.toContain("moving");
   await expect.poll(() => replacementTab.evaluate(() =>
     (window as Window & { __turnCueCount?: number }).__turnCueCount ?? 0,
   )).toBe(declarerCueBeforeLead + 1);
