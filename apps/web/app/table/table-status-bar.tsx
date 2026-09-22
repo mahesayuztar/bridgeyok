@@ -180,7 +180,7 @@ export function ActiveTableStatusBar({
                 (game?.phase === "AUCTION" ? "Auction" : "—")}
             </span>
           </button>
-          <TrickIndicator table={table} />
+          <TrickIndicator key={table.boardId ?? table.boardNumber} table={table} />
         </div>
       </div>
       {game === undefined ? null : (
@@ -202,7 +202,7 @@ export function ActiveTableStatusBar({
               ×
             </button>
           </header>
-          <AuctionTable game={game} />
+          <AuctionTable game={game} followLatest={false} />
         </section>
       )}
       <ConsensusControls

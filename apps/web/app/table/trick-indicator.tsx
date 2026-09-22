@@ -1,5 +1,5 @@
 import { useDialogDrag } from "./use-dialog-drag";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   oppositeSeat,
   tableOrientation,
@@ -11,6 +11,8 @@ import { PlayingCard } from "./playing-card";
 
 export function TrickIndicator({ table }: { table: LiveTableProjection }) {
   const dialogDrag = useDialogDrag();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [selectedTrickNumber, setSelectedTrickNumber] = useState<number | null>(
     null,
   );
@@ -67,16 +69,18 @@ export function TrickIndicator({ table }: { table: LiveTableProjection }) {
   );
   const trick = game.completedTricks[trickNumber - firstVisibleTrickNumber]!;
   const orientation = tableOrientation(table.viewerSeat);
+  const leader = trick.leader ?? trick.plays[0]?.seat;
 
   return (
     <>
       <button
+        ref={triggerRef}
         className="trick-indicator-button"
         type="button"
         popoverTarget={historyId}
         aria-label={`Trick partnership Anda: ${counts.won} menang, ${counts.lost} kalah. Buka riwayat trick`}
         data-history-available="true"
-        onClick={() => setSelectedTrickNumber(null)}
+        onClick={() => setSelectedTrickNumber(game.completedTrickCount)}
       >
         {indicator}
       </button>
@@ -87,10 +91,24 @@ export function TrickIndicator({ table }: { table: LiveTableProjection }) {
         role="dialog"
         aria-labelledby={historyTitleId}
         data-history-policy={viewerIsDummy ? "full" : "latest"}
+        onToggle={(event) => {
+          if (event.currentTarget.matches(":popover-open")) {
+            closeButtonRef.current?.focus();
+          } else {
+            triggerRef.current?.focus();
+          }
+        }}
       >
         <header {...dialogDrag} className="trick-history-header">
-          <h2 id={historyTitleId}>Trick {trickNumber}</h2>
+          <div>
+            <h2 id={historyTitleId}>Trick {trickNumber}</h2>
+            <p className="trick-history-outcome">
+              <span>Leader <strong>{leader ?? "—"}</strong></span>
+              <span>Pemenang <strong>{trick.winner ?? "—"}</strong></span>
+            </p>
+          </div>
           <button
+            ref={closeButtonRef}
             className="trick-history-close"
             type="button"
             popoverTarget={historyId}
@@ -103,12 +121,18 @@ export function TrickIndicator({ table }: { table: LiveTableProjection }) {
         <ol className="trick-history-list">
           <li className="trick-history-item" key={trickNumber}>
             <div className="trick-history-cards">
-              {trick.plays.map((play) => (
+              {trick.plays.map((play, _playIndex) => (
                 <div
                   className={`trick-history-play history-${visualPositionForSeat(orientation, play.seat)}`}
+                  data-winner={trick.winner === play.seat}
                   key={`${play.seat}-${cardKey(play.card)}`}
                 >
-                  <span>{play.seat}</span>
+                  <span
+                    className="trick-history-order"
+                    aria-label={`Urutan ${_playIndex + 1}, kursi ${play.seat}${trick.winner === play.seat ? ", pemenang" : ""}`}
+                  >
+                    {_playIndex + 1} · {play.seat}
+                  </span>
                   <PlayingCard card={play.card} variant="trick" />
                 </div>
               ))}
@@ -124,6 +148,7 @@ export function TrickIndicator({ table }: { table: LiveTableProjection }) {
           >
             ‹
           </button>
+          <output aria-live="polite">{trickNumber} / {game.completedTrickCount}</output>
           <button
             type="button"
             aria-label="Trick berikutnya"

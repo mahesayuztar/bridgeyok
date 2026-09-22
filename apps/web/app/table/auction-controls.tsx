@@ -8,6 +8,7 @@ import {
 import {
   callKey,
   callLabel,
+  contractLabel,
   suitLabels,
 } from "./gameplay-presentation";
 
@@ -32,8 +33,10 @@ const callColor: Partial<Record<"C" | "D" | "H" | "S" | "NT", string>> = {
 };
 export function AuctionTable({
   game,
+  followLatest = true,
 }: {
   game: NonNullable<LiveTableProjection["game"]>;
+  followLatest?: boolean;
 }) {
   const auctionTableRef = useRef<HTMLDivElement>(null);
   const rows = auctionRows(game.auction.dealer, game.auction.calls);
@@ -41,10 +44,10 @@ export function AuctionTable({
   useLayoutEffect(() => {
     const auctionTable = auctionTableRef.current;
 
-    if (auctionTable) {
+    if (auctionTable && followLatest) {
       auctionTable.scrollTop = auctionTable.scrollHeight;
     }
-  }, [game.auction.calls.length]);
+  }, [followLatest, game.auction.calls.length]);
 
   function getCallClass(call?: Call) {
     if (!call || call.kind !== "BID") return "";
@@ -59,11 +62,36 @@ export function AuctionTable({
   return (
     <div ref={auctionTableRef} className="auction-table-wrap">
       <table className="auction-table">
+        <caption>
+          <span>
+            Dealer <strong>{game.auction.dealer}</strong>
+          </span>
+          <span>
+            {game.auction.contract === undefined ? (
+              game.auction.passedOut ? "Passed out" : "Kontrak belum ditentukan"
+            ) : (
+              <>
+                Kontrak <strong>{contractLabel(game.auction.contract)}</strong>
+                <span aria-hidden="true"> · </span>
+                Deklarer <strong>{game.auction.contract.declarer}</strong>
+              </>
+            )}
+          </span>
+        </caption>
         <thead>
           <tr>
             {auctionSeats.map((seat) => (
-              <th key={seat} scope="col" data-turn={game.turn === seat} data-vulnerable={game.board.vulnerability === "BOTH" || game.board.vulnerability === (seat === "N" || seat === "S" ? "NS" : "EW")}>
-                {seat}
+              <th
+                key={seat}
+                scope="col"
+                aria-label={`${seat}${game.auction.dealer === seat ? ", dealer" : ""}${game.turn === seat ? ", giliran" : ""}`}
+                data-dealer={game.auction.dealer === seat}
+                data-turn={game.turn === seat}
+                data-vulnerable={game.board.vulnerability === "BOTH" || game.board.vulnerability === (seat === "N" || seat === "S" ? "NS" : "EW")}
+              >
+                <span>{seat}</span>
+                {game.auction.dealer === seat ? <small>Dealer</small> : null}
+                {game.turn === seat ? <small className="auction-turn-label" aria-hidden="true">Giliran</small> : null}
               </th>
             ))}
           </tr>

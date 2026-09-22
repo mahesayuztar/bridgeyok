@@ -1424,6 +1424,25 @@ h2 {
   text-align: center;
 }
 
+.auction-table caption {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--table-panel);
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  text-align: start;
+}
+
+.auction-table caption span + span {
+  margin-inline-start: 0.75rem;
+}
+
+.auction-table caption strong {
+  color: var(--foreground);
+  font-weight: 800;
+}
+
 /* =========================================================
    AUCTION HEADER
    ========================================================= */
@@ -1450,6 +1469,25 @@ h2 {
   font-weight: 800;
 
   letter-spacing: 0.08em;
+}
+
+.auction-table th > span {
+  display: block;
+}
+
+.auction-table th small {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.auction-table th .auction-turn-label {
+  text-decoration: underline 2px currentColor;
+  text-underline-offset: 0.18rem;
 }
 
 .auction-table th:last-child {
@@ -4320,7 +4358,7 @@ button.physical-card.is-dragging {
   --history-card-width: min(var(--card-trick-width), 4rem, 19vw, 20dvh);
   --history-card-height: calc(var(--history-card-width) * 1.4);
   inset: 0;
-  width: min(15rem, calc(100vw - 1rem));
+  width: min(17rem, calc(100vw - 1rem));
   margin: auto;
   box-shadow: none;
 }
@@ -4348,6 +4386,30 @@ button.physical-card.is-dragging {
   z-index: 1;
   right: 0.3rem;
   top: 0.3rem;
+}
+.trick-history-outcome {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.08rem 0 0;
+  color: var(--table-ink);
+  font-size: 0.68rem;
+}
+.trick-history-outcome strong {
+  font-variant-numeric: tabular-nums;
+}
+.trick-history-play[data-winner="true"] .trick-history-order {
+  border: 2px solid var(--foreground);
+  background: var(--card);
+  color: var(--foreground);
+}
+.trick-history-order {
+  min-width: 2.2rem;
+  padding: 0.15rem 0.25rem;
+  background: var(--surface-strong);
+  color: var(--foreground) !important;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
 }
 .trick-history-play .card-trick {
   flex: none;
@@ -4385,9 +4447,17 @@ button.physical-card.is-dragging {
 }
 .trick-history-navigation {
   display: flex;
+  align-items: center;
   justify-content: center;
   gap: 0.5rem;
   padding: 0 0.5rem 0.5rem;
+}
+.trick-history-navigation output {
+  min-width: 3.5rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  text-align: center;
 }
 .trick-history-navigation button {
   width: 3rem;
