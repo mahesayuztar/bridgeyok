@@ -1,6 +1,6 @@
 # BridgeYok — Product & Engineering Implementation Plan
 
-> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending; Phase 6 berjalan dengan P6-01–P6-04 PASS
+> Status: Phase 0–2 selesai; Phase 3 berjalan; Objective GUX UX-01–UX-14, UX-G1, dan ENG-01–ENG-03 PASS; Phase 4 teknis selesai, review bridge independen pending; Phase 5 API/actor, UI, dan hardening lokal PASS; release gates pending; Phase 6 berjalan dengan P6-01–P6-05 PASS
 > Disusun: 29 Agustus 2026
 > Refactor scope: 30 Agustus 2026
 > Gameplay UX reliability objective: 1 September 2026
