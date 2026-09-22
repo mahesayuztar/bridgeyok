@@ -18,7 +18,10 @@ export type GameplayMotionFrame = {
 
 const emptyTrick: Trick = { plays: [] };
 
-export function useGameplayMotion(game: GameProjection | undefined) {
+export function useGameplayMotion(
+  game: GameProjection | undefined,
+  animate = true,
+) {
   const [frame, setFrame] = useState<GameplayMotionFrame>({
     trick: game?.currentTrick ?? emptyTrick,
     stage: "idle",
@@ -41,6 +44,7 @@ export function useGameplayMotion(game: GameProjection | undefined) {
       return;
     }
     if (event.kind === "sync") {
+      setIsAnimating(false);
       setFrame({ trick: event.trick, stage: "idle" });
       queueMicrotask(() => runNextRef.current());
       return;
@@ -99,6 +103,20 @@ export function useGameplayMotion(game: GameProjection | undefined) {
   }, []);
 
   useEffect(() => {
+    if (!animate) {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      timerRef.current = null;
+      finishRef.current = null;
+      activeEventKindRef.current = null;
+      queueRef.current = [
+        { kind: "sync", trick: game?.currentTrick ?? emptyTrick },
+      ];
+      previousGameRef.current = game;
+      previousKeyRef.current =
+        game === undefined ? null : gameplayMotionKey(game);
+      queueMicrotask(() => runNextRef.current());
+      return;
+    }
     if (game === undefined) {
       previousGameRef.current = undefined;
       previousKeyRef.current = null;
@@ -137,7 +155,7 @@ export function useGameplayMotion(game: GameProjection | undefined) {
       return;
     }
     queueMicrotask(() => runNextRef.current());
-  }, [game]);
+  }, [animate, game]);
 
   useEffect(
     () => () => {
