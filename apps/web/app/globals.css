@@ -4884,55 +4884,42 @@ button.physical-card.is-dragging {
   position: static;
 }
 
-.bid-matrix {
+.bid-strain-stage {
   display: grid;
-  gap: 0.28rem;
-  margin-top: 0.45rem;
+  gap: 0.45rem;
 }
 
-.bid-matrix-header,
-.bid-matrix-row {
-  display: grid;
-  grid-template-columns: 1.35rem repeat(5, minmax(0, 1fr));
-  gap: 0.28rem;
-}
-
-.bid-matrix-header {
+.bid-stage-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   color: var(--muted);
-  font-family: Georgia, "Times New Roman", serif;
   font-size: 0.78rem;
-  font-weight: 800;
-  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.bid-matrix-header .h-call,
-.bid-matrix-header .d-call {
-  color: var(--suit-h) !important;
-}
-
-.bid-level-label {
-  display: grid;
-  place-items: center;
-  color: var(--muted);
+.bid-stage-level {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.2rem 0.5rem;
+  border-color: var(--accent-strong);
+  background: var(--surface-strong);
+  color: var(--accent-strong);
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.85rem;
+  font-size: 1.25rem;
   font-weight: 800;
 }
 
-.bid-matrix-row button {
-  min-width: 0;
-  min-height: 2.25rem;
-  padding: 0.15rem 0.1rem;
-  border-color: #9c9588;
-  background: var(--card);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.92rem;
-  font-weight: 800;
-  line-height: 1;
+.bid-stage-heading + .bid-strains {
+  margin-top: 0;
 }
 
-.bid-matrix-row button:disabled {
-  opacity: 0.3;
+.bid-levels button,
+.bid-strains button {
+  min-height: 2.75rem;
 }
 
 .active-table-client .board-play-zone > .board-result {
@@ -4999,29 +4986,19 @@ button.physical-card.is-dragging {
     height: 1.8rem;
   }
 
-  .bid-matrix {
-    gap: 0.18rem;
-    margin-top: 0.28rem;
+  .call-actions button {
+    min-height: 2.75rem;
   }
 
-  .bid-matrix-header,
-  .bid-matrix-row {
-    grid-template-columns: 1.1rem repeat(5, minmax(0, 1fr));
-    gap: 0.18rem;
+  .bid-levels {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.4rem;
   }
 
-  .bid-matrix-header {
-    font-size: 0.66rem;
-  }
-
-  .bid-level-label {
-    font-size: 0.74rem;
-  }
-
-  .bid-matrix-row button {
-    min-height: 1.78rem;
-    padding: 0.1rem 0;
-    font-size: 0.7rem;
+  .bid-levels button,
+  .bid-strains button,
+  .bid-stage-level {
+    min-height: 2.75rem;
   }
 
   .active-table-client .board-play-zone > .board-result {

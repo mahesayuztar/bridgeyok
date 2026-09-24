@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   auctionRows,
   type Call,
@@ -145,7 +145,32 @@ export function BiddingBox({
   canCall: (call: Call) => boolean;
   onCall: (call: Call) => void;
 }) {
+  const [selectedBid, setSelectedBid] = useState<{
+    level: number;
+    signature: string;
+  } | null>(null);
   const legalKeys = new Set(legalCalls.map(callKey));
+  const legalCallSignature = legalCalls.map(callKey).join("|");
+  const legalBidLevels = [1, 2, 3, 4, 5, 6, 7].filter((level) =>
+    strains.some((strain) => legalKeys.has(callKey({ kind: "BID", level, strain }))),
+  );
+  const activeLevel = disabled || selectedBid === null || selectedBid.signature !== legalCallSignature || !legalBidLevels.includes(selectedBid.level)
+    ? null
+    : selectedBid.level;
+
+  function selectLevel(level: number) {
+    if (disabled || !legalBidLevels.includes(level)) return;
+    setSelectedBid({ level, signature: legalCallSignature });
+  }
+
+  function submitBid(strain: (typeof strains)[number]) {
+    if (activeLevel === null) return;
+    const call: Call = { kind: "BID", level: activeLevel, strain };
+    if (!legalKeys.has(callKey(call)) || !canCall(call)) return;
+    setSelectedBid(null);
+    onCall(call);
+  }
+
   return (
     <section className="bidding-box" aria-label="Kotak lelang">
       <div className="call-actions">
@@ -154,43 +179,71 @@ export function BiddingBox({
             type="button"
             key={label}
             disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}
-            onClick={() => onCall(call)}
+            onClick={() => {
+              setSelectedBid(null);
+              onCall(call);
+            }}
           >
             {label}
             <kbd>{shortcut}</kbd>
           </button>
         ))}
       </div>
-      <div className="bid-strains bid-matrix" role="group" aria-label="Pilih bid">
-        <div className="bid-matrix-header" aria-hidden="true">
-          <span />
-          {strains.map((strain) => (
-            <span className={callColor[strain]} key={strain}>
-              {strain === "NT" ? "NT" : suitLabels[strain]}
-            </span>
+      {activeLevel === null ? (
+        <div className="bid-levels" role="group" aria-label="Pilih level bid">
+          {legalBidLevels.map((level) => (
+            <button
+              type="button"
+              key={level}
+              aria-label={`Pilih level ${level}`}
+              disabled={disabled || !strains.some((strain) => {
+                const call: Call = { kind: "BID", level, strain };
+                return legalKeys.has(callKey(call)) && canCall(call);
+              })}
+              onClick={() => selectLevel(level)}
+            >
+              {level}
+            </button>
           ))}
         </div>
-        {[1, 2, 3, 4, 5, 6, 7].map((level) => (
-          <div className="bid-matrix-row" key={level}>
-            <span className="bid-level-label" aria-hidden="true">{level}</span>
+      ) : (
+        <div className="bid-strain-stage">
+          <div className="bid-stage-heading">
+            <button
+              className="bid-stage-level"
+              type="button"
+              aria-label="Ubah level bid"
+              onClick={() => setSelectedBid(null)}
+            >
+              {activeLevel}
+            </button>
+            <span aria-hidden="true">→</span>
+            <span>Denom.</span>
+          </div>
+          <div
+            className="bid-strains"
+            role="group"
+            aria-label={`Pilih denomination untuk level ${activeLevel}`}
+          >
             {strains.map((strain) => {
-              const call: Call = { kind: "BID", level, strain };
-              return (
+              const call: Call = { kind: "BID", level: activeLevel, strain };
+              const available = legalKeys.has(callKey(call));
+              return available ? (
                 <button
                   className={callColor[strain]}
                   type="button"
                   key={strain}
                   aria-label={`Bid ${callLabel(call)}`}
-                  disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}
-                  onClick={() => onCall(call)}
+                  disabled={disabled || !canCall(call)}
+                  onClick={() => submitBid(strain)}
                 >
-                  {callLabel(call)}
+                  {strain === "NT" ? "NT" : suitLabels[strain]}
                 </button>
-              );
+              ) : null;
             })}
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </section>
   );
 }
