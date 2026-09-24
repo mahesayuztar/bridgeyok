@@ -97,7 +97,7 @@ test("private chat optimistic realtime, offline retained history, emoji, toast a
   await bobContext.close();
 });
 
-test("table chat preserves gameplay geometry and pointer actions across viewport sizes", async ({
+test("permanent table chat preserves gameplay geometry and pointer actions across viewport sizes", async ({
   browser,
 }, testInfo) => {
   test.setTimeout(120000);
@@ -123,12 +123,11 @@ test("table chat preserves gameplay geometry and pointer actions across viewport
   await page.getByRole("button", { name: "Saya siap", exact: true }).click();
   await page.getByRole("button", { name: "Mulai board", exact: true }).click();
   await expect(page.locator(".own-hand .physical-card")).toHaveCount(13);
-  await page.getByRole("button", { name: "Chat", exact: true }).click();
   const panel = page.getByRole("region", { name: "Chat meja", exact: true });
+  await expect(panel).toBeVisible();
   await panel.getByLabel("Pesan", { exact: true }).fill("Table ♠️");
   await panel.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(panel.getByText("Table ♠️", { exact: true })).toHaveCount(1);
-  await panel.getByRole("button", { name: "Tutup chat", exact: true }).click();
   await page.setViewportSize({ width: 320, height: 700 });
   const levelGeometry = await page.locator(".bidding-box").evaluate((box) => {
     const levelButtons = [...box.querySelectorAll<HTMLElement>(".bid-levels button")];
@@ -169,7 +168,6 @@ test("table chat preserves gameplay geometry and pointer actions across viewport
   expect(strainGeometry.overflowY).toBe(false);
   await page.screenshot({ path: testInfo.outputPath("bidding-stage-320x700.png") });
   await page.getByRole("button", { name: "Bid 1NT", exact: true }).click();
-  await page.getByRole("button", { name: "Chat", exact: true }).click();
   await expect(page.locator(".dummy-hand .physical-card")).toHaveCount(13);
   for (const [width, height] of [
     [320, 700],
@@ -206,10 +204,8 @@ test("table chat preserves gameplay geometry and pointer actions across viewport
       ).toBe(true);
       await page.setViewportSize({ width: width!, height: height! });
     }
-    await panel.getByRole("button", { name: "Tutup chat" }).click();
     const after = await page.locator(".own-hand").boundingBox();
     expect(Math.abs(before!.y - after!.y)).toBeLessThan(1);
-    await page.getByRole("button", { name: "Chat", exact: true }).click();
   }
   await page.setViewportSize({ width: 1920, height: 1080 });
   const card = page.locator('button[aria-label^="Mainkan "]:enabled').last();
@@ -237,7 +233,6 @@ test("table chat preserves gameplay geometry and pointer actions across viewport
     page.locator(".own-hand .physical-card,.dummy-hand .physical-card"),
   ).toHaveCount(count - 1);
   await page.setViewportSize({ width: 390, height: 844 });
-  await panel.getByRole("button", { name: "Tutup chat" }).click();
   const touchCard = page
     .locator('button[aria-label^="Mainkan "]:enabled')
     .last();
@@ -334,7 +329,6 @@ test("social toast actions and table chat stay scoped to authorized recipients",
     bob.getByRole("button", { name: `Unfollow ${aName}`, exact: true }),
   ).toBeVisible();
   await alice.getByRole("button", { name: "Tutup invite" }).click();
-  await alice.getByRole("button", { name: "Chat", exact: true }).click();
   await alice.getByLabel("Pesan", { exact: true }).fill("table only");
   await alice.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(bob.getByRole("button", { name: "Open Chat" })).toBeVisible();
