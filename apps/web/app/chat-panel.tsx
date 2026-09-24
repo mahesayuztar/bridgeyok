@@ -209,21 +209,24 @@ export function ChatPanel({
             )}
             <p>{message.content}</p>
             <small>
-              <time dateTime={message.createdAt}>
-                {new Date(message.createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </time>{" "}
-              ·{" "}
-              {message.status === "sent"
-                ? "Terkirim"
-                : message.status === "failed"
-                  ? "Gagal"
-                  : message.status === "retrying"
-                    ? "Mencoba lagi…"
-                    : "Mengirim…"}
-            </small>
+  <time dateTime={message.createdAt}>
+    {new Date(message.createdAt).toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })}
+  </time>{" "}
+  ·{" "}
+  {message.status === "sent"
+    ? "Terkirim"
+    : message.status === "failed"
+      ? "Gagal"
+      : message.status === "retrying"
+        ? "Mencoba lagi…"
+        : "Mengirim…"}
+</small>
             {message.status === "failed" ? (
               <button
                 type="button"
