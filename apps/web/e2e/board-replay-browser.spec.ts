@@ -133,6 +133,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       ["Receive claim", "Permintaan claim", "Tolak"],
       [/Buka menu South/, /South/, "Tutup menu pemain"],
     ] as const) {
+      if (triggerName === "Ajukan claim") {
+        await page.locator('summary[aria-label="Buka menu meja"]').click();
+      }
       const trigger = triggerName === "Ajukan claim"
         ? page.getByLabel("Ajukan claim", { exact: true })
         : page.getByRole("button", { name: triggerName });

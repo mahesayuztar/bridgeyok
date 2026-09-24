@@ -202,6 +202,12 @@ export function ActiveTableStatusBar({
           <AuctionTable game={game} followLatest={false} />
         </section>
       )}
+      <ConsensusControls
+        showActions={false}
+        table={table}
+        canSendCommand={canSendCommand}
+        onCommand={onCommand}
+      />
       <div className="status-actions">
         {table.matchId ? <Link href={`/match/${table.matchId}`}>Match</Link> : null}
         <div
@@ -218,6 +224,7 @@ export function ActiveTableStatusBar({
           <summary aria-label="Buka menu meja">•••</summary>
           <div>
             <ConsensusControls
+              showRequest={false}
               table={table}
               canSendCommand={canSendCommand}
               onCommand={onCommand}

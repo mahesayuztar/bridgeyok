@@ -72,6 +72,13 @@ async function waitForConnection(page: Page) {
   await expect(page.locator(".connection-status")).toContainText("Terhubung");
 }
 
+async function openTableMenu(page: Page) {
+  const menu = page.locator("details.table-menu");
+  if (!(await menu.evaluate((element) => element.hasAttribute("open")))) {
+    await page.locator('summary[aria-label="Buka menu meja"]').click();
+  }
+}
+
 async function takeSeat(page: Page, nickname: string, seat: "N" | "E" | "S" | "W") {
   const seatMenu = page.getByRole("button", {
     name: `Buka menu kursi kosong ${seat}`,
@@ -1453,6 +1460,7 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
   await expect(fullHistory.locator(".trick-history-play")).toHaveCount(4);
   await south.page.getByRole("button", { name: "Tutup riwayat trick" }).click();
   await expect(fullHistory).toBeHidden();
+  await openTableMenu(replacementTab);
   const claimTrigger = replacementTab.getByLabel("Ajukan claim");
   await expect(claimTrigger).toBeVisible();
   await claimTrigger.focus();
@@ -1678,6 +1686,7 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
     await setReady(guest, "Human Partner");
     await owner.getByRole("button", { name: "Mulai board" }).click();
     await makeBid(owner, 1, "NT");
+    await openTableMenu(owner);
     await owner.getByLabel("Minta undo", { exact: true }).click();
     await expect(guest.locator(".consensus-request")).toContainText("1 setuju");
     await guest.reload();
@@ -1688,6 +1697,7 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
     await guest.getByRole("button", { name: "Tolak", exact: true }).click();
     await expect(owner.locator(".consensus-request")).toHaveCount(0);
     await expect(owner.locator(".auction-workspace .auction-table tbody")).toContainText("1NT");
+    await openTableMenu(owner);
     await owner.getByLabel("Minta undo", { exact: true }).click();
     await expect(guest.locator(".consensus-request")).toContainText("1 setuju");
     await guest.getByRole("button", { name: "Terima", exact: true }).click();
@@ -1707,6 +1717,7 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
         }).toBe(true);
         const game = ownerProjection?.game;
         if (game?.phase === "PLAY" && game.currentTrick.plays.length === 0 && (game.turn === "N" || game.turn === "S")) {
+          await openTableMenu(owner);
           await expect(owner.getByLabel("Ajukan claim", { exact: true })).toBeVisible();
           return;
         }
@@ -1723,6 +1734,7 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
     }
 
     await reachClaimBoundary([owner, guest]);
+    await openTableMenu(owner);
     await owner.getByLabel("Ajukan claim", { exact: true }).click();
     await owner.getByRole("button", { name: "Claim 0 trick", exact: true }).click();
     await expect(guest.locator(".consensus-request")).toContainText("0 setuju");
@@ -1733,6 +1745,7 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
     await owner.getByRole("button", { name: "Keluarkan & ganti bot" }).click();
     await expect(owner.getByRole("button", { name: "Buka menu Bot, kursi E, bot" })).toBeVisible();
     const rejectedBefore = receivedFrames.filter((frame) => frame.includes('"eventType":"CLAIM_REJECTED"')).length;
+    await openTableMenu(owner);
     await owner.getByLabel("Ajukan claim", { exact: true }).click();
     await owner.getByRole("button", { name: "Claim 0 trick", exact: true }).click();
     await expect.poll(() => receivedFrames.filter((frame) => frame.includes('"eventType":"CLAIM_REJECTED"')).length).toBeGreaterThan(rejectedBefore);
@@ -1747,6 +1760,7 @@ test("bot consensus follows human partners, recovers pending votes, and rejects 
     await guest.getByRole("button", { name: "Masuk", exact: true }).click();
     await waitForConnection(guest);
     await takeSeat(guest, "Human Partner", "E");
+    await openTableMenu(owner);
     await owner.getByLabel("Ajukan claim", { exact: true }).click();
     await owner.getByRole("button", { name: "Claim 0 trick", exact: true }).click();
     await guest.getByRole("button", { name: "Terima", exact: true }).click();
