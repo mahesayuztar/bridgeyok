@@ -5248,7 +5248,7 @@ button.physical-card.is-dragging {
 
 .play-board-chat .chat-panel {
   max-width: none;
-  height: clamp(14rem, 30dvh, 18rem);
+  height: clamp(12rem, 26dvh, 15rem);
 }
 
 .play-board-client {
@@ -5332,7 +5332,7 @@ button.physical-card.is-dragging {
   }
 
   .play-board-client .play-board-chat .chat-panel {
-    height: clamp(16rem, 42dvh, 28rem);
+    height: clamp(12rem, 26dvh, 15rem);
   }
 }
 
