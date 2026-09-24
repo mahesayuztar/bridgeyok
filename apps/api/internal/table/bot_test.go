@@ -1,14 +1,18 @@
 package table
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/analysis"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
 )
 
@@ -44,7 +48,7 @@ func TestDecideBotSeatLifecycle(t *testing.T) {
 	}
 }
 
-func TestNextBotCommandUsesFirstLegalCall(t *testing.T) {
+func TestNextBotCommandChoosesLegalCall(t *testing.T) {
 	t.Parallel()
 
 	aggregate := testAggregateWithGuests(t, 2)
@@ -58,12 +62,12 @@ func TestNextBotCommandUsesFirstLegalCall(t *testing.T) {
 	aggregate = acceptedDecision(t, aggregate, Command{Name: CommandStartGame, SessionID: aggregate.OwnerSessionID, Deal: &deal, BoardID: "board-one"}).NextState
 
 	command, ready := nextBotCommand(aggregate)
-	if !ready || command.Name != CommandMakeCall || command.BotSeat != bridge.North || command.Call == nil || *command.Call != bridge.Pass() {
+	if !ready || command.Name != CommandMakeCall || command.BotSeat != bridge.North || command.Call == nil || !slices.Contains(aggregate.Game.Auction.LegalCalls(), *command.Call) {
 		t.Fatalf("nextBotCommand() = %+v, %t", command, ready)
 	}
 }
 
-func TestNextBotCommandUsesFirstLegalCard(t *testing.T) {
+func TestNextBotCommandChoosesLegalCardWithHeuristicFallback(t *testing.T) {
 	t.Parallel()
 
 	aggregate := testStartedAggregate(t)
@@ -82,8 +86,164 @@ func TestNextBotCommandUsesFirstLegalCard(t *testing.T) {
 	}
 
 	command, ready := nextBotCommand(aggregate)
-	if !ready || command.Name != CommandPlayCard || command.BotSeat != openingLeader || command.Card == nil || *command.Card != legalCards[0] {
+	if !ready || command.Name != CommandPlayCard || command.BotSeat != openingLeader || command.Card == nil || !slices.Contains(legalCards, *command.Card) {
 		t.Fatalf("nextBotCommand() = %+v, %t", command, ready)
+	}
+}
+
+func TestSampleBotStatePreservesVisibleCardsAndResamplesHiddenCards(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	for _, call := range []bridge.Call{bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass()} {
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call}).NextState
+	}
+	state := *aggregate.Game
+	actor := state.Turn
+	maskedState := state
+	hiddenSeats := []bridge.Seat{}
+	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+		if seat != actor {
+			hiddenSeats = append(hiddenSeats, seat)
+		}
+	}
+	swapDealHands(&maskedState.Deal, hiddenSeats[0], hiddenSeats[1])
+	if botSampleSeed(state, actor, 0) != botSampleSeed(maskedState, actor, 0) {
+		t.Fatal("sampling seed depends on hidden hand ownership")
+	}
+	actualHidden := map[bridge.Seat]bridge.Hand{}
+	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+		if seat != actor {
+			actualHidden[seat] = state.Deal.Hand(seat)
+		}
+	}
+
+	differentHiddenWorld := false
+	for _sampleIndex := 0; _sampleIndex < 4; _sampleIndex++ {
+		sampled, err := sampleBotState(state, actor, _sampleIndex)
+		if err != nil {
+			t.Fatalf("sampleBotState() error = %v", err)
+		}
+		if !reflect.DeepEqual(sampled.Deal.Hand(actor), state.Deal.Hand(actor)) {
+			t.Fatal("sample changed bot hand")
+		}
+		for seat, actual := range actualHidden {
+			if !reflect.DeepEqual(sampled.Deal.Hand(seat), actual) {
+				differentHiddenWorld = true
+			}
+		}
+		if err := sampled.ValidateInvariants(); err != nil {
+			t.Fatalf("sampled state violates bridge invariants: %v", err)
+		}
+	}
+	if !differentHiddenWorld {
+		t.Fatal("sampler retained the authoritative hidden partition")
+	}
+}
+
+func TestBotDecisionEngineCachesCompletePositions(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	for _, call := range []bridge.Call{bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass()} {
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call}).NextState
+	}
+	state := *aggregate.Game
+	legal, domainError := state.LegalCards(state.Turn)
+	if domainError != nil {
+		t.Fatal(domainError)
+	}
+	solver := &recordingBotSolver{}
+	engine := NewBotDecisionEngine(solver, BotDecisionEngineOptions{SampleCount: 4, ProgressiveSamples: []int{4}, CacheCapacity: 16})
+	first, err := engine.decideCard(context.Background(), state, state.Turn, legal)
+	if err != nil {
+		t.Fatalf("first decideCard() error = %v", err)
+	}
+	second, err := engine.decideCard(context.Background(), state, state.Turn, legal)
+	if err != nil {
+		t.Fatalf("second decideCard() error = %v", err)
+	}
+	if first.card != second.card || !slices.Contains(legal, first.card) {
+		t.Fatalf("decisions = %+v and %+v, legal cards = %v", first, second, legal)
+	}
+	if calls := solver.callCount(); calls != 4 {
+		t.Fatalf("solver calls = %d, want 4 after cache reuse", calls)
+	}
+}
+
+type recordingBotSolver struct {
+	mutex sync.Mutex
+	calls int
+}
+
+func swapDealHands(deal *bridge.Deal, first bridge.Seat, second bridge.Seat) {
+	firstHand, secondHand := deal.Hand(first), deal.Hand(second)
+	switch first {
+	case bridge.North:
+		deal.North = secondHand
+	case bridge.East:
+		deal.East = secondHand
+	case bridge.South:
+		deal.South = secondHand
+	case bridge.West:
+		deal.West = secondHand
+	}
+	switch second {
+	case bridge.North:
+		deal.North = firstHand
+	case bridge.East:
+		deal.East = firstHand
+	case bridge.South:
+		deal.South = firstHand
+	case bridge.West:
+		deal.West = firstHand
+	}
+}
+
+func (solver *recordingBotSolver) SolvePosition(_ context.Context, state bridge.State) ([]analysis.CardPrediction, error) {
+	solver.mutex.Lock()
+	solver.calls++
+	solver.mutex.Unlock()
+	predictions := make([]analysis.CardPrediction, 0, len(state.Deal.Hand(state.Turn)))
+	for _, card := range state.Deal.Hand(state.Turn) {
+		predictions = append(predictions, analysis.CardPrediction{Card: card, Tricks: botRankValue(card.Rank) - 1})
+	}
+	return predictions, nil
+}
+
+func (solver *recordingBotSolver) callCount() int {
+	solver.mutex.Lock()
+	defer solver.mutex.Unlock()
+	return solver.calls
+}
+
+func BenchmarkBotDecisionEngine(b *testing.B) {
+	deal, err := bridge.GenerateDeal(bytes.NewReader(bytes.Repeat([]byte{0xff}, 1024)))
+	if err != nil {
+		b.Fatal(err)
+	}
+	state, err := bridge.NewBoard(1, deal)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for _, call := range []bridge.Call{bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass()} {
+		decision, domainError := bridge.Decide(state, bridge.MakeCallCommand(state.Turn, call))
+		if domainError != nil {
+			b.Fatal(domainError)
+		}
+		state = decision.NextState
+	}
+	legal, domainError := state.LegalCards(state.Turn)
+	if domainError != nil {
+		b.Fatal(domainError)
+	}
+	engine := NewBotDecisionEngine(&recordingBotSolver{}, BotDecisionEngineOptions{SampleCount: 1, ProgressiveSamples: []int{1}, CacheCapacity: 32})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if _, err := engine.decideCard(context.Background(), state, state.Turn, legal); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 

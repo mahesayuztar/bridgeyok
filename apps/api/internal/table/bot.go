@@ -1,12 +1,17 @@
 package table
 
 import (
+	"context"
 	"slices"
 
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
 )
 
 func nextBotCommand(aggregate Aggregate) (Command, bool) {
+	return nextBotCommandWithContext(context.Background(), aggregate, nil)
+}
+
+func nextBotCommandWithContext(ctx context.Context, aggregate Aggregate, engine *BotDecisionEngine) (Command, bool) {
 	if aggregate.ActionRequest != nil {
 		for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
 			accepted, ready := botConsensusResponse(aggregate, seat)
@@ -33,7 +38,8 @@ func nextBotCommand(aggregate Aggregate) (Command, bool) {
 		if !seated || !assignment.IsBot || len(legalCalls) == 0 {
 			return Command{}, false
 		}
-		return Command{Name: CommandMakeCall, BotSeat: game.Turn, Call: &legalCalls[0]}, true
+		call := chooseBotCall(*game, game.Turn, legalCalls)
+		return Command{Name: CommandMakeCall, BotSeat: game.Turn, Call: &call}, true
 	case bridge.PhaseOpeningLead, bridge.PhasePlay:
 		actorSeat := game.Turn
 		if game.Auction.Contract != nil && game.Turn == game.Auction.Contract.Dummy() {
@@ -47,7 +53,8 @@ func nextBotCommand(aggregate Aggregate) (Command, bool) {
 		if domainError != nil || len(legalCards) == 0 {
 			return Command{}, false
 		}
-		return Command{Name: CommandPlayCard, BotSeat: actorSeat, Card: &legalCards[0]}, true
+		card := chooseBotCard(ctx, aggregate, actorSeat, legalCards, engine)
+		return Command{Name: CommandPlayCard, BotSeat: actorSeat, Card: &card}, true
 	default:
 		return Command{}, false
 	}
