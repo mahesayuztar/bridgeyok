@@ -212,9 +212,9 @@ export function BoardReplayModal({
                 {frame.showResult ? (
                   <BoardResult
                     table={replayTable}
+                    autoAdvance={false}
                     canSendCommand={() => false}
                     onCommand={() => {}}
-                    persistent
                   />
                 ) : null}
             </TableSurface>

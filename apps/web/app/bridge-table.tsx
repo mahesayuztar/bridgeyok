@@ -287,7 +287,7 @@ export default function BridgeTable({
         )}
         {game?.phase === "AUCTION" ? (
           <div className="auction-workspace">
-            <AuctionTable game={game} />
+            <AuctionTable game={game} showSummary={false} />
             <BiddingBox
               legalCalls={game.legalCalls ?? []}
               disabled={!viewerTurn}
@@ -335,6 +335,14 @@ export default function BridgeTable({
             />
           </>
         ) : null}
+        {game?.result !== undefined && table.state !== "FINISHED" ? (
+          <BoardResult
+            table={table}
+            autoAdvance={presentationVisible}
+            canSendCommand={canSendVisibleCommand}
+            onCommand={sendVisibleCommand}
+          />
+        ) : null}
       </TableSurface>
 
       {table.state === "FINISHED" ? (
@@ -350,15 +358,9 @@ export default function BridgeTable({
             {table.matchId ? "Lihat progres match" : "Kembali ke lobby"}
           </button>
         </section>
-      ) : game?.result !== undefined ? (
-        <BoardResult
-          table={table}
-          canSendCommand={canSendVisibleCommand}
-          onCommand={sendVisibleCommand}
-        />
       ) : game === undefined || boardComplete ? null : (
         <BridgeHand
-          className="own-hand"
+          className={`own-hand ${game.phase === "AUCTION" ? "own-hand-auction" : "own-hand-play"}`}
           title="Kartu Anda"
           cards={game.ownHand}
           analysisCards={game.turn === table.viewerSeat ? analysisHand?.hand : undefined}

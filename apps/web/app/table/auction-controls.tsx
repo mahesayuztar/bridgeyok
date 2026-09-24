@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
 import {
   auctionRows,
   type Call,
@@ -34,17 +34,20 @@ const callColor: Partial<Record<"C" | "D" | "H" | "S" | "NT", string>> = {
 export function AuctionTable({
   game,
   followLatest = true,
+  showSummary = true,
 }: {
   game: NonNullable<LiveTableProjection["game"]>;
   followLatest?: boolean;
+  showSummary?: boolean;
 }) {
   const auctionTableRef = useRef<HTMLDivElement>(null);
+  const followScrollRef = useRef(true);
   const rows = auctionRows(game.auction.dealer, game.auction.calls);
 
   useLayoutEffect(() => {
     const auctionTable = auctionTableRef.current;
 
-    if (auctionTable && followLatest) {
+    if (auctionTable && followLatest && followScrollRef.current) {
       auctionTable.scrollTop = auctionTable.scrollHeight;
     }
   }, [followLatest, game.auction.calls.length]);
@@ -60,24 +63,34 @@ export function AuctionTable({
   }
 
   return (
-    <div ref={auctionTableRef} className="auction-table-wrap">
+    <div
+      ref={auctionTableRef}
+      className="auction-table-wrap"
+      onScroll={(event) => {
+        const table = event.currentTarget;
+        followScrollRef.current =
+          table.scrollHeight - table.scrollTop - table.clientHeight < 8;
+      }}
+    >
       <table className="auction-table">
-        <caption>
-          <span>
-            Dealer <strong>{game.auction.dealer}</strong>
-          </span>
-          <span>
-            {game.auction.contract === undefined ? (
-              game.auction.passedOut ? "Passed out" : "Kontrak belum ditentukan"
-            ) : (
-              <>
-                Kontrak <strong>{contractLabel(game.auction.contract)}</strong>
-                <span aria-hidden="true"> · </span>
-                Deklarer <strong>{game.auction.contract.declarer}</strong>
-              </>
-            )}
-          </span>
-        </caption>
+        {showSummary ? (
+          <caption>
+            <span>
+              Dealer <strong>{game.auction.dealer}</strong>
+            </span>
+            <span>
+              {game.auction.contract === undefined ? (
+                game.auction.passedOut ? "Passed out" : "Kontrak belum ditentukan"
+              ) : (
+                <>
+                  Kontrak <strong>{contractLabel(game.auction.contract)}</strong>
+                  <span aria-hidden="true"> · </span>
+                  Deklarer <strong>{game.auction.contract.declarer}</strong>
+                </>
+              )}
+            </span>
+          </caption>
+        ) : null}
         <thead>
           <tr>
             {auctionSeats.map((seat) => (
@@ -90,8 +103,7 @@ export function AuctionTable({
                 data-vulnerable={game.board.vulnerability === "BOTH" || game.board.vulnerability === (seat === "N" || seat === "S" ? "NS" : "EW")}
               >
                 <span>{seat}</span>
-                {game.auction.dealer === seat ? <small>Dealer</small> : null}
-                {game.turn === seat ? <small className="auction-turn-label" aria-hidden="true">Giliran</small> : null}
+                {showSummary && game.auction.dealer === seat ? <small>Dealer</small> : null}
               </th>
             ))}
           </tr>
@@ -133,11 +145,7 @@ export function BiddingBox({
   canCall: (call: Call) => boolean;
   onCall: (call: Call) => void;
 }) {
-  const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const legalKeys = new Set(legalCalls.map(callKey));
-  const legalLevels = new Set(
-    legalCalls.filter((call) => call.kind === "BID").map((call) => call.level),
-  );
   return (
     <section className="bidding-box" aria-label="Kotak lelang">
       <div className="call-actions">
@@ -146,54 +154,43 @@ export function BiddingBox({
             type="button"
             key={label}
             disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}
-            onClick={() => {
-              setSelectedLevel(null);
-              onCall(call);
-            }}
+            onClick={() => onCall(call)}
           >
             {label}
             <kbd>{shortcut}</kbd>
           </button>
         ))}
       </div>
-      <div className="bid-levels" aria-label="Pilih level bid">
+      <div className="bid-strains bid-matrix" role="group" aria-label="Pilih bid">
+        <div className="bid-matrix-header" aria-hidden="true">
+          <span />
+          {strains.map((strain) => (
+            <span className={callColor[strain]} key={strain}>
+              {strain === "NT" ? "NT" : suitLabels[strain]}
+            </span>
+          ))}
+        </div>
         {[1, 2, 3, 4, 5, 6, 7].map((level) => (
-          <button
-            type="button"
-            key={level}
-            aria-pressed={selectedLevel === level}
-            disabled={disabled || !legalLevels.has(level) || !legalCalls.some((call) => call.kind === "BID" && call.level === level && canCall(call))}
-            onClick={() => setSelectedLevel(level)}
-          >
-            {level}
-          </button>
+          <div className="bid-matrix-row" key={level}>
+            <span className="bid-level-label" aria-hidden="true">{level}</span>
+            {strains.map((strain) => {
+              const call: Call = { kind: "BID", level, strain };
+              return (
+                <button
+                  className={callColor[strain]}
+                  type="button"
+                  key={strain}
+                  aria-label={`Bid ${callLabel(call)}`}
+                  disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}
+                  onClick={() => onCall(call)}
+                >
+                  {callLabel(call)}
+                </button>
+              );
+            })}
+          </div>
         ))}
       </div>
-      {selectedLevel === null ? null : (
-        <div
-          className="bid-strains"
-          aria-label={`Pilih strain untuk level ${selectedLevel}`}
-        >
-          {strains.map((strain) => {
-            const call: Call = { kind: "BID", level: selectedLevel, strain };
-            return (
-              <button
-                className={callColor[strain]}
-                type="button"
-                key={strain}
-                disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}
-                onClick={() => {
-                  setSelectedLevel(null);
-                  onCall(call);
-                }}
-              >
-                <span className="sr-only">Bid {selectedLevel} </span>
-                {strain === "NT" ? "NT" : suitLabels[strain]}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </section>
   );
 }
