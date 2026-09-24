@@ -99,9 +99,18 @@ async function makeCall(page: Page, name: RegExp) {
 }
 
 async function makeBid(page: Page, level: number, strain: string) {
-  const button = page.getByRole("button", { name: `Bid ${level}${strain}`, exact: true });
-  await expect(button).toBeEnabled();
-  await button.click();
+  const levelButton = page.getByRole("button", {
+    name: `Pilih level ${level}`,
+    exact: true,
+  });
+  await expect(levelButton).toBeEnabled();
+  await levelButton.click();
+  const strainButton = page.getByRole("button", {
+    name: `Bid ${level}${strain}`,
+    exact: true,
+  });
+  await expect(strainButton).toBeEnabled();
+  await strainButton.click();
   await expect(page.locator(".auction-workspace .auction-table tbody")).toContainText(`${level}${strain}`, { timeout: 250 });
 }
 

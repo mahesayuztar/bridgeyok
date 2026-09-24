@@ -128,7 +128,48 @@ test("table chat preserves gameplay geometry and pointer actions across viewport
   await panel.getByLabel("Pesan", { exact: true }).fill("Table ♠️");
   await panel.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(panel.getByText("Table ♠️", { exact: true })).toHaveCount(1);
+  await panel.getByRole("button", { name: "Tutup chat", exact: true }).click();
+  await page.setViewportSize({ width: 320, height: 700 });
+  const levelGeometry = await page.locator(".bidding-box").evaluate((box) => {
+    const levelButtons = [...box.querySelectorAll<HTMLElement>(".bid-levels button")];
+    return {
+      levelCount: levelButtons.length,
+      minimumLevelWidth: Math.min(...levelButtons.map((button) => button.getBoundingClientRect().width)),
+      minimumLevelHeight: Math.min(...levelButtons.map((button) => button.getBoundingClientRect().height)),
+      overflowX: document.documentElement.scrollWidth > innerWidth,
+      overflowY: document.documentElement.scrollHeight > innerHeight,
+    };
+  });
+  expect(levelGeometry).toEqual({
+    levelCount: expect.any(Number),
+    minimumLevelWidth: expect.any(Number),
+    minimumLevelHeight: expect.any(Number),
+    overflowX: false,
+    overflowY: false,
+  });
+  expect(levelGeometry.levelCount).toBeGreaterThan(0);
+  expect(levelGeometry.levelCount).toBeLessThanOrEqual(7);
+  expect(levelGeometry.minimumLevelWidth).toBeGreaterThanOrEqual(44);
+  expect(levelGeometry.minimumLevelHeight).toBeGreaterThanOrEqual(44);
+  await page.getByRole("button", { name: "Pilih level 1", exact: true }).click();
+  const strainGeometry = await page.locator(".bid-strains").evaluate((group) => {
+    const buttons = [...group.querySelectorAll<HTMLElement>("button")];
+    return {
+      count: buttons.length,
+      minimumWidth: Math.min(...buttons.map((button) => button.getBoundingClientRect().width)),
+      minimumHeight: Math.min(...buttons.map((button) => button.getBoundingClientRect().height)),
+      overflowX: document.documentElement.scrollWidth > innerWidth,
+      overflowY: document.documentElement.scrollHeight > innerHeight,
+    };
+  });
+  expect(strainGeometry.count).toBeGreaterThan(0);
+  expect(strainGeometry.minimumWidth).toBeGreaterThanOrEqual(44);
+  expect(strainGeometry.minimumHeight).toBeGreaterThanOrEqual(44);
+  expect(strainGeometry.overflowX).toBe(false);
+  expect(strainGeometry.overflowY).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath("bidding-stage-320x700.png") });
   await page.getByRole("button", { name: "Bid 1NT", exact: true }).click();
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
   await expect(page.locator(".dummy-hand .physical-card")).toHaveCount(13);
   for (const [width, height] of [
     [320, 700],
