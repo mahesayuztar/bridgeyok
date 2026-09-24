@@ -5292,6 +5292,7 @@ button.physical-card.is-dragging {
 
 .play-board-client .gameplay-region {
   display: grid;
+  flex: 1 1 auto;
   min-height: 0;
   grid-template-rows: minmax(0, 1fr) clamp(7.75rem, 18vh, 10.75rem);
 }
