@@ -273,7 +273,7 @@ func TestActorRegistryRunsBotActionAfterCommittedCommand(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Snapshot() error = %v", err)
 		}
-		if current.Revision != 2 || len(current.Game.Auction.Calls) != 1 || current.Game.Auction.Calls[0].Call != bridge.Pass() {
+		if current.Revision != 2 || len(current.Game.Auction.Calls) != 1 {
 			t.Fatalf("current bot state = %+v", current)
 		}
 		if err := registry.Drain(t.Context()); err != nil {

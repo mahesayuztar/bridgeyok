@@ -35,6 +35,7 @@ type ActorRegistryOptions struct {
 	IdleTimeout   time.Duration
 	Logger        *slog.Logger
 	Now           func() time.Time
+	BotEngine     *BotDecisionEngine
 }
 
 // ActorRegistryStats describes the process-local actor lifecycle.
@@ -76,6 +77,7 @@ type tableActor struct {
 	idle           time.Duration
 	logger         *slog.Logger
 	now            func() time.Time
+	botEngine      *BotDecisionEngine
 	onStop         func(*tableActor)
 	startedAt      time.Time
 	lifecycleMutex sync.Mutex
@@ -221,6 +223,7 @@ func (registry *ActorRegistry) actor(tableID string) (*tableActor, error) {
 		idle:      registry.options.IdleTimeout,
 		logger:    registry.options.Logger,
 		now:       registry.options.Now,
+		botEngine: registry.options.BotEngine,
 		onStop:    registry.actorStopped,
 		startedAt: registry.options.Now().UTC(),
 		accepting: true,
@@ -415,7 +418,7 @@ func (actor *tableActor) handle(request actorRequest, aggregate **Aggregate) {
 func (actor *tableActor) driveBots(ctx context.Context, aggregate **Aggregate) []CommandResult {
 	results := make([]CommandResult, 0)
 	for _actionIndex := 0; _actionIndex < maxConsecutiveBotActions; _actionIndex++ {
-		command, ready := nextBotCommand(**aggregate)
+		command, ready := nextBotCommandWithContext(ctx, **aggregate, actor.botEngine)
 		if !ready {
 			return results
 		}

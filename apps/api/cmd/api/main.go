@@ -54,6 +54,12 @@ func main() {
 		logger.Error("table initialization failed", "error", err)
 		os.Exit(1)
 	}
+	ddsSolver, err := analysis.NewDDS(appConfig.DDSExecutable, appConfig.DDSTimeout, appConfig.DDSConcurrency)
+	if err != nil {
+		logger.Error("analysis initialization failed")
+		os.Exit(1)
+	}
+	botEngine := table.NewBotDecisionEngine(ddsSolver, table.BotDecisionEngineOptions{Logger: logger})
 	commandProcessor, err := table.NewCommandProcessor(postgres, nil, logger, time.Now)
 	if err != nil {
 		logger.Error("command processor initialization failed", "error", err)
@@ -64,6 +70,7 @@ func main() {
 		IdleTimeout:   appConfig.TableActorIdleTimeout,
 		Logger:        logger,
 		Now:           time.Now,
+		BotEngine:     botEngine,
 	})
 	if err != nil {
 		logger.Error("table actor initialization failed", "error", err)
@@ -105,11 +112,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	ddsSolver, err := analysis.NewDDS(appConfig.DDSExecutable, appConfig.DDSTimeout, appConfig.DDSConcurrency)
-	if err != nil {
-		logger.Error("analysis initialization failed")
-		os.Exit(1)
-	}
 	analysisService, err := analysis.NewService(postgres, ddsSolver)
 	if err != nil {
 		logger.Error("analysis service initialization failed")

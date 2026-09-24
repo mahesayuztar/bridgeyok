@@ -37,7 +37,7 @@ type solverContract struct {
 type boundedOutput struct{ bytes.Buffer }
 
 func (output *boundedOutput) Write(value []byte) (int, error) {
-	if output.Len()+len(value) > 16384 {
+	if output.Buffer.Len()+len(value) > 16384 {
 		return 0, ErrUnavailable
 	}
 	return output.Buffer.Write(value)
