@@ -5342,8 +5342,23 @@ button.physical-card.is-dragging {
     overflow: visible;
   }
 
-.play-board-client .play-board-layout {
+  .play-board-client .play-board-layout {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
     min-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom));
+  }
+
+  .play-board-client .gameplay-region {
+    height: 100%;
+  }
+
+  .play-board-client .play-board-chat,
+  .play-board-client .play-board-chat .chat-panel {
+    height: auto;
+  }
+
+  .play-board-client .play-board-chat .chat-panel {
+    height: clamp(16rem, 42dvh, 28rem);
   }
 }
 
