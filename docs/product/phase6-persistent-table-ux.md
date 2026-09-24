@@ -368,11 +368,13 @@ Tujuan: History menjadi destination nyata dengan sumber data yang tersedia.
 Scope: compose ScoreSheet/replay + participant match list; responsive board rows dan result/score chain.
 Dependency: P6-01 fixtures, P6-03 shell. Parallelization: P6-06 pada reader terpisah; koordinasi selected-board state.
 
-- [ ] Active-table History memakai state valid tanpa full table GET baru; no-table menampilkan authorized match list/empty state.
-- [ ] Contract/declarer/vulnerability/result/signed perspective, passed-out/zero/positive/negative terlihat jelas.
-- [ ] Duplicate total tidak dilabeli IMP; Team Match memakai actual IMP/comparisons; tidak ada Matchpoint placeholder.
-- [ ] Replay/analysis tetap ditolak selama active match; match COMPLETE menyegarkan entitlement sekali tanpa route-remount dependency.
-- [ ] History panjang memakai scroll vertikal mobile dengan row readable, stable selection dan return ke live table.
+- [x] Active-table History memakai state valid tanpa full table GET baru; no-table menampilkan authorized board history/empty state.
+- [x] Contract/declarer/vulnerability/result/signed perspective, passed-out/zero/positive/negative terlihat jelas.
+- [x] Duplicate total tidak dilabeli IMP; Team Match memakai actual IMP/comparisons; tidak ada Matchpoint placeholder.
+- [x] Replay/analysis tetap ditolak selama active match; match COMPLETE menyegarkan entitlement sekali tanpa route-remount dependency.
+- [x] History panjang memakai scroll vertikal mobile dengan row readable, stable selection dan return ke live table.
+
+Evidence P6-07, 24 September 2026: history board kini memakai `GET /v1/history/boards` dengan keyset cursor `(completed_at, board_id)` dan page lookahead 16 (maksimum 40), sehingga casual/bot/table match dan Team Match berada pada satu authorized list tanpa `OFFSET` atau daftar format terpisah. Query mengembalikan result, lineup board-start, viewer perspective, dan actual signed Team Match IMP tanpa deal/hidden hand. History workspace mempertahankan selected board, memakai score sheet table aktif sebagai fallback tanpa full table GET, melakukan prefetch saat sentinel mendekati viewport, mencegah concurrent page request/duplicate board, dan refresh entitlement sekali ketika match menjadi COMPLETE. Replay/analysis tetap memakai endpoint authorization existing; board Team Match aktif ditampilkan tetapi replay disabled sampai match selesai. Contract/generated source, cursor unit test, Go API tests, web lint/typecheck/build, dan contract tests lulus; lint hanya menyisakan dua warning `aria-description` lama pada score controls.
 
 ### P6-08 — Accessibility dan responsive integration gate
 
