@@ -5345,7 +5345,7 @@ button.physical-card.is-dragging {
   .play-board-client .play-board-layout {
     display: grid;
     grid-template-rows: minmax(0, 1fr) auto;
-    min-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom));
+    min-height: 0;
   }
 
   .play-board-client .gameplay-region {
