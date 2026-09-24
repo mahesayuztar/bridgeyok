@@ -12,6 +12,7 @@ import (
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/analysis"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/config"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/database"
+	"github.com/mahesayuztar/bridgeyok/apps/api/internal/history"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpapi"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/httpserver"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/identity"
@@ -130,6 +131,7 @@ func main() {
 		Replay:         postgres,
 		Accounts:       postgres,
 		Match:          matchService,
+		History:        history.NewService(postgres),
 	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

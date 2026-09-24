@@ -4748,6 +4748,9 @@ button.physical-card.is-dragging {
 .history-section-label h3 { margin: .25rem 0 0; font-size: 1.05rem; }
 .history-board-list, .history-match-list { margin: 0; padding: 0; list-style: none; }
 .history-board-list { max-height: min(58svh, 38rem); overflow-y: auto; overscroll-behavior: contain; background: var(--surface); }
+.history-board-sentinel { min-height: 2.5rem; padding: .75rem 1rem; color: var(--muted); font-size: .78rem; text-align: center; }
+.history-load-error { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding: .8rem 1rem; border-block: 1px solid var(--line); }
+.history-load-error p { margin: 0; }
 .history-board-list li { border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 .history-board-list li:last-child { border-bottom: 0; }
 .history-board-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .35rem .75rem; align-items: start; width: 100%; min-height: 7.25rem; padding: 1rem 1rem 1rem 1.1rem; border: 0; border-radius: 0; text-align: left; transition: background-color 150ms ease; }
@@ -5215,9 +5218,8 @@ button.physical-card.is-dragging {
 .chat-panel button { padding:.45rem; }
 .chat-toast { position:fixed; z-index:150; bottom:5rem; right:1rem; max-width:calc(100vw - 2rem); display:flex; gap:.6rem; align-items:center; padding:1rem; background:var(--background); border:1px solid var(--line); }
 .chat-toast > span { max-width:14rem; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.table-chat-container { position:fixed; z-index:90; right:1rem; bottom:max(1rem,var(--chat-keyboard-offset,0px)); width:min(22rem,calc(100vw - 2rem)); }
-@media(max-width:767px) { .table-chat-container { right:0; bottom:var(--chat-keyboard-offset,0px); width:100%; } .table-chat-container .chat-panel { height:min(24rem,calc(var(--chat-visible-height,100dvh) * 0.5)); max-width:none; border-radius:.5rem .5rem 0 0; } }
-@media(min-width:1280px) { body.table-chat-open .table-client { margin-right:calc(clamp(16rem,18vw,22rem) + 2rem); } body.table-chat-open .table-chat-container { top:5rem; bottom:1rem; width:clamp(16rem,18vw,22rem); } body.table-chat-open .table-chat-container .chat-panel { height:100%; } }
+.private-chat-container { position:fixed; z-index:90; right:1rem; bottom:max(1rem,var(--chat-keyboard-offset,0px)); width:min(22rem,calc(100vw - 2rem)); }
+@media(max-width:767px) { .private-chat-container { right:0; bottom:var(--chat-keyboard-offset,0px); width:100%; } .private-chat-container .chat-panel { height:min(24rem,calc(var(--chat-visible-height,100dvh) * 0.5)); max-width:none; border-radius:.5rem .5rem 0 0; } }
 
 .match-main { max-width: 68rem; }
 .match-section { margin-block: 2rem; padding-block: 1.5rem; border-top: 1px solid var(--line); }
@@ -5251,3 +5253,171 @@ button.physical-card.is-dragging {
 .match-progress progress::-webkit-progress-bar { background: var(--surface-strong); }
 .match-progress progress::-webkit-progress-value { background: var(--ready); }
 .match-progress progress::-moz-progress-bar { background: var(--ready); }
+
+.play-board-layout,
+.gameplay-region,
+.play-board-chat {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.play-board-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.play-board-chat {
+  display: flex;
+  min-height: 0;
+}
+
+.play-board-chat .chat-panel {
+  max-width: none;
+  height: clamp(16rem, 42dvh, 28rem);
+}
+
+.play-board-client {
+  display: flex;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  flex-direction: column;
+}
+
+.play-board-client .play-board-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.play-board-client .gameplay-region {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) clamp(7.75rem, 18vh, 10.75rem);
+}
+
+.play-board-client[data-board-complete="true"] .gameplay-region {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.play-board-client .play-board-chat,
+.play-board-client .play-board-chat .chat-panel {
+  height: 100%;
+}
+
+.play-board-client .gameplay-region > .finished-result {
+  position: static;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.45rem clamp(0.55rem, 2vw, 1rem);
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: var(--table-panel);
+  text-align: left;
+  transform: none;
+}
+
+@media (min-width: 80rem) {
+  .play-board-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(19rem, 22vw, 22rem);
+    align-items: stretch;
+    gap: clamp(0.75rem, 1.5vw, 1.25rem);
+  }
+
+  .play-board-chat .chat-panel {
+    height: 100%;
+  }
+}
+
+@media (max-width: 79.999rem) {
+  .play-board-client {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+.play-board-client .play-board-layout {
+    min-height: calc(100dvh - 4.5rem - env(safe-area-inset-bottom));
+  }
+}
+
+.bid-alert-control {
+  display: grid;
+  grid-template-columns: minmax(6.4rem, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.55rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.2;
+}
+
+.bid-alert-toggle {
+  display: inline-flex;
+  min-height: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.45rem;
+  border-color: var(--line);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.bid-alert-toggle.is-active {
+  border-color: var(--accent);
+  background: var(--surface-strong);
+  color: var(--accent-strong);
+  box-shadow: inset 0 -3px var(--accent);
+}
+
+.bid-alert-marker,
+.auction-alert-marker {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.bid-alert-marker {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.bid-alert-toggle.is-active .bid-alert-marker {
+  background: var(--accent);
+  color: var(--card);
+}
+
+.bid-alert-state {
+  color: var(--muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+}
+
+.auction-table td.artificial-call {
+  box-shadow: inset 0 -3px var(--accent);
+}
+
+.auction-alert-marker {
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-inline-start: 0.25rem;
+  vertical-align: 0.12em;
+}
+
+@media (max-width: 48rem) {
+  .bid-alert-control {
+    grid-template-columns: minmax(5.8rem, 0.7fr) minmax(0, 1.3fr);
+  }
+}

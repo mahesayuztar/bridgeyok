@@ -31,7 +31,7 @@ WHERE r.board_id = $1
       WHERE mr.table_id = r.table_id AND m.status <> 'COMPLETE'
   )
   AND EXISTS (SELECT 1 FROM bridgeyok.table_participants p
-              WHERE p.table_id = r.table_id AND p.session_id = $2 AND p.left_at IS NULL)
+              WHERE p.table_id = r.table_id AND p.session_id = $2)
 `
 
 type FindBoardRecordParams struct {
@@ -124,6 +124,135 @@ func (q *Queries) ListBoardRecordEvents(ctx context.Context, arg ListBoardRecord
 			&i.EventType,
 			&i.Payload,
 			&i.OccurredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listHistoryBoards = `-- name: ListHistoryBoards :many
+SELECT b.id,
+       b.table_id,
+       b.board_number,
+       b.result,
+       b.completed_at,
+       jsonb_object_agg(
+           attribution.seat,
+           jsonb_build_object(
+               'id', attribution.occupant_id,
+               'nickname', attribution.nickname,
+               'isBot', attribution.is_bot
+           ) ORDER BY attribution.seat
+       ) AS lineup,
+       viewer_seat.seat AS viewer_seat,
+       match_room_board.match_id,
+       COALESCE(team_match.status, '') AS match_status,
+       COALESCE(match_room_board.room, '') AS match_room,
+       COALESCE(CASE
+           WHEN match_assignment.room = 'OPEN' AND match_assignment.seat IN ('N', 'S') THEN 'A'
+           WHEN match_assignment.room = 'CLOSED' AND match_assignment.seat IN ('E', 'W') THEN 'A'
+           WHEN match_assignment.match_id IS NOT NULL THEN 'B'
+           ELSE NULL
+       END, '') AS team,
+       comparison.team_a_imp
+FROM bridgeyok.boards b
+JOIN bridgeyok.board_seat_attributions attribution
+  ON attribution.board_id = b.id
+LEFT JOIN LATERAL (
+    SELECT board_attribution.seat
+    FROM bridgeyok.board_seat_attributions board_attribution
+    JOIN bridgeyok.table_participants participant
+      ON participant.table_id = b.table_id
+     AND participant.id = board_attribution.occupant_id
+     AND participant.session_id = $1
+    WHERE board_attribution.board_id = b.id
+    LIMIT 1
+) viewer_seat ON true
+LEFT JOIN bridgeyok.match_room_boards match_room_board
+  ON match_room_board.table_board_id = b.id
+LEFT JOIN bridgeyok.team_matches team_match
+  ON team_match.id = match_room_board.match_id
+LEFT JOIN bridgeyok.match_assignments match_assignment
+  ON match_assignment.match_id = match_room_board.match_id
+ AND match_assignment.session_id = $1
+LEFT JOIN bridgeyok.match_comparisons comparison
+  ON comparison.match_id = match_room_board.match_id
+ AND comparison.board_id = match_room_board.board_id
+WHERE b.status IN ('SCORED', 'PASSED_OUT')
+  AND b.completed_at IS NOT NULL
+  AND viewer_seat.seat IS NOT NULL
+  AND EXISTS (
+      SELECT 1
+      FROM bridgeyok.table_participants participant
+      WHERE participant.table_id = b.table_id
+        AND participant.session_id = $1
+  )
+  AND (
+      $2::timestamptz IS NULL
+      OR (b.completed_at, b.id) < ($2::timestamptz, $3::uuid)
+  )
+GROUP BY b.id, b.table_id, b.board_number, b.result, b.completed_at,
+         viewer_seat.seat, match_room_board.match_id, team_match.status,
+         match_room_board.room, match_assignment.room, match_assignment.seat,
+         match_assignment.match_id, comparison.team_a_imp
+ORDER BY b.completed_at DESC, b.id DESC
+LIMIT $4
+`
+
+type ListHistoryBoardsParams struct {
+	SessionID string             `json:"session_id"`
+	CursorAt  pgtype.Timestamptz `json:"cursor_at"`
+	CursorID  pgtype.UUID        `json:"cursor_id"`
+	PageLimit int32              `json:"page_limit"`
+}
+
+type ListHistoryBoardsRow struct {
+	ID          string             `json:"id"`
+	TableID     string             `json:"table_id"`
+	BoardNumber int32              `json:"board_number"`
+	Result      []byte             `json:"result"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	Lineup      []byte             `json:"lineup"`
+	ViewerSeat  string             `json:"viewer_seat"`
+	MatchID     pgtype.UUID        `json:"match_id"`
+	MatchStatus string             `json:"match_status"`
+	MatchRoom   string             `json:"match_room"`
+	Team        interface{}        `json:"team"`
+	TeamAImp    *int32             `json:"team_a_imp"`
+}
+
+func (q *Queries) ListHistoryBoards(ctx context.Context, arg ListHistoryBoardsParams) ([]ListHistoryBoardsRow, error) {
+	rows, err := q.db.Query(ctx, listHistoryBoards,
+		arg.SessionID,
+		arg.CursorAt,
+		arg.CursorID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListHistoryBoardsRow{}
+	for rows.Next() {
+		var i ListHistoryBoardsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TableID,
+			&i.BoardNumber,
+			&i.Result,
+			&i.CompletedAt,
+			&i.Lineup,
+			&i.ViewerSeat,
+			&i.MatchID,
+			&i.MatchStatus,
+			&i.MatchRoom,
+			&i.Team,
+			&i.TeamAImp,
 		); err != nil {
 			return nil, err
 		}

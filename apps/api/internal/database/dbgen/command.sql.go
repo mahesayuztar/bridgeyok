@@ -61,7 +61,7 @@ WHERE b.id = $1
   )
   AND EXISTS (
       SELECT 1 FROM bridgeyok.table_participants p
-      WHERE p.table_id = b.table_id AND p.session_id = $2 AND p.left_at IS NULL
+      WHERE p.table_id = b.table_id AND p.session_id = $2
   )
 `
 

@@ -7,6 +7,38 @@ servers:
   - url: http://localhost:8080
     description: Local development
 paths:
+  /v1/history/boards:
+    get:
+      operationId: listHistoryBoards
+      description: Lists the authenticated user's recent completed boards across casual tables and Team Match rooms. Keyset pagination is ordered by completion time; the response contains only board result and lineup metadata, never a deal.
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: cursor
+        in: query
+        schema:
+          type: string
+          maxLength: 512
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 40
+          default: 16
+      responses:
+        '200':
+          description: Recent authorized board history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryBoardPage'
+        default:
+          description: Authentication, pagination, or history infrastructure failure.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /v1/matches:
     get:
       operationId: listMatches
@@ -936,6 +968,99 @@ components:
           minimum: 0
         ready:
           type: boolean
+    HistoryParticipant:
+      type: object
+      additionalProperties: false
+      required: [id, nickname, isBot]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+          minLength: 2
+          maxLength: 64
+        isBot:
+          type: boolean
+    HistoryPair:
+      type: object
+      additionalProperties: false
+      required: [id, members]
+      properties:
+        id:
+          type: string
+        members:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/HistoryParticipant'
+    HistoryLineup:
+      type: object
+      additionalProperties: false
+      required: [seats, northSouth, eastWest]
+      properties:
+        seats:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/HistoryParticipant'
+        northSouth:
+          $ref: '#/components/schemas/HistoryPair'
+        eastWest:
+          $ref: '#/components/schemas/HistoryPair'
+    HistoryBoard:
+      type: object
+      additionalProperties: false
+      required: [boardId, tableId, boardNumber, result, lineup, viewerSeat, completedAt, replayAllowed]
+      properties:
+        boardId:
+          type: string
+          format: uuid
+        tableId:
+          type: string
+          format: uuid
+        boardNumber:
+          type: integer
+          minimum: 1
+        result:
+          $ref: '#/components/schemas/ReplayResult'
+        lineup:
+          $ref: '#/components/schemas/HistoryLineup'
+        viewerSeat:
+          $ref: '#/components/schemas/TableSeat'
+        completedAt:
+          type: string
+          format: date-time
+        matchId:
+          type: string
+          format: uuid
+        matchStatus:
+          type: string
+          enum: [WAITING, ACTIVE, COMPLETE, CANCELLED]
+        matchRoom:
+          type: string
+          enum: [OPEN, CLOSED]
+        team:
+          type: string
+          enum: [A, B]
+        teamAIMP:
+          type: integer
+          minimum: -24
+          maximum: 24
+        replayAllowed:
+          type: boolean
+    HistoryBoardPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 40
+          items:
+            $ref: '#/components/schemas/HistoryBoard'
+        nextCursor:
+          type: string
     MatchComparison:
       type: object
       additionalProperties: false

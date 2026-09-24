@@ -35,6 +35,7 @@ type Options struct {
 	Replay         BoardReplayService
 	Accounts       identity.AccountRepository
 	Match          MatchService
+	History        HistoryService
 }
 
 type RealtimeService interface {
@@ -113,6 +114,8 @@ func NewRouter(options Options) http.Handler {
 	replayHandler := boardReplayHTTPHandler{service: options.Replay, identity: identityHandler, logger: options.Logger}
 	router.Get("/v1/boards/{boardId}/replay", replayHandler.get)
 	matchHandler := matchHTTPHandler{service: options.Match, identity: identityHandler, logger: options.Logger}
+	historyHandler := historyHTTPHandler{service: options.History, identity: identityHandler, logger: options.Logger}
+	router.Get("/v1/history/boards", historyHandler.list)
 	router.Get("/v1/matches", matchHandler.serve)
 	router.Post("/v1/matches", matchHandler.serve)
 	router.Get("/v1/matches/{matchId}", matchHandler.serve)

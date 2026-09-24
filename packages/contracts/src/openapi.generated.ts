@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/history/boards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Lists the authenticated user's recent completed boards across casual tables and Team Match rooms. Keyset pagination is ordered by completion time; the response contains only board result and lineup metadata, never a deal. */
+        get: operations["listHistoryBoards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/matches": {
         parameters: {
             query?: never;
@@ -565,6 +582,49 @@ export interface components {
             expectedTableRevision: number;
             ready: boolean;
         };
+        HistoryParticipant: {
+            /** Format: uuid */
+            id: string;
+            nickname: string;
+            isBot: boolean;
+        };
+        HistoryPair: {
+            id: string;
+            members: components["schemas"]["HistoryParticipant"][];
+        };
+        HistoryLineup: {
+            seats: {
+                [key: string]: components["schemas"]["HistoryParticipant"];
+            };
+            northSouth: components["schemas"]["HistoryPair"];
+            eastWest: components["schemas"]["HistoryPair"];
+        };
+        HistoryBoard: {
+            /** Format: uuid */
+            boardId: string;
+            /** Format: uuid */
+            tableId: string;
+            boardNumber: number;
+            result: components["schemas"]["ReplayResult"];
+            lineup: components["schemas"]["HistoryLineup"];
+            viewerSeat: components["schemas"]["TableSeat"];
+            /** Format: date-time */
+            completedAt: string;
+            /** Format: uuid */
+            matchId?: string;
+            /** @enum {string} */
+            matchStatus?: "WAITING" | "ACTIVE" | "COMPLETE" | "CANCELLED";
+            /** @enum {string} */
+            matchRoom?: "OPEN" | "CLOSED";
+            /** @enum {string} */
+            team?: "A" | "B";
+            teamAIMP?: number;
+            replayAllowed: boolean;
+        };
+        HistoryBoardPage: {
+            items: components["schemas"]["HistoryBoard"][];
+            nextCursor?: string;
+        };
         MatchComparison: {
             /** Format: uuid */
             boardId: string;
@@ -933,6 +993,38 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listHistoryBoards: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recent authorized board history. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryBoardPage"];
+                };
+            };
+            /** @description Authentication, pagination, or history infrastructure failure. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     listMatches: {
         parameters: {
             query?: never;

@@ -34,9 +34,77 @@ WHERE r.board_id = sqlc.arg(board_id)
       WHERE mr.table_id = r.table_id AND m.status <> 'COMPLETE'
   )
   AND EXISTS (SELECT 1 FROM bridgeyok.table_participants p
-              WHERE p.table_id = r.table_id AND p.session_id = sqlc.arg(session_id) AND p.left_at IS NULL);
+              WHERE p.table_id = r.table_id AND p.session_id = sqlc.arg(session_id));
 
 -- name: DeleteCompactedBoardEvents :exec
 DELETE FROM bridgeyok.game_events e USING bridgeyok.board_records r
 WHERE r.board_id = sqlc.arg(board_id) AND e.table_id = r.table_id
   AND e.seq BETWEEN r.first_seq AND r.last_seq;
+
+-- name: ListHistoryBoards :many
+SELECT b.id,
+       b.table_id,
+       b.board_number,
+       b.result,
+       b.completed_at,
+       jsonb_object_agg(
+           attribution.seat,
+           jsonb_build_object(
+               'id', attribution.occupant_id,
+               'nickname', attribution.nickname,
+               'isBot', attribution.is_bot
+           ) ORDER BY attribution.seat
+       ) AS lineup,
+       viewer_seat.seat AS viewer_seat,
+       match_room_board.match_id,
+       COALESCE(team_match.status, '') AS match_status,
+       COALESCE(match_room_board.room, '') AS match_room,
+       COALESCE(CASE
+           WHEN match_assignment.room = 'OPEN' AND match_assignment.seat IN ('N', 'S') THEN 'A'
+           WHEN match_assignment.room = 'CLOSED' AND match_assignment.seat IN ('E', 'W') THEN 'A'
+           WHEN match_assignment.match_id IS NOT NULL THEN 'B'
+           ELSE NULL
+       END, '') AS team,
+       comparison.team_a_imp
+FROM bridgeyok.boards b
+JOIN bridgeyok.board_seat_attributions attribution
+  ON attribution.board_id = b.id
+LEFT JOIN LATERAL (
+    SELECT board_attribution.seat
+    FROM bridgeyok.board_seat_attributions board_attribution
+    JOIN bridgeyok.table_participants participant
+      ON participant.table_id = b.table_id
+     AND participant.id = board_attribution.occupant_id
+     AND participant.session_id = sqlc.arg(session_id)
+    WHERE board_attribution.board_id = b.id
+    LIMIT 1
+) viewer_seat ON true
+LEFT JOIN bridgeyok.match_room_boards match_room_board
+  ON match_room_board.table_board_id = b.id
+LEFT JOIN bridgeyok.team_matches team_match
+  ON team_match.id = match_room_board.match_id
+LEFT JOIN bridgeyok.match_assignments match_assignment
+  ON match_assignment.match_id = match_room_board.match_id
+ AND match_assignment.session_id = sqlc.arg(session_id)
+LEFT JOIN bridgeyok.match_comparisons comparison
+  ON comparison.match_id = match_room_board.match_id
+ AND comparison.board_id = match_room_board.board_id
+WHERE b.status IN ('SCORED', 'PASSED_OUT')
+  AND b.completed_at IS NOT NULL
+  AND viewer_seat.seat IS NOT NULL
+  AND EXISTS (
+      SELECT 1
+      FROM bridgeyok.table_participants participant
+      WHERE participant.table_id = b.table_id
+        AND participant.session_id = sqlc.arg(session_id)
+  )
+  AND (
+      sqlc.narg(cursor_at)::timestamptz IS NULL
+      OR (b.completed_at, b.id) < (sqlc.narg(cursor_at)::timestamptz, sqlc.narg(cursor_id)::uuid)
+  )
+GROUP BY b.id, b.table_id, b.board_number, b.result, b.completed_at,
+         viewer_seat.seat, match_room_board.match_id, team_match.status,
+         match_room_board.room, match_assignment.room, match_assignment.seat,
+         match_assignment.match_id, comparison.team_a_imp
+ORDER BY b.completed_at DESC, b.id DESC
+LIMIT sqlc.arg(page_limit);

@@ -230,5 +230,5 @@ WHERE b.id = sqlc.arg(board_id)
   )
   AND EXISTS (
       SELECT 1 FROM bridgeyok.table_participants p
-      WHERE p.table_id = b.table_id AND p.session_id = sqlc.arg(session_id) AND p.left_at IS NULL
+      WHERE p.table_id = b.table_id AND p.session_id = sqlc.arg(session_id)
   );

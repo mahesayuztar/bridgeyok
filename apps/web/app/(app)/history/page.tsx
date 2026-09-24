@@ -6,7 +6,7 @@ export default async function HistoryPage() {
   return (
     <main className="account-main history-page">
       <h1>History</h1>
-      <p className="history-page-subtitle">Riwayat sesi dan hasil board.</p>
+      <p className="history-page-subtitle">Beberapa board terakhir yang pernah kamu mainkan.</p>
       <HistoryWorkspace />
     </main>
   );

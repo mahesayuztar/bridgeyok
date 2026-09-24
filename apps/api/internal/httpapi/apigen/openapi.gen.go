@@ -230,6 +230,66 @@ func (e HealthResponseStatus) Valid() bool {
 	}
 }
 
+// Defines values for HistoryBoardMatchRoom.
+const (
+	HistoryBoardMatchRoomCLOSED HistoryBoardMatchRoom = "CLOSED"
+	HistoryBoardMatchRoomOPEN   HistoryBoardMatchRoom = "OPEN"
+)
+
+// Valid indicates whether the value is a known member of the HistoryBoardMatchRoom enum.
+func (e HistoryBoardMatchRoom) Valid() bool {
+	switch e {
+	case HistoryBoardMatchRoomCLOSED:
+		return true
+	case HistoryBoardMatchRoomOPEN:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HistoryBoardMatchStatus.
+const (
+	HistoryBoardMatchStatusACTIVE    HistoryBoardMatchStatus = "ACTIVE"
+	HistoryBoardMatchStatusCANCELLED HistoryBoardMatchStatus = "CANCELLED"
+	HistoryBoardMatchStatusCOMPLETE  HistoryBoardMatchStatus = "COMPLETE"
+	HistoryBoardMatchStatusWAITING   HistoryBoardMatchStatus = "WAITING"
+)
+
+// Valid indicates whether the value is a known member of the HistoryBoardMatchStatus enum.
+func (e HistoryBoardMatchStatus) Valid() bool {
+	switch e {
+	case HistoryBoardMatchStatusACTIVE:
+		return true
+	case HistoryBoardMatchStatusCANCELLED:
+		return true
+	case HistoryBoardMatchStatusCOMPLETE:
+		return true
+	case HistoryBoardMatchStatusWAITING:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HistoryBoardTeam.
+const (
+	HistoryBoardTeamA HistoryBoardTeam = "A"
+	HistoryBoardTeamB HistoryBoardTeam = "B"
+)
+
+// Valid indicates whether the value is a known member of the HistoryBoardTeam enum.
+func (e HistoryBoardTeam) Valid() bool {
+	switch e {
+	case HistoryBoardTeamA:
+		return true
+	case HistoryBoardTeamB:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MatchSeatRequestRoom.
 const (
 	MatchSeatRequestRoomCLOSED MatchSeatRequestRoom = "CLOSED"
@@ -860,6 +920,58 @@ type HealthResponse struct {
 // HealthResponseStatus defines model for HealthResponse.Status.
 type HealthResponseStatus string
 
+// HistoryBoard defines model for HistoryBoard.
+type HistoryBoard struct {
+	BoardId       openapi_types.UUID       `json:"boardId"`
+	BoardNumber   int                      `json:"boardNumber"`
+	CompletedAt   time.Time                `json:"completedAt"`
+	Lineup        HistoryLineup            `json:"lineup"`
+	MatchId       *openapi_types.UUID      `json:"matchId,omitempty"`
+	MatchRoom     *HistoryBoardMatchRoom   `json:"matchRoom,omitempty"`
+	MatchStatus   *HistoryBoardMatchStatus `json:"matchStatus,omitempty"`
+	ReplayAllowed bool                     `json:"replayAllowed"`
+	Result        ReplayResult             `json:"result"`
+	TableId       openapi_types.UUID       `json:"tableId"`
+	Team          *HistoryBoardTeam        `json:"team,omitempty"`
+	TeamAIMP      *int                     `json:"teamAIMP,omitempty"`
+	ViewerSeat    TableSeat                `json:"viewerSeat"`
+}
+
+// HistoryBoardMatchRoom defines model for HistoryBoard.MatchRoom.
+type HistoryBoardMatchRoom string
+
+// HistoryBoardMatchStatus defines model for HistoryBoard.MatchStatus.
+type HistoryBoardMatchStatus string
+
+// HistoryBoardTeam defines model for HistoryBoard.Team.
+type HistoryBoardTeam string
+
+// HistoryBoardPage defines model for HistoryBoardPage.
+type HistoryBoardPage struct {
+	Items      []HistoryBoard `json:"items"`
+	NextCursor *string        `json:"nextCursor,omitempty"`
+}
+
+// HistoryLineup defines model for HistoryLineup.
+type HistoryLineup struct {
+	EastWest   HistoryPair                   `json:"eastWest"`
+	NorthSouth HistoryPair                   `json:"northSouth"`
+	Seats      map[string]HistoryParticipant `json:"seats"`
+}
+
+// HistoryPair defines model for HistoryPair.
+type HistoryPair struct {
+	Id      string               `json:"id"`
+	Members []HistoryParticipant `json:"members"`
+}
+
+// HistoryParticipant defines model for HistoryParticipant.
+type HistoryParticipant struct {
+	Id       openapi_types.UUID `json:"id"`
+	IsBot    bool               `json:"isBot"`
+	Nickname string             `json:"nickname"`
+}
+
 // MatchComparison defines model for MatchComparison.
 type MatchComparison struct {
 	BoardId       openapi_types.UUID `json:"boardId"`
@@ -1182,6 +1294,12 @@ type AnalyzeCompletedBoardParams struct {
 // AnalyzeCompletedBoard200JSONResponseBody defines parameters for AnalyzeCompletedBoard.
 type AnalyzeCompletedBoard200JSONResponseBody struct {
 	union json.RawMessage
+}
+
+// ListHistoryBoardsParams defines parameters for ListHistoryBoards.
+type ListHistoryBoardsParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // LoginAccountJSONRequestBody defines body for LoginAccount for application/json ContentType.
