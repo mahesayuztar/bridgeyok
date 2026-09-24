@@ -28,7 +28,7 @@ function DialogHarness() {
   const [request, setRequest] = useState<LiveTableProjection["actionRequest"]>(undefined);
   const activeTable = { ...table, ...(request ? { actionRequest: request } : {}) };
   return <main className="active-table-client">
-    <ActiveTableStatusBar table={activeTable} connectionState="connected" inviteCode={null} canSendCommand={() => true} onCommand={() => setRequest(undefined)} analysisControl={null} soundMuted onSoundMutedChange={idle} onLeaveTable={idle} loadBoardReplay={async () => { throw new Error("Unused"); }} loadPositionAnalysis={async () => { throw new Error("Unused"); }} />
+    <ActiveTableStatusBar table={activeTable} connectionState="connected" inviteCode={null} canSendCommand={() => true} onCommand={() => setRequest(undefined)} soundMuted onSoundMutedChange={idle} onLeaveTable={idle} loadBoardReplay={async () => { throw new Error("Unused"); }} loadPositionAnalysis={async () => { throw new Error("Unused"); }} />
     <ParticipantPosition table={table} presence={{}} seat="S" position="bottom" canSendCommand={unavailable} onCommand={idle} turn={false} />
     <button onClick={() => setRequest({ kind: "CLAIM", requesterSeat: "N", claimTricks: 4, approvedBy: [], canRespond: true } as unknown as NonNullable<LiveTableProjection["actionRequest"]>)}>Receive claim</button>
   </main>;
