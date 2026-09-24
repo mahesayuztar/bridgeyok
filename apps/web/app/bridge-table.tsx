@@ -23,6 +23,7 @@ import {
   ActiveTableStatusBar,
   WaitingTableStatusBar,
 } from "./table/table-status-bar";
+import { TableChat } from "./table/table-chat";
 import { TableSurface } from "./table/table-surface";
 import { useGameplayMotion } from "./table/use-gameplay-motion";
 import { WaitingRoom } from "./table/waiting-room";
@@ -191,26 +192,31 @@ export default function BridgeTable({
           connectionState={session.connectionState}
           onLeaveTable={() => void returnToLobby()}
         />
-        {session.tableState.issue === null ? null : (
-          <IssueNotice
-            compact
-            issue={session.tableState.issue}
-            onDismiss={session.dismissIssue}
-            onAction={(action) => {
-              if (action === "retry") session.reconnect();
-              else if (action === "resync") session.resync();
-            }}
-          />
-        )}
-        <WaitingRoom
-          table={table}
-          orientation={orientation}
-          presence={session.tableState.presence}
-          inviteCode={session.inviteCode}
-          canSendCommand={canSendVisibleCommand}
-          onLeaveTable={() => void returnToLobby()}
-          onCommand={sendVisibleCommand}
-        />
+        <div className="play-board-layout waiting-play-layout">
+          <div className="gameplay-region waiting-gameplay-region">
+            {session.tableState.issue === null ? null : (
+              <IssueNotice
+                compact
+                issue={session.tableState.issue}
+                onDismiss={session.dismissIssue}
+                onAction={(action) => {
+                  if (action === "retry") session.reconnect();
+                  else if (action === "resync") session.resync();
+                }}
+              />
+            )}
+            <WaitingRoom
+              table={table}
+              orientation={orientation}
+              presence={session.tableState.presence}
+              inviteCode={session.inviteCode}
+              canSendCommand={canSendVisibleCommand}
+              onLeaveTable={() => void returnToLobby()}
+              onCommand={sendVisibleCommand}
+            />
+          </div>
+          {visible ? <TableChat tableId={table.tableId} /> : null}
+        </div>
       </main>
     );
   }
@@ -228,7 +234,7 @@ export default function BridgeTable({
   const boardComplete = game?.phase === "BOARD_SCORED";
   return (
     <main
-      className="table-client active-table-client"
+      className="table-client active-table-client play-board-client"
       data-board-complete={boardComplete}
     >
       <ActiveTableStatusBar
@@ -244,6 +250,8 @@ export default function BridgeTable({
         onLeaveTable={() => void returnToLobby()}
       />
 
+      <div className="play-board-layout">
+        <div className="gameplay-region">
       <div className="table-feedback" aria-live="polite">
         {analysis.failed ? <span role="status">DDS tidak tersedia untuk posisi ini.</span> : null}
         {session.tableState.issue === null ? null : (
@@ -383,6 +391,9 @@ export default function BridgeTable({
             : {})}
         />
       )}
+        </div>
+        {visible ? <TableChat tableId={table.tableId} /> : null}
+      </div>
     </main>
   );
 }

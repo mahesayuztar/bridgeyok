@@ -13,7 +13,7 @@ export function ChatPanel({
 }: {
   target: ChatTarget;
   profile?: Profile;
-  onClose: () => void;
+  onClose?: () => void;
 }) {
   const messages = useSyncExternalStore(
     chatStore.subscribe,
@@ -100,7 +100,7 @@ export function ChatPanel({
   useEffect(() => {
     const viewport = window.visualViewport;
     const container = panelRef.current?.closest<HTMLElement>(
-      ".table-chat-container",
+      ".private-chat-container",
     );
     if (!viewport || !container) return;
     function updateViewport() {
@@ -144,7 +144,7 @@ export function ChatPanel({
     <section
       ref={panelRef}
       className="chat-panel"
-      onKeyDown={(event) => {
+      onKeyDown={onClose === undefined ? undefined : (event) => {
         if (event.key === "Escape") {
           event.stopPropagation();
           onClose();
@@ -174,9 +174,11 @@ export function ChatPanel({
             <small>Participant meja ini · 14 hari</small>
           )}
         </div>
-        <button type="button" onClick={onClose} aria-label="Tutup chat">
-          ×
-        </button>
+        {onClose === undefined ? null : (
+          <button type="button" onClick={onClose} aria-label="Tutup chat">
+            ×
+          </button>
+        )}
       </header>
       <div
         className="chat-messages"

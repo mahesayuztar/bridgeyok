@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { type Profile } from "./account-types";
 import { ProfileAvatar } from "./profile-avatar";
@@ -11,6 +11,7 @@ import { useTableSession } from "./use-table-session";
 
 export function AccountPresence({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
+  const pathname = usePathname();
   const session = useTableSession();
   const [privateProfile, setPrivateProfile] = useState<Profile | null>(null);
   const [socialNotice, setSocialNotice] = useState<{
@@ -71,25 +72,21 @@ export function AccountPresence({ compact = false }: { compact?: boolean }) {
             </>
           ) : null}
           <span>{notice.message.content}</span>
-          <button
-            type="button"
-            onClick={() => {
-              if (notice.target.scope === "private" && notice.message.sender)
-                setPrivateProfile(notice.message.sender);
-              else if (
-                window.location.pathname === `/table/${notice.target.id}`
-              )
-                window.dispatchEvent(
-                  new CustomEvent("open-table-chat", {
-                    detail: notice.target.id,
-                  }),
-                );
-              else router.push(`/table/${notice.target.id}?chat=open`);
-              setNotice(null);
-            }}
-          >
-            Open Chat
-          </button>
+          {notice.target.scope === "table" && pathname === `/table/${notice.target.id}` ? (
+            <span>Lihat di panel Chat</span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (notice.target.scope === "private" && notice.message.sender)
+                  setPrivateProfile(notice.message.sender);
+                else router.push(`/table/${notice.target.id}`);
+                setNotice(null);
+              }}
+            >
+              Open Chat
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setNotice(null)}
@@ -138,7 +135,7 @@ export function AccountPresence({ compact = false }: { compact?: boolean }) {
         </div>
       ) : null}
       {privateProfile ? (
-        <div className="table-chat-container">
+        <div className="private-chat-container">
           <ChatPanel
             key={privateProfile.id}
             target={{ scope: "private", id: privateProfile.id }}
