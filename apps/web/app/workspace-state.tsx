@@ -19,6 +19,8 @@ type WorkspacePresentation = {
   setFriendsQuery: Dispatch<SetStateAction<string>>;
   friendsOnly: boolean;
   setFriendsOnly: Dispatch<SetStateAction<boolean>>;
+  historyBoardId: string | null;
+  setHistoryBoardId: Dispatch<SetStateAction<string | null>>;
   settingsDraft: SettingsDraft | null;
   setSettingsDraft: Dispatch<SetStateAction<SettingsDraft | null>>;
   settingsStatus: SettingsStatus;
@@ -30,6 +32,7 @@ const WorkspacePresentationContext = createContext<WorkspacePresentation | null>
 export function WorkspacePresentationProvider({ children }: { children: ReactNode }) {
   const [friendsQuery, setFriendsQuery] = useState("");
   const [friendsOnly, setFriendsOnly] = useState(true);
+  const [historyBoardId, setHistoryBoardId] = useState<string | null>(null);
   const [settingsDraft, setSettingsDraft] = useState<SettingsDraft | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<SettingsStatus>({ error: false, message: "" });
 
@@ -39,6 +42,8 @@ export function WorkspacePresentationProvider({ children }: { children: ReactNod
       setFriendsQuery,
       friendsOnly,
       setFriendsOnly,
+      historyBoardId,
+      setHistoryBoardId,
       settingsDraft,
       setSettingsDraft,
       settingsStatus,
