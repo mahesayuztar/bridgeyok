@@ -116,6 +116,8 @@ func NewRouter(options Options) http.Handler {
 	matchHandler := matchHTTPHandler{service: options.Match, identity: identityHandler, logger: options.Logger}
 	historyHandler := historyHTTPHandler{service: options.History, identity: identityHandler, logger: options.Logger}
 	router.Get("/v1/history/boards", historyHandler.list)
+	router.Put("/v1/history/boards/{boardId}/label", historyHandler.setLabel)
+	router.Delete("/v1/history/boards/{boardId}/label", historyHandler.deleteLabel)
 	router.Get("/v1/matches", matchHandler.serve)
 	router.Post("/v1/matches", matchHandler.serve)
 	router.Get("/v1/matches/{matchId}", matchHandler.serve)

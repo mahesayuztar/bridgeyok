@@ -119,6 +119,13 @@ type BridgeyokGuestSession struct {
 	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
 }
 
+type BridgeyokHistoryBoardLabel struct {
+	SessionID string             `json:"session_id"`
+	BoardID   string             `json:"board_id"`
+	Label     string             `json:"label"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BridgeyokMatchAssignment struct {
 	MatchID   string `json:"match_id"`
 	Room      string `json:"room"`

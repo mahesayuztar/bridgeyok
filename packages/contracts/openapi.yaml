@@ -26,6 +26,12 @@ paths:
           minimum: 1
           maximum: 40
           default: 16
+      - name: search
+        in: query
+        description: Searches by local date, personal learning label, or compact contract/result string.
+        schema:
+          type: string
+          maxLength: 96
       responses:
         '200':
           description: Recent authorized board history.
@@ -35,6 +41,59 @@ paths:
                 $ref: '#/components/schemas/HistoryBoardPage'
         default:
           description: Authentication, pagination, or history infrastructure failure.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /v1/history/boards/{boardId}/label:
+    put:
+      operationId: setHistoryBoardLabel
+      description: Saves one personal learning label for an authorized history board.
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: boardId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HistoryBoardLabelRequest'
+      responses:
+        '200':
+          description: Saved board label.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryBoardLabel'
+        default:
+          description: Authentication, authorization, validation, or history infrastructure failure.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      operationId: deleteHistoryBoardLabel
+      description: Removes the personal learning label from an authorized history board.
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: boardId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Label removed.
+        default:
+          description: Authentication, authorization, validation, or history infrastructure failure.
           content:
             application/problem+json:
               schema:
@@ -982,6 +1041,24 @@ components:
           maxLength: 64
         isBot:
           type: boolean
+    HistoryBoardLabelRequest:
+      type: object
+      additionalProperties: false
+      required: [label]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+    HistoryBoardLabel:
+      type: object
+      additionalProperties: false
+      required: [label]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
     HistoryPair:
       type: object
       additionalProperties: false
@@ -1031,6 +1108,9 @@ components:
         completedAt:
           type: string
           format: date-time
+        label:
+          type: string
+          maxLength: 80
         matchId:
           type: string
           format: uuid

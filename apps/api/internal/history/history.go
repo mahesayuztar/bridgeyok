@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/bridge"
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
@@ -18,10 +20,14 @@ const (
 
 var ErrInvalidCursor = errors.New("invalid history cursor")
 var ErrInvalidPageSize = errors.New("invalid history page size")
+var ErrInvalidLabel = errors.New("invalid history label")
+var ErrInvalidSearch = errors.New("invalid history search")
+var ErrHistoryBoardNotFound = errors.New("history board not found")
 
 type Cursor struct {
 	CompletedAt time.Time
 	BoardID     string
+	Search      string
 }
 
 type Participant struct {
@@ -44,6 +50,7 @@ type Board struct {
 	Lineup        BoardLineup   `json:"lineup"`
 	ViewerSeat    bridge.Seat   `json:"viewerSeat"`
 	CompletedAt   time.Time     `json:"completedAt"`
+	Label         string        `json:"label,omitempty"`
 	MatchID       string        `json:"matchId,omitempty"`
 	MatchStatus   string        `json:"matchStatus,omitempty"`
 	MatchRoom     string        `json:"matchRoom,omitempty"`
@@ -80,6 +87,21 @@ func DecodeCursor(value string) (Cursor, error) {
 func ValidatePageSize(value int) error {
 	if value < 1 || value > MaxPageSize {
 		return fmt.Errorf("%w: must be between 1 and %d", ErrInvalidPageSize, MaxPageSize)
+	}
+	return nil
+}
+
+func ValidateLabel(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" || utf8.RuneCountInString(value) > 80 {
+		return ErrInvalidLabel
+	}
+	return nil
+}
+
+func ValidateSearch(value string) error {
+	if utf8.RuneCountInString(value) > 96 {
+		return ErrInvalidSearch
 	}
 	return nil
 }

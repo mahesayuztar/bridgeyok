@@ -21,6 +21,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/history/boards/{boardId}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Saves one personal learning label for an authorized history board. */
+        put: operations["setHistoryBoardLabel"];
+        post?: never;
+        /** @description Removes the personal learning label from an authorized history board. */
+        delete: operations["deleteHistoryBoardLabel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/matches": {
         parameters: {
             query?: never;
@@ -588,6 +606,12 @@ export interface components {
             nickname: string;
             isBot: boolean;
         };
+        HistoryBoardLabelRequest: {
+            label: string;
+        };
+        HistoryBoardLabel: {
+            label: string;
+        };
         HistoryPair: {
             id: string;
             members: components["schemas"]["HistoryParticipant"][];
@@ -610,6 +634,7 @@ export interface components {
             viewerSeat: components["schemas"]["TableSeat"];
             /** Format: date-time */
             completedAt: string;
+            label?: string;
             /** Format: uuid */
             matchId?: string;
             /** @enum {string} */
@@ -998,6 +1023,8 @@ export interface operations {
             query?: {
                 cursor?: string;
                 limit?: number;
+                /** @description Searches by local date, personal learning label, or compact contract/result string. */
+                search?: string;
             };
             header?: never;
             path?: never;
@@ -1015,6 +1042,70 @@ export interface operations {
                 };
             };
             /** @description Authentication, pagination, or history infrastructure failure. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setHistoryBoardLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoryBoardLabelRequest"];
+            };
+        };
+        responses: {
+            /** @description Saved board label. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryBoardLabel"];
+                };
+            };
+            /** @description Authentication, authorization, validation, or history infrastructure failure. */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteHistoryBoardLabel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                boardId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Label removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication, authorization, validation, or history infrastructure failure. */
             default: {
                 headers: {
                     [name: string]: unknown;

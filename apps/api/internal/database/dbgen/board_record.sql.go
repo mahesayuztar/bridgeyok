@@ -22,6 +22,34 @@ func (q *Queries) DeleteCompactedBoardEvents(ctx context.Context, boardID string
 	return err
 }
 
+const deleteHistoryBoardLabel = `-- name: DeleteHistoryBoardLabel :execrows
+DELETE FROM bridgeyok.history_board_labels label
+WHERE label.session_id = $1
+  AND label.board_id = $2
+  AND EXISTS (
+      SELECT 1
+      FROM bridgeyok.board_seat_attributions attribution
+      JOIN bridgeyok.table_participants participant
+        ON participant.table_id = attribution.table_id
+       AND participant.id = attribution.occupant_id
+       AND participant.session_id = $1
+      WHERE attribution.board_id = $2
+  )
+`
+
+type DeleteHistoryBoardLabelParams struct {
+	SessionID string `json:"session_id"`
+	BoardID   string `json:"board_id"`
+}
+
+func (q *Queries) DeleteHistoryBoardLabel(ctx context.Context, arg DeleteHistoryBoardLabelParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteHistoryBoardLabel, arg.SessionID, arg.BoardID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const findBoardRecord = `-- name: FindBoardRecord :one
 SELECT r.record FROM bridgeyok.board_records r
 WHERE r.board_id = $1
@@ -141,6 +169,7 @@ SELECT b.id,
        b.board_number,
        b.result,
        b.completed_at,
+       board_label.label,
        jsonb_object_agg(
            attribution.seat,
            jsonb_build_object(
@@ -183,6 +212,9 @@ LEFT JOIN bridgeyok.match_assignments match_assignment
 LEFT JOIN bridgeyok.match_comparisons comparison
   ON comparison.match_id = match_room_board.match_id
  AND comparison.board_id = match_room_board.board_id
+LEFT JOIN bridgeyok.history_board_labels board_label
+  ON board_label.board_id = b.id
+ AND board_label.session_id = $1
 WHERE b.status IN ('SCORED', 'PASSED_OUT')
   AND b.completed_at IS NOT NULL
   AND viewer_seat.seat IS NOT NULL
@@ -196,18 +228,54 @@ WHERE b.status IN ('SCORED', 'PASSED_OUT')
       $2::timestamptz IS NULL
       OR (b.completed_at, b.id) < ($2::timestamptz, $3::uuid)
   )
+  AND (
+      NULLIF(trim($4::text), '') IS NULL
+      OR board_label.label ILIKE '%' || trim($4::text) || '%'
+      OR to_char(b.completed_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') ILIKE '%' || trim($4::text) || '%'
+      OR to_char(b.completed_at AT TIME ZONE 'Asia/Jakarta', 'DD/MM/YYYY') ILIKE '%' || trim($4::text) || '%'
+      OR to_char(b.completed_at AT TIME ZONE 'Asia/Jakarta', 'DD-MM-YYYY') ILIKE '%' || trim($4::text) || '%'
+      OR b.result::text ILIKE '%' || trim($4::text) || '%'
+      OR lower(regexp_replace(
+          CASE
+              WHEN b.result->>'passedOut' = 'true' THEN 'passedout'
+              ELSE concat(
+                  b.result->'contract'->>'level',
+                  CASE b.result->'contract'->>'strain'
+                      WHEN 'NT' THEN 'NT'
+                      ELSE b.result->'contract'->>'strain'
+                  END,
+                  CASE b.result->'contract'->>'doubling'
+                      WHEN 'DOUBLED' THEN 'X'
+                      WHEN 'REDOUBLED' THEN 'XX'
+                      ELSE ''
+                  END,
+                  b.result->'contract'->>'declarer',
+                  CASE
+                      WHEN (b.result->>'tricksDeclarer')::integer - (6 + (b.result->'contract'->>'level')::integer) = 0 THEN '='
+                      WHEN (b.result->>'tricksDeclarer')::integer - (6 + (b.result->'contract'->>'level')::integer) > 0 THEN '+' || ((b.result->>'tricksDeclarer')::integer - (6 + (b.result->'contract'->>'level')::integer))::text
+                      ELSE ((b.result->>'tricksDeclarer')::integer - (6 + (b.result->'contract'->>'level')::integer))::text
+                  END
+              )
+          END,
+          '\s+', '', 'g'
+      )) LIKE '%' || lower(regexp_replace(
+          replace(replace(replace(replace(trim($4::text), '♣', 'C'), '♦', 'D'), '♥', 'H'), '♠', 'S'),
+          '\s+', '', 'g'
+      )) || '%'
+  )
 GROUP BY b.id, b.table_id, b.board_number, b.result, b.completed_at,
-         viewer_seat.seat, match_room_board.match_id, team_match.status,
+         board_label.label, viewer_seat.seat, match_room_board.match_id, team_match.status,
          match_room_board.room, match_assignment.room, match_assignment.seat,
          match_assignment.match_id, comparison.team_a_imp
 ORDER BY b.completed_at DESC, b.id DESC
-LIMIT $4
+LIMIT $5
 `
 
 type ListHistoryBoardsParams struct {
 	SessionID string             `json:"session_id"`
 	CursorAt  pgtype.Timestamptz `json:"cursor_at"`
 	CursorID  pgtype.UUID        `json:"cursor_id"`
+	Search    string             `json:"search"`
 	PageLimit int32              `json:"page_limit"`
 }
 
@@ -217,6 +285,7 @@ type ListHistoryBoardsRow struct {
 	BoardNumber int32              `json:"board_number"`
 	Result      []byte             `json:"result"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	Label       *string            `json:"label"`
 	Lineup      []byte             `json:"lineup"`
 	ViewerSeat  string             `json:"viewer_seat"`
 	MatchID     pgtype.UUID        `json:"match_id"`
@@ -231,6 +300,7 @@ func (q *Queries) ListHistoryBoards(ctx context.Context, arg ListHistoryBoardsPa
 		arg.SessionID,
 		arg.CursorAt,
 		arg.CursorID,
+		arg.Search,
 		arg.PageLimit,
 	)
 	if err != nil {
@@ -246,6 +316,7 @@ func (q *Queries) ListHistoryBoards(ctx context.Context, arg ListHistoryBoardsPa
 			&i.BoardNumber,
 			&i.Result,
 			&i.CompletedAt,
+			&i.Label,
 			&i.Lineup,
 			&i.ViewerSeat,
 			&i.MatchID,
@@ -292,4 +363,41 @@ func (q *Queries) LoadBoardSource(ctx context.Context, boardID string) ([]byte, 
 	var source_record []byte
 	err := row.Scan(&source_record)
 	return source_record, err
+}
+
+const upsertHistoryBoardLabel = `-- name: UpsertHistoryBoardLabel :execrows
+INSERT INTO bridgeyok.history_board_labels (session_id, board_id, label, updated_at)
+SELECT $1, $2, $3, $4
+WHERE EXISTS (
+    SELECT 1
+    FROM bridgeyok.board_seat_attributions attribution
+    JOIN bridgeyok.table_participants participant
+      ON participant.table_id = attribution.table_id
+     AND participant.id = attribution.occupant_id
+     AND participant.session_id = $1
+    WHERE attribution.board_id = $2
+)
+ON CONFLICT (session_id, board_id) DO UPDATE SET
+    label = EXCLUDED.label,
+    updated_at = EXCLUDED.updated_at
+`
+
+type UpsertHistoryBoardLabelParams struct {
+	SessionID string             `json:"session_id"`
+	BoardID   string             `json:"board_id"`
+	Label     string             `json:"label"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) UpsertHistoryBoardLabel(ctx context.Context, arg UpsertHistoryBoardLabelParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertHistoryBoardLabel,
+		arg.SessionID,
+		arg.BoardID,
+		arg.Label,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

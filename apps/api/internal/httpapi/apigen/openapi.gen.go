@@ -925,6 +925,7 @@ type HistoryBoard struct {
 	BoardId       openapi_types.UUID       `json:"boardId"`
 	BoardNumber   int                      `json:"boardNumber"`
 	CompletedAt   time.Time                `json:"completedAt"`
+	Label         *string                  `json:"label,omitempty"`
 	Lineup        HistoryLineup            `json:"lineup"`
 	MatchId       *openapi_types.UUID      `json:"matchId,omitempty"`
 	MatchRoom     *HistoryBoardMatchRoom   `json:"matchRoom,omitempty"`
@@ -945,6 +946,16 @@ type HistoryBoardMatchStatus string
 
 // HistoryBoardTeam defines model for HistoryBoard.Team.
 type HistoryBoardTeam string
+
+// HistoryBoardLabel defines model for HistoryBoardLabel.
+type HistoryBoardLabel struct {
+	Label string `json:"label"`
+}
+
+// HistoryBoardLabelRequest defines model for HistoryBoardLabelRequest.
+type HistoryBoardLabelRequest struct {
+	Label string `json:"label"`
+}
 
 // HistoryBoardPage defines model for HistoryBoardPage.
 type HistoryBoardPage struct {
@@ -1300,6 +1311,9 @@ type AnalyzeCompletedBoard200JSONResponseBody struct {
 type ListHistoryBoardsParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Search Searches by local date, personal learning label, or compact contract/result string.
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
 }
 
 // LoginAccountJSONRequestBody defines body for LoginAccount for application/json ContentType.
@@ -1319,6 +1333,9 @@ type CreateGuestSessionJSONRequestBody = CreateGuestSessionRequest
 
 // RefreshGuestSessionJSONRequestBody defines body for RefreshGuestSession for application/json ContentType.
 type RefreshGuestSessionJSONRequestBody = RefreshGuestSessionRequest
+
+// SetHistoryBoardLabelJSONRequestBody defines body for SetHistoryBoardLabel for application/json ContentType.
+type SetHistoryBoardLabelJSONRequestBody = HistoryBoardLabelRequest
 
 // CreateMatchJSONRequestBody defines body for CreateMatch for application/json ContentType.
 type CreateMatchJSONRequestBody = MatchCreateRequest

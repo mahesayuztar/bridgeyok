@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -13,7 +14,7 @@ import (
 	"github.com/mahesayuztar/bridgeyok/apps/api/internal/table"
 )
 
-func (postgres *Postgres) ListHistoryBoards(ctx context.Context, sessionID string, cursor history.Cursor, limit int) ([]history.Board, error) {
+func (postgres *Postgres) ListHistoryBoards(ctx context.Context, sessionID string, cursor history.Cursor, search string, limit int) ([]history.Board, error) {
 	var cursorAt pgtype.Timestamptz
 	var cursorID pgtype.UUID
 	if !cursor.CompletedAt.IsZero() {
@@ -28,6 +29,7 @@ func (postgres *Postgres) ListHistoryBoards(ctx context.Context, sessionID strin
 		SessionID: sessionID,
 		CursorAt:  cursorAt,
 		CursorID:  cursorID,
+		Search:    search,
 		PageLimit: int32(limit),
 	})
 	if err != nil {
@@ -50,9 +52,14 @@ func (postgres *Postgres) ListHistoryBoards(ctx context.Context, sessionID strin
 		if err != nil {
 			return nil, err
 		}
+		label := ""
+		if row.Label != nil {
+			label = *row.Label
+		}
 		item := history.Board{
 			BoardID: row.ID, TableID: row.TableID, BoardNumber: int(row.BoardNumber), Result: result,
 			Lineup: lineup, ViewerSeat: bridge.Seat(row.ViewerSeat), CompletedAt: row.CompletedAt.Time,
+			Label:         label,
 			ReplayAllowed: row.MatchStatus == "" || row.MatchStatus == "COMPLETE",
 		}
 		if row.MatchID.Valid {
@@ -72,6 +79,30 @@ func (postgres *Postgres) ListHistoryBoards(ctx context.Context, sessionID strin
 		items = append(items, item)
 	}
 	return items, nil
+}
+
+func (postgres *Postgres) SaveHistoryBoardLabel(ctx context.Context, sessionID, boardID, label string) error {
+	rows, err := postgres.queries.UpsertHistoryBoardLabel(ctx, dbgen.UpsertHistoryBoardLabelParams{
+		SessionID: sessionID,
+		BoardID:   boardID,
+		Label:     label,
+		UpdatedAt: timestamptz(time.Now().UTC()),
+	})
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return history.ErrHistoryBoardNotFound
+	}
+	return nil
+}
+
+func (postgres *Postgres) DeleteHistoryBoardLabel(ctx context.Context, sessionID, boardID string) error {
+	_, err := postgres.queries.DeleteHistoryBoardLabel(ctx, dbgen.DeleteHistoryBoardLabelParams{SessionID: sessionID, BoardID: boardID})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func historyLineup(participants map[bridge.Seat]history.Participant) (history.BoardLineup, error) {
