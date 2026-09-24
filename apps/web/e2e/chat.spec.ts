@@ -124,7 +124,7 @@ test("permanent table chat preserves gameplay geometry and pointer actions acros
   await page.getByRole("button", { name: "Mulai board", exact: true }).click();
   await expect(page.locator(".own-hand .physical-card")).toHaveCount(13);
   await expect(page.getByRole("button", { name: /^DD / })).toHaveCount(0);
-  const tableMenuTrigger = page.getByRole("button", { name: "Buka menu meja", exact: true });
+  const tableMenuTrigger = page.locator('summary[aria-label="Buka menu meja"]');
   await tableMenuTrigger.click();
   await expect(page.getByRole("button", { name: "Undo tidak tersedia", exact: true })).toBeVisible();
   await expect(page.getByText("Claim", { exact: true })).toBeVisible();
