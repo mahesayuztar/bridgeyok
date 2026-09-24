@@ -365,16 +365,16 @@ Evidence P6-06, 23 September 2026: commits `e90ac1c` dan `12cfb0e`. Auction read
 ### P6-07 — History workspace dan score context
 
 Tujuan: History menjadi destination nyata dengan sumber data yang tersedia.
-Scope: compose ScoreSheet/replay + participant match list; responsive board rows dan result/score chain.
+Scope: compose ScoreSheet/replay + unified board feed; responsive board rows, result chain, learning labels, and history search.
 Dependency: P6-01 fixtures, P6-03 shell. Parallelization: P6-06 pada reader terpisah; koordinasi selected-board state.
 
 - [x] Active-table History memakai state valid tanpa full table GET baru; no-table menampilkan authorized board history/empty state.
 - [x] Contract/declarer/vulnerability/result/signed perspective, passed-out/zero/positive/negative terlihat jelas.
 - [x] Duplicate total tidak dilabeli IMP; Team Match memakai actual IMP/comparisons; tidak ada Matchpoint placeholder.
 - [x] Replay/analysis tetap ditolak selama active match; match COMPLETE menyegarkan entitlement sekali tanpa route-remount dependency.
-- [x] History panjang memakai scroll vertikal mobile dengan row readable, stable selection dan return ke live table.
+- [x] History panjang memakai scroll vertikal mobile dengan row readable, stable selection, learning label, and replay action.
 
-Evidence P6-07, 24 September 2026: history board kini memakai `GET /v1/history/boards` dengan keyset cursor `(completed_at, board_id)` dan page lookahead 16 (maksimum 40), sehingga casual/bot/table match dan Team Match berada pada satu authorized list tanpa `OFFSET` atau daftar format terpisah. Query mengembalikan result, lineup board-start, viewer perspective, dan actual signed Team Match IMP tanpa deal/hidden hand. History workspace mempertahankan selected board, memakai score sheet table aktif sebagai fallback tanpa full table GET, melakukan prefetch saat sentinel mendekati viewport, mencegah concurrent page request/duplicate board, dan refresh entitlement sekali ketika match menjadi COMPLETE. Replay/analysis tetap memakai endpoint authorization existing; board Team Match aktif ditampilkan tetapi replay disabled sampai match selesai. Contract/generated source, cursor unit test, Go API tests, web lint/typecheck/build, dan contract tests lulus; lint hanya menyisakan dua warning `aria-description` lama pada score controls.
+Evidence P6-07, 25 September 2026: history board memakai `GET /v1/history/boards` dengan keyset cursor `(completed_at, board_id)` dan page lookahead 16 (maksimum 40), sehingga casual/bot/table match dan Team Match berada pada satu authorized list tanpa `OFFSET` atau daftar format terpisah. Query mengembalikan result, lineup board-start, viewer perspective, actual signed Team Match IMP, dan label personal per session tanpa deal/hidden hand. History workspace kini langsung dimulai dari satu `Recent boards`, tanpa summary atau navigasi kembali ke meja; setiap row menampilkan compact contract/result, label belajar yang tersimpan melalui endpoint label, dan hanya tanggal/jam sebagai metadata kecil. Search server-side mencari tanggal lokal, label, atau compact contract/result; debounce input, cursor terikat pada query, satu request aktif, de-duplication, dan active score-sheet fallback menjaga infinite scroll efisien. Replay/analysis tetap memakai endpoint authorization existing; board Team Match aktif ditampilkan tetapi replay disabled sampai match selesai. Contract/generated source, cursor/label unit test, Go API tests, web lint/typecheck/build, dan contract tests lulus; lint hanya menyisakan dua warning `aria-description` lama pada score controls.
 
 ### P6-08 — Accessibility dan responsive integration gate
 

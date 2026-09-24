@@ -1,15 +1,12 @@
 import { useDialogDrag } from "./use-dialog-drag";
-import type { ReactNode } from "react";
 import { oppositeSeat, type LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
 
 export function ConsensusControls({
-  analysisControl,
   table,
   canSendCommand,
   onCommand,
 }: {
-  analysisControl?: ReactNode;
   table: LiveTableProjection;
   canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
@@ -36,7 +33,6 @@ export function ConsensusControls({
 
   return (
     <div className="consensus-navigation">
-      {analysisControl}
       <details className="claim-menu">
         <summary
           aria-label={

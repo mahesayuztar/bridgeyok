@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { usePositionAnalysis } from "./use-position-analysis";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import IssueNotice from "./issue-notice";
 import {
   oppositeSeat,
@@ -68,13 +67,6 @@ export default function BridgeTable({
     [table?.viewerSeat],
   );
   const legalPlay = table === null ? null : playableHand(table);
-  const visibleDummyTurn = game?.auction.contract !== undefined && game.turn === oppositeSeat(game.auction.contract.declarer) && game.dummyHand !== undefined;
-  const analysisHand = visibleDummyTurn && table && game?.turn && game.dummyHand
-    ? playableHand({ ...table, viewerSeat: game.turn, game: { ...game, ownHand: game.dummyHand } })
-    : legalPlay;
-  const [doubleDummy, setDoubleDummy] = useState(false);
-  const analysis = usePositionAnalysis(session.loadPositionAnalysis, table?.boardId,
-    String(table?.revision), doubleDummy && analysisHand !== null && (game?.phase === "PLAY" || game?.phase === "OPENING_LEAD") && Object.keys(session.tableState.pending).length === 0);
   const viewerTurn = game?.turn === table?.viewerSeat;
   const motion = useGameplayMotion(game, presentationVisible);
   const turnAudio = useTurnAudio(session.tableState.table, presentationVisible);
@@ -244,7 +236,6 @@ export default function BridgeTable({
         inviteCode={session.inviteCode}
         canSendCommand={canSendVisibleCommand}
         onCommand={sendVisibleCommand}
-        analysisControl={table.matchId ? null : <button type="button" aria-pressed={doubleDummy} onClick={() => setDoubleDummy((value) => !value)} title="Predicted total tricks untuk pasangan yang sedang turn">DD {doubleDummy ? "ON" : "OFF"}</button>}
         soundMuted={turnAudio.muted}
         onSoundMutedChange={turnAudio.setMuted}
         onLeaveTable={() => void returnToLobby()}
@@ -253,7 +244,6 @@ export default function BridgeTable({
       <div className="play-board-layout">
         <div className="gameplay-region">
       <div className="table-feedback" aria-live="polite">
-        {analysis.failed ? <span role="status">DDS tidak tersedia untuk posisi ini.</span> : null}
         {session.tableState.issue === null ? null : (
           <IssueNotice
             compact
@@ -316,9 +306,6 @@ export default function BridgeTable({
                 variant="dummy"
                 position={dummyPosition}
                 cards={game.dummyHand}
-                analysisCards={visibleDummyTurn ? analysisHand?.hand : undefined}
-                predictions={visibleDummyTurn ? analysis.result?.cards : undefined}
-                analysisPending={visibleDummyTurn && analysis.pending}
                 contractStrain={game.auction.contract?.strain}
                 playableCards={
                   legalPlay?.source === "dummy"
@@ -371,9 +358,6 @@ export default function BridgeTable({
           className={`own-hand ${game.phase === "AUCTION" ? "own-hand-auction" : "own-hand-play"}`}
           title="Kartu Anda"
           cards={game.ownHand}
-          analysisCards={game.turn === table.viewerSeat ? analysisHand?.hand : undefined}
-          predictions={game.turn === table.viewerSeat ? analysis.result?.cards : undefined}
-          analysisPending={game.turn === table.viewerSeat && analysis.pending}
           contractStrain={game.auction.contract?.strain}
           playableCards={
             legalPlay?.source === "own"

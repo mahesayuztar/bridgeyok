@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { components } from "@bridgeyok/contracts/openapi";
 import { accountRequest } from "./account-types";
 import { BoardReplayModal } from "./table/board-replay-modal";
-import { contractLabel } from "./table/gameplay-presentation";
-import { boardResultLabel, type LiveTableProjection, type Seat } from "./table-state";
+import { compactContractLabel } from "./table/gameplay-presentation";
+import type { LiveTableProjection } from "./table-state";
 import { useTableSession } from "./use-table-session";
 import { useWorkspacePresentation } from "./workspace-state";
 
@@ -15,40 +14,43 @@ type ScoreSheetEntry = LiveTableProjection["scoreSheet"][number];
 type HistoryParticipant = components["schemas"]["HistoryParticipant"];
 type HistoryPair = components["schemas"]["HistoryPair"];
 
-const vulnerabilityLabels = {
-  NONE: "Tidak vul",
-  NS: "NS vul",
-  EW: "EW vul",
-  BOTH: "Kedua sisi vul",
-};
+const historyDateFormatter = new Intl.DateTimeFormat("id-ID", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 
-function signedScore(score: number) {
-  return score > 0 ? `+${score}` : String(score);
-}
-
-function boardNumberLabel(boardNumber: number) {
-  return String(boardNumber).padStart(2, "0");
-}
-
-function viewerPartnership(viewerSeat: Seat) {
-  return viewerSeat === "E" || viewerSeat === "W" ? "EW" : "NS";
-}
-
-function scoreContext(board: HistoryBoard) {
-  const perspective = viewerPartnership(board.viewerSeat);
-  const perspectiveScore = perspective === "EW" ? -board.result.scoreNS : board.result.scoreNS;
-  return {
-    perspective,
-    perspectiveScore,
-    resultLabel: board.result.passedOut ? "Passed out" : board.result.contract === undefined ? "Result tidak tersedia" : boardResultLabel(board.result as ScoreSheetEntry["result"]),
-  };
-}
-
-function HistoryIcon({ name }: { name: "arrow-left" | "play" }) {
-  if (name === "arrow-left") {
-    return <svg className="history-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>;
-  }
+function HistoryIcon() {
   return <svg className="history-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6z" /></svg>;
+}
+
+function compactBoardResult(board: HistoryBoard) {
+  if (board.result.passedOut || board.result.contract === undefined) return "Passed out";
+  const contract = board.result.contract as NonNullable<ScoreSheetEntry["result"]["contract"]>;
+  const difference = board.result.tricksDeclarer - (6 + contract.level);
+  const result = difference === 0 ? "=" : difference > 0 ? `+${difference}` : String(difference);
+  return `${compactContractLabel(contract)}${result}`;
+}
+
+function formatBoardDate(value: string) {
+  return historyDateFormatter.format(new Date(value));
+}
+
+function searchableBoardValues(board: HistoryBoard) {
+  const date = new Date(board.completedAt);
+  const isoDate = date.toISOString().slice(0, 10);
+  const localDate = historyDateFormatter.format(date).slice(0, 10);
+  return [board.label ?? "", compactBoardResult(board), formatBoardDate(board.completedAt), isoDate, localDate].map((value) => value.toLocaleLowerCase());
+}
+
+function boardMatchesSearch(board: HistoryBoard, search: string) {
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  if (normalizedSearch === "") return true;
+  const compactSearch = normalizedSearch.replace(/[♣♦♥♠]/g, (suit) => ({ "♣": "c", "♦": "d", "♥": "h", "♠": "s" })[suit] ?? suit).replace(/\s+/g, "");
+  return searchableBoardValues(board).some((value) => value.includes(normalizedSearch) || value.replace(/[♣♦♥♠]/g, (suit) => ({ "♣": "c", "♦": "d", "♥": "h", "♠": "s" })[suit] ?? suit).replace(/\s+/g, "").includes(compactSearch));
 }
 
 function participantFromHistory(participant: HistoryParticipant) {
@@ -82,44 +84,32 @@ function scoreEntryFromHistory(board: HistoryBoard): ScoreSheetEntry | null {
   };
 }
 
-function lineupLabel(board: HistoryBoard) {
-  const seats = board.lineup.seats;
-  const northSouth = [seats.N?.nickname, seats.S?.nickname].filter(Boolean).join(" / ");
-  const eastWest = [seats.E?.nickname, seats.W?.nickname].filter(Boolean).join(" / ");
-  return `NS ${northSouth} · EW ${eastWest}`;
-}
+function HistoryBoardRow({ board, selected, savingLabel, onSelect, onSaveLabel }: { board: HistoryBoard; selected: boolean; savingLabel: boolean; onSelect: (boardId: string) => void; onSaveLabel: (boardId: string, label: string) => void }) {
+  const labelInputRef = useRef<HTMLInputElement | null>(null);
 
-function ContractValue({ board, showDeclarer }: { board: HistoryBoard; showDeclarer: boolean }) {
-  if (board.result.passedOut) return <strong>Passed out</strong>;
-  if (board.result.contract === undefined) return <strong>Kontrak tidak tersedia</strong>;
-  return <span className="history-contract" data-strain={board.result.contract.strain}>{contractLabel(board.result.contract as ScoreSheetEntry["result"]["contract"])}{showDeclarer ? ` · ${board.result.contract.declarer}` : ""}</span>;
-}
-
-function ScorePair({ scoreNS }: { scoreNS: number }) {
-  const scoreEW = -scoreNS;
-  return (
-    <div className="history-score-pair" aria-label={`NS ${signedScore(scoreNS)}, EW ${signedScore(scoreEW)}`}>
-      <div data-score-sign={scoreNS === 0 ? "zero" : scoreNS > 0 ? "positive" : "negative"}><span>NS</span><strong>{signedScore(scoreNS)}</strong></div>
-      <div data-score-sign={scoreEW === 0 ? "zero" : scoreEW > 0 ? "positive" : "negative"}><span>EW</span><strong>{signedScore(scoreEW)}</strong></div>
-    </div>
-  );
-}
-
-function SessionSummary({ table }: { table: LiveTableProjection | null }) {
-  if (table === null) {
-    return <section className="history-session-summary history-session-empty" aria-labelledby="history-session-title"><div><span className="history-kicker">Session</span><h2 id="history-session-title">Tidak ada meja aktif</h2><p>History board tetap tersedia dari sesi yang pernah kamu ikuti.</p></div></section>;
+  function saveDraftLabel() {
+    if (savingLabel) return;
+    const nextLabel = labelInputRef.current?.value.trim() ?? "";
+    if (nextLabel !== (board.label ?? "")) onSaveLabel(board.boardId, nextLabel);
   }
-  const scoreNS = table.scoreSheet.reduce((total, entry) => total + entry.result.scoreNS, 0);
+
   return (
-    <section className="history-session-summary" aria-labelledby="history-session-title">
-      <div className="history-summary-heading"><span className="history-kicker">Session</span><h2 id="history-session-title">Sesi aktif</h2></div>
-      <div className="history-summary-metrics" aria-label="Ringkasan sesi"><div><span>Boards</span><strong>{table.scoreSheet.length}</strong></div><div data-score-sign={scoreNS === 0 ? "zero" : scoreNS > 0 ? "positive" : "negative"}><span>NS</span><strong>{signedScore(scoreNS)}</strong></div><div data-score-sign={scoreNS === 0 ? "zero" : scoreNS < 0 ? "positive" : "negative"}><span>EW</span><strong>{signedScore(-scoreNS)}</strong></div></div>
-      <Link className="history-back-link" href={`/table/${table.tableId}`}><HistoryIcon name="arrow-left" />Kembali ke meja</Link>
-    </section>
+    <li className="history-board-list-item">
+      <div className="history-board-row" data-selected={selected}>
+        <button className="history-board-select" type="button" aria-pressed={selected} onClick={() => onSelect(board.boardId)}>
+          <strong className="history-board-result">{compactBoardResult(board)}</strong>
+          <time className="history-board-time" dateTime={board.completedAt}>{formatBoardDate(board.completedAt)}</time>
+        </button>
+        <label className="history-board-label">
+          <span>Label belajar</span>
+          <input ref={labelInputRef} type="text" defaultValue={board.label ?? ""} maxLength={80} placeholder="Tambah label" aria-label={`Label belajar board ${board.boardNumber}`} disabled={savingLabel} onBlur={saveDraftLabel} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
+        </label>
+      </div>
+    </li>
   );
 }
 
-function HistoryBoardList({ boards, selectedBoardId, loadingMore, hasMore, onSelect, onLoadMore }: { boards: HistoryBoard[]; selectedBoardId: string | null; loadingMore: boolean; hasMore: boolean; onSelect: (boardId: string) => void; onLoadMore: () => void }) {
+function HistoryBoardList({ boards, selectedBoardId, loadingMore, hasMore, savingLabelId, onSelect, onLoadMore, onSaveLabel }: { boards: HistoryBoard[]; selectedBoardId: string | null; loadingMore: boolean; hasMore: boolean; savingLabelId: string | null; onSelect: (boardId: string) => void; onLoadMore: () => void; onSaveLabel: (boardId: string, label: string) => void }) {
   const sentinelRef = useRef<HTMLLIElement | null>(null);
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -129,24 +119,15 @@ function HistoryBoardList({ boards, selectedBoardId, loadingMore, hasMore, onSel
     return () => observer.disconnect();
   }, [hasMore, onLoadMore]);
 
-  return (
-    <div className="history-board-navigation">
-      <div className="history-section-label"><span className="history-kicker">Recent boards</span><h3>Semua hasil</h3></div>
-      {boards.length === 0 && !loadingMore ? <p className="history-empty-copy">Belum ada board selesai.</p> : <ol className="history-board-list" aria-label="History board" aria-busy={loadingMore}>
-        {boards.map((board) => {
-          const context = scoreContext(board);
-          return <li key={board.boardId}><button className="history-board-row" type="button" aria-pressed={selectedBoardId === board.boardId} onClick={() => onSelect(board.boardId)}><span className="history-board-number">Board {boardNumberLabel(board.boardNumber)}</span><strong className="history-board-contract"><ContractValue board={board} showDeclarer /></strong><strong className="history-board-result">{context.resultLabel}</strong><span className="history-board-score">{context.perspective} {signedScore(context.perspectiveScore)}</span><span className="history-board-meta">{vulnerabilityLabels[board.result.vulnerability]} · {lineupLabel(board)}</span>{board.teamAIMP === undefined ? null : <span className="history-board-meta">{signedScore(board.teamAIMP)} IMP</span>}</button></li>;
-        })}
-        {hasMore ? <li ref={sentinelRef} className="history-board-sentinel" aria-hidden="true">{loadingMore ? "Memuat board berikutnya…" : ""}</li> : null}
-      </ol>}
-    </div>
-  );
+  return <ol className="history-board-list" aria-label="History board" aria-busy={loadingMore}>
+    {boards.map((board) => <HistoryBoardRow key={board.boardId} board={board} selected={selectedBoardId === board.boardId} savingLabel={savingLabelId === board.boardId} onSelect={onSelect} onSaveLabel={onSaveLabel} />)}
+    {hasMore ? <li ref={sentinelRef} className="history-board-sentinel" aria-hidden="true">{loadingMore ? "Memuat board berikutnya…" : ""}</li> : null}
+  </ol>;
 }
 
-function BoardDetail({ board, onOpenReplay }: { board: HistoryBoard | null; onOpenReplay: (board: HistoryBoard, trigger: HTMLButtonElement) => void }) {
-  if (board === null) return <div className="history-board-detail history-board-detail-empty"><span className="history-kicker">Selected board</span><h3>Pilih board untuk melihat detail</h3><p>Kontrak, result, score, dan replay akan muncul di sini.</p></div>;
-  const context = scoreContext(board);
-  return <article className="history-board-detail" aria-labelledby="selected-board-title"><header className="history-detail-heading"><div><span className="history-kicker">Board {boardNumberLabel(board.boardNumber)}</span><h3 id="selected-board-title"><ContractValue board={board} showDeclarer={false} /></h3>{board.result.passedOut ? null : <p className="history-detail-declarer">Declarer {board.result.contract?.declarer}</p>}</div><span className="history-vulnerability">{vulnerabilityLabels[board.result.vulnerability]}</span></header><p className="history-detail-players">{lineupLabel(board)}</p><div className="history-outcome"><div className="history-result-block"><span className="history-label">Result</span><strong className="history-result">{context.resultLabel}</strong><span className="history-perspective">Perspektif: {context.perspective} {signedScore(context.perspectiveScore)}</span>{board.teamAIMP === undefined ? null : <span className="history-perspective">Team Match: {signedScore(board.teamAIMP)} IMP</span>}</div><ScorePair scoreNS={board.result.scoreNS} /></div><footer className="history-detail-actions">{board.replayAllowed ? <button className="history-replay-button" type="button" onClick={(event) => onOpenReplay(board, event.currentTarget)}><HistoryIcon name="play" />Buka replay &amp; analysis</button> : <p>Replay dan analysis tersedia setelah Team Match selesai.</p>}</footer></article>;
+function HistoryBoardActions({ board, onOpenReplay }: { board: HistoryBoard | null; onOpenReplay: (board: HistoryBoard, trigger: HTMLButtonElement) => void }) {
+  if (board === null) return null;
+  return <div className="history-board-actions">{board.replayAllowed ? <button className="history-replay-button" type="button" onClick={(event) => onOpenReplay(board, event.currentTarget)}><HistoryIcon />Pelajari board &amp; buka replay</button> : <p>Replay tersedia setelah Team Match selesai.</p>}</div>;
 }
 
 function replayTableFor(board: HistoryBoard, entry: ScoreSheetEntry): LiveTableProjection {
@@ -165,9 +146,13 @@ export function HistoryWorkspace() {
   const table = session.projectedTable;
   const presentation = useWorkspacePresentation();
   const [boards, setBoards] = useState<HistoryBoard[]>([]);
+  const [labelOverrides, setLabelOverrides] = useState<Record<string, string | null>>({});
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [savingLabelId, setSavingLabelId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [replayBoard, setReplayBoard] = useState<HistoryBoard | null>(null);
   const replayTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -177,16 +162,17 @@ export function HistoryWorkspace() {
   const historyBoardId = presentation?.historyBoardId ?? null;
   const setHistoryBoardId = presentation?.setHistoryBoardId;
 
-  const loadPage = useCallback(async (cursor: string | null, replace: boolean) => {
-    if (loadingRef.current) return;
+  const loadPage = useCallback(async (cursor: string | null, replace: boolean, search: string) => {
+    if (loadingRef.current && !replace) return;
+    if (replace) requestRef.current?.abort();
     loadingRef.current = true;
     if (replace) setLoading(true); else setLoadingMore(true);
     const controller = new AbortController();
-    requestRef.current?.abort();
     requestRef.current = controller;
     try {
       const query = new URLSearchParams({ limit: "16" });
       if (cursor !== null) query.set("cursor", cursor);
+      if (search !== "") query.set("search", search);
       const page = await accountRequest<components["schemas"]["HistoryBoardPage"]>(`/history/boards?${query}`, { signal: controller.signal });
       if (controller.signal.aborted) return;
       setBoards((current) => replace ? page.items : [...current, ...page.items.filter((item) => !current.some((candidate) => candidate.boardId === item.boardId))]);
@@ -195,31 +181,73 @@ export function HistoryWorkspace() {
     } catch (failure) {
       if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "Koneksi terputus.");
     } finally {
-      if (!controller.signal.aborted) { loadingRef.current = false; setLoading(false); setLoadingMore(false); }
+      if (requestRef.current === controller) {
+        loadingRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadPage(null, true), 0);
-    return () => { window.clearTimeout(timer); requestRef.current?.abort(); };
-  }, [loadPage]);
+    const timer = window.setTimeout(() => setSearchQuery(searchInput.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadPage(null, true, searchQuery), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadPage, searchQuery]);
+
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   useEffect(() => {
     const matchId = table?.matchId;
     if (matchId === undefined || table?.matchComplete !== true || refreshedMatchRef.current === matchId) return;
     refreshedMatchRef.current = matchId;
-    const timer = window.setTimeout(() => void loadPage(null, true), 0);
+    const timer = window.setTimeout(() => void loadPage(null, true, searchQuery), 0);
     return () => window.clearTimeout(timer);
-  }, [loadPage, table?.matchComplete, table?.matchId]);
+  }, [loadPage, searchQuery, table?.matchComplete, table?.matchId]);
 
   const localBoards = table?.scoreSheet.map((entry) => ({ boardId: entry.boardId, tableId: table.tableId, boardNumber: entry.boardNumber, result: entry.result, lineup: entry.lineup, viewerSeat: table.viewerSeat ?? "N", completedAt: new Date().toISOString(), replayAllowed: !(table.matchId !== undefined && table.matchComplete !== true) } as HistoryBoard)) ?? [];
-  const allBoards = [...boards, ...localBoards.filter((local) => !boards.some((board) => board.boardId === local.boardId))].sort((first, second) => Date.parse(second.completedAt) - Date.parse(first.completedAt));
-  const selectedBoard = historyBoardId === null ? allBoards[0] ?? null : allBoards.find((board) => board.boardId === historyBoardId) ?? null;
+  const allBoards: HistoryBoard[] = [...boards, ...localBoards.filter((local) => !boards.some((board) => board.boardId === local.boardId))].map((board): HistoryBoard => {
+    if (!Object.prototype.hasOwnProperty.call(labelOverrides, board.boardId)) return board;
+    const label = labelOverrides[board.boardId];
+    if (label === null || label === undefined) {
+      const boardWithoutLabel = { ...board };
+      delete boardWithoutLabel.label;
+      return boardWithoutLabel;
+    }
+    return { ...board, label };
+  }).sort((first, second) => Date.parse(second.completedAt) - Date.parse(first.completedAt));
+  const visibleBoards = allBoards.filter((board) => boardMatchesSearch(board, searchQuery));
+  const selectedBoard = visibleBoards.find((board) => board.boardId === historyBoardId) ?? visibleBoards[0] ?? null;
 
-  function openReplay(board: HistoryBoard, trigger: HTMLButtonElement) { replayTriggerRef.current = trigger; setReplayBoard(board); }
+  const saveLabel = useCallback(async (boardId: string, label: string) => {
+    setSavingLabelId(boardId);
+    try {
+      if (label === "") {
+        await accountRequest(`/history/boards/${boardId}/label`, { method: "DELETE" });
+        setLabelOverrides((current) => ({ ...current, [boardId]: null }));
+      } else {
+        await accountRequest<components["schemas"]["HistoryBoardLabel"]>(`/history/boards/${boardId}/label`, { method: "PUT", body: JSON.stringify({ label }) });
+        setLabelOverrides((current) => ({ ...current, [boardId]: label }));
+      }
+      setError("");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Label belum tersimpan.");
+    } finally {
+      setSavingLabelId(null);
+    }
+  }, []);
+
+  function openReplay(board: HistoryBoard, trigger: HTMLButtonElement) {
+    replayTriggerRef.current = trigger;
+    setReplayBoard(board);
+  }
 
   const replayEntry = replayBoard === null ? null : scoreEntryFromHistory(replayBoard);
   const replayTable = replayBoard === null || replayEntry === null ? null : replayTableFor(replayBoard, replayEntry);
 
-  return <div className="history-workspace"><SessionSummary table={table} /><section className="history-board-section" aria-labelledby="board-history-title"><div className="history-section-heading"><div><span className="history-kicker">Board history</span><h2 id="board-history-title">Recent boards</h2><p>Semua board terakhir dari meja casual, bot, dan Team Match tampil dalam satu daftar.</p></div></div>{error ? <div className="history-load-error" role="alert"><p className="form-error">{error}</p><button type="button" onClick={() => void loadPage(null, true)}>Coba lagi</button></div> : null}{loading ? <p role="status">Memuat history…</p> : <div className="history-board-workspace"><HistoryBoardList boards={allBoards} selectedBoardId={selectedBoard?.boardId ?? null} loadingMore={loadingMore} hasMore={nextCursor !== null} onSelect={(boardId) => setHistoryBoardId?.(boardId)} onLoadMore={() => void loadPage(nextCursor, false)} /><BoardDetail board={selectedBoard} onOpenReplay={openReplay} /></div>}{replayTable === null || replayEntry === null ? null : <BoardReplayModal key={replayBoard?.boardId} table={replayTable} entry={replayEntry} loadBoardReplay={session.loadBoardReplay} loadPositionAnalysis={session.loadPositionAnalysis} onClose={() => { setReplayBoard(null); requestAnimationFrame(() => replayTriggerRef.current?.focus()); }} />}</section></div>;
+  return <div className="history-workspace"><section className="history-board-section" aria-labelledby="board-history-title"><header className="history-section-heading"><div><h1 id="board-history-title">Recent boards</h1><p>Semua board yang pernah kamu mainkan, dari casual, bot, maupun Team Match.</p></div><label className="history-search-field"><span>Cari history</span><input type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tanggal, label, atau contract" aria-label="Cari berdasarkan tanggal, label, atau contract" /></label></header>{error ? <div className="history-load-error" role="alert"><p>{error}</p><button type="button" onClick={() => void loadPage(null, true, searchQuery)}>Coba lagi</button></div> : null}{loading ? <p role="status">Memuat history…</p> : visibleBoards.length === 0 ? <p className="history-empty-copy">Tidak ada board yang cocok.</p> : <><HistoryBoardList boards={visibleBoards} selectedBoardId={selectedBoard?.boardId ?? null} loadingMore={loadingMore} hasMore={nextCursor !== null} savingLabelId={savingLabelId} onSelect={(boardId) => setHistoryBoardId?.(boardId)} onLoadMore={() => void loadPage(nextCursor, false, searchQuery)} onSaveLabel={(boardId, label) => void saveLabel(boardId, label)} /><HistoryBoardActions board={selectedBoard} onOpenReplay={openReplay} /></>}{replayTable === null || replayEntry === null ? null : <BoardReplayModal key={replayBoard?.boardId} table={replayTable} entry={replayEntry} loadBoardReplay={session.loadBoardReplay} loadPositionAnalysis={session.loadPositionAnalysis} onClose={() => { setReplayBoard(null); requestAnimationFrame(() => replayTriggerRef.current?.focus()); }} />}</section></div>;
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TableInvite } from "./table-social";
 import { useDialogDrag } from "./use-dialog-drag";
-import { useRef, type ReactNode } from "react";
+import { useRef } from "react";
 import type { LiveTableProjection } from "../table-state";
 import type { TableSession } from "../use-table-session";
 import { ConsensusControls } from "./consensus-controls";
@@ -65,7 +65,6 @@ export function ActiveTableStatusBar({
   inviteCode,
   canSendCommand,
   onCommand,
-  analysisControl,
   soundMuted,
   onSoundMutedChange,
   onLeaveTable,
@@ -77,7 +76,6 @@ export function ActiveTableStatusBar({
   inviteCode: string | null;
   canSendCommand: TableSession["canSendCommand"];
   onCommand: TableSession["sendCommand"];
-  analysisControl: ReactNode;
   soundMuted: boolean;
   onSoundMutedChange: (muted: boolean) => void;
   onLeaveTable: () => void;
@@ -204,12 +202,6 @@ export function ActiveTableStatusBar({
           <AuctionTable game={game} followLatest={false} />
         </section>
       )}
-      <ConsensusControls
-        analysisControl={analysisControl}
-        table={table}
-        canSendCommand={canSendCommand}
-        onCommand={onCommand}
-      />
       <div className="status-actions">
         {table.matchId ? <Link href={`/match/${table.matchId}`}>Match</Link> : null}
         <div
@@ -225,6 +217,11 @@ export function ActiveTableStatusBar({
         <details className="table-menu">
           <summary aria-label="Buka menu meja">•••</summary>
           <div>
+            <ConsensusControls
+              table={table}
+              canSendCommand={canSendCommand}
+              onCommand={onCommand}
+            />
             {table.viewerRole === "OWNER" &&
             table.state === "BETWEEN_BOARDS" ? (
               <button

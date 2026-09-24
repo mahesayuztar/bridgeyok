@@ -33,6 +33,8 @@ export async function accountRequest<T>(path = "", init: RequestInit = {}): Prom
       INVALID_MATCH_INPUT: "Pilih delapan pemain berbeda dan 1–32 board.",
       MATCH_CAPACITY: "Salah satu pemain sudah memiliki empat match yang belum selesai.",
       STATE_CHANGED: "Status telah berubah. Periksa pembaruan lalu coba lagi.",
+      INVALID_HISTORY_LABEL: "Label belajar harus berisi 1–80 karakter.",
+      HISTORY_BOARD_NOT_FOUND: "Board history tidak ditemukan atau tidak bisa kamu ubah.",
       RATE_LIMITED: "Terlalu banyak percobaan. Coba lagi sebentar."
     };
     throw new AccountRequestError(messages[problem.code ?? ""] ?? "Layanan belum terhubung. Coba lagi.", response.status);
