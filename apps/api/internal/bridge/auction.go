@@ -42,6 +42,7 @@ type Call struct {
 	Kind   CallKind `json:"kind"`
 	Level  int      `json:"level,omitempty"`
 	Strain Strain   `json:"strain,omitempty"`
+	Alert  bool     `json:"alert,omitempty"`
 }
 
 // CallRecord associates a legal call with its caller.
@@ -106,8 +107,8 @@ func (strain Strain) value() int {
 func (call Call) Validate() error {
 	switch call.Kind {
 	case CallPass, CallDouble, CallRedouble:
-		if call.Level != 0 || call.Strain != "" {
-			return fmt.Errorf("%s call must not include level or strain", call.Kind)
+		if call.Level != 0 || call.Strain != "" || call.Alert {
+			return fmt.Errorf("%s call must not include level, strain, or alert", call.Kind)
 		}
 		return nil
 	case CallBid:

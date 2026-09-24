@@ -15,6 +15,7 @@ func TestCallValidate(t *testing.T) {
 	}{
 		{name: "pass", call: Pass()},
 		{name: "one club", call: Bid(1, StrainClubs)},
+		{name: "artificial one club", call: Call{Kind: CallBid, Level: 1, Strain: StrainClubs, Alert: true}},
 		{name: "seven no trump", call: Bid(7, StrainNoTrump)},
 		{name: "double", call: Double()},
 		{name: "redouble", call: Redouble()},
@@ -22,6 +23,7 @@ func TestCallValidate(t *testing.T) {
 		{name: "level eight", call: Bid(8, StrainClubs), wantErr: true},
 		{name: "invalid strain", call: Bid(1, "X"), wantErr: true},
 		{name: "pass with bid fields", call: Call{Kind: CallPass, Level: 1, Strain: StrainClubs}, wantErr: true},
+		{name: "pass with alert", call: Call{Kind: CallPass, Alert: true}, wantErr: true},
 		{name: "unknown kind", call: Call{Kind: "CLAIM"}, wantErr: true},
 	}
 
@@ -33,6 +35,15 @@ func TestCallValidate(t *testing.T) {
 				t.Errorf("Validate() error = %v, wantErr %v", err, test.wantErr)
 			}
 		})
+	}
+}
+
+func TestAuctionPersistsArtificialBidIntent(t *testing.T) {
+	t.Parallel()
+
+	auction := runAuction(t, North, []Call{{Kind: CallBid, Level: 1, Strain: StrainClubs, Alert: true}})
+	if !auction.Calls[0].Call.Alert {
+		t.Fatal("artificial bid intent was not retained in auction history")
 	}
 }
 

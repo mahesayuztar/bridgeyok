@@ -62,6 +62,21 @@ test("WebSocket contract accepts owner bot mutations", () => {
   }
 });
 
+test("WebSocket contract preserves artificial bid intent", () => {
+  const envelope = {
+    v: 1,
+    kind: "command",
+    name: "game.make_call",
+    request_id: "artificial_bid_01",
+    table_id: "0f4b9a5b-0ea8-4ad6-a866-e576ccd8be31",
+    expected_revision: 3,
+    controller_epoch: 1,
+    payload: { call: { kind: "BID", level: 2, strain: "C", alert: true } }
+  };
+
+  assert.equal(validateEnvelope(envelope), true, ajv.errorsText(validateEnvelope.errors));
+});
+
 const realtimeParticipantId = "99ef3682-3ba8-42db-9c33-17238bfb2207";
 
 test("chat commands stay outside gameplay revision and sender authority", () => {
