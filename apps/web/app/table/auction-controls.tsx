@@ -118,11 +118,20 @@ export function AuctionTable({
                 return (
                   <td
                     key={seat}
-                    className={getCallClass(record?.call)}
+                    className={[
+                      getCallClass(record?.call),
+                      record?.call.alert === true ? "artificial-call" : "",
+                    ].filter(Boolean).join(" ")}
+                    aria-label={record?.call.alert === true ? `${record.call.kind === "BID" ? callLabel(record.call) : "Call"}, artificial` : undefined}
                   >
-                    {record === undefined
-                      ? null
-                      : callLabel(record.call)}
+                    {record === undefined ? null : (
+                      <>
+                        <span>{callLabel(record.call)}</span>
+                        {record.call.alert === true ? (
+                          <span className="auction-alert-marker" title="Bid artificial">A</span>
+                        ) : null}
+                      </>
+                    )}
                   </td>
                 );
               })}
@@ -149,11 +158,14 @@ export function BiddingBox({
     level: number;
     signature: string;
   } | null>(null);
+  const [alertIntent, setAlertIntent] = useState<{ signature: string; enabled: boolean } | null>(null);
   const legalKeys = new Set(legalCalls.map(callKey));
   const legalCallSignature = legalCalls.map(callKey).join("|");
   const legalBidLevels = [1, 2, 3, 4, 5, 6, 7].filter((level) =>
     strains.some((strain) => legalKeys.has(callKey({ kind: "BID", level, strain }))),
   );
+  const alertEnabled = alertIntent?.signature === legalCallSignature && alertIntent.enabled;
+  const canAlert = !disabled && legalBidLevels.length > 0;
   const activeLevel = disabled || selectedBid === null || selectedBid.signature !== legalCallSignature || !legalBidLevels.includes(selectedBid.level)
     ? null
     : selectedBid.level;
@@ -165,7 +177,12 @@ export function BiddingBox({
 
   function submitBid(strain: (typeof strains)[number]) {
     if (activeLevel === null) return;
-    const call: Call = { kind: "BID", level: activeLevel, strain };
+    const call: Call = {
+      kind: "BID",
+      level: activeLevel,
+      strain,
+      ...(alertEnabled ? { alert: true } : {}),
+    };
     if (!legalKeys.has(callKey(call)) || !canCall(call)) return;
     setSelectedBid(null);
     onCall(call);
@@ -188,6 +205,20 @@ export function BiddingBox({
             <kbd>{shortcut}</kbd>
           </button>
         ))}
+      </div>
+      <div className="bid-alert-control">
+        <button
+          className={alertEnabled ? "bid-alert-toggle is-active" : "bid-alert-toggle"}
+          type="button"
+          aria-pressed={alertEnabled}
+          disabled={!canAlert}
+          onClick={() => setAlertIntent({ signature: legalCallSignature, enabled: !alertEnabled })}
+        >
+          <span className="bid-alert-marker" aria-hidden="true">A</span>
+          <span>Alert</span>
+          <span className="bid-alert-state">{alertEnabled ? "ON" : "OFF"}</span>
+        </button>
+        <span>Bid berikutnya artificial</span>
       </div>
       {activeLevel === null ? (
         <div className="bid-levels" role="group" aria-label="Pilih level bid">

@@ -47,6 +47,15 @@ test("normalizes nullable Go collections before table state reaches the UI", () 
   assert.deepEqual(table.game.ownHand, []);
 });
 
+test("preserves artificial bid intent in the auction projection", () => {
+  const projection = activeProjection();
+  projection.game.auction.calls = [{ seat: "N", call: { kind: "BID", level: 1, strain: "C", alert: true } }];
+
+  const table = normalizeLiveTableProjection(projection);
+
+  assert.deepEqual(table.game.auction.calls, projection.game.auction.calls);
+});
+
 test("normalizes durable score rows and rejects non-canonical pair identities", () => {
   const projection = activeProjection();
   const north = { id: "participant-a", nickname: "North", isBot: false };

@@ -22,6 +22,7 @@ test("gameplay presentation keeps bridge labels stable", () => {
   assert.equal(callLabel({ kind: "BID", level: 4, strain: "S" }), "4♠");
   assert.equal(callLabel({ kind: "BID", level: 3, strain: "NT" }), "3NT");
   assert.equal(callKey({ kind: "BID", level: 4, strain: "S" }), "BID:4:S");
+  assert.equal(callKey({ kind: "BID", level: 4, strain: "S", alert: true }), "BID:4:S");
   assert.equal(cardKey({ suit: "H", rank: "T" }), "HT");
 });
 

@@ -39,13 +39,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isCall(value: unknown): value is Call {
   if (!isRecord(value)) return false;
   if (value.kind === "PASS" || value.kind === "DOUBLE" || value.kind === "REDOUBLE") {
-    return true;
+    return value.alert === undefined;
   }
   return (
     value.kind === "BID" &&
     Number.isInteger(value.level) &&
     typeof value.strain === "string" &&
-    ["C", "D", "H", "S", "NT"].includes(value.strain)
+    ["C", "D", "H", "S", "NT"].includes(value.strain) &&
+    (value.alert === undefined || typeof value.alert === "boolean")
   );
 }
 

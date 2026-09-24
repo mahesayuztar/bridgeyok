@@ -22,6 +22,7 @@ export type Call = {
   kind: "PASS" | "BID" | "DOUBLE" | "REDOUBLE";
   level?: number;
   strain?: "C" | "D" | "H" | "S" | "NT";
+  alert?: boolean;
 };
 
 export type CallRecord = {

@@ -72,12 +72,23 @@ function normalizeCall(value: unknown): Call | null {
     return null;
   }
   if (value.kind !== "BID") {
+    if (value.alert !== undefined) {
+      return null;
+    }
     return { kind: value.kind as Exclude<Call["kind"], "BID"> };
   }
   if (!Number.isInteger(value.level) || !STRAINS.includes(value.strain as Contract["strain"])) {
     return null;
   }
-  return { kind: "BID", level: value.level as number, strain: value.strain as Contract["strain"] };
+  if (value.alert !== undefined && typeof value.alert !== "boolean") {
+    return null;
+  }
+  return {
+    kind: "BID",
+    level: value.level as number,
+    strain: value.strain as Contract["strain"],
+    ...(value.alert === true ? { alert: true } : {})
+  };
 }
 
 function normalizeCallRecord(value: unknown): CallRecord | null {

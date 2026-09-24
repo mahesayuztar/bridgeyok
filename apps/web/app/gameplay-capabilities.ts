@@ -25,8 +25,8 @@ function isSeat(value: unknown): value is Seat {
 
 function isCall(value: unknown): value is Call {
   if (!isRecord(value)) return false;
-  if (value.kind === "PASS" || value.kind === "DOUBLE" || value.kind === "REDOUBLE") return true;
-  return value.kind === "BID" && Number.isInteger(value.level) && ["C", "D", "H", "S", "NT"].includes(String(value.strain));
+  if (value.kind === "PASS" || value.kind === "DOUBLE" || value.kind === "REDOUBLE") return value.alert === undefined;
+  return value.kind === "BID" && Number.isInteger(value.level) && ["C", "D", "H", "S", "NT"].includes(String(value.strain)) && (value.alert === undefined || typeof value.alert === "boolean");
 }
 
 function isCard(value: unknown): value is Card {
