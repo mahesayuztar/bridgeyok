@@ -128,8 +128,7 @@ test("table chat preserves gameplay geometry and pointer actions across viewport
   await panel.getByLabel("Pesan", { exact: true }).fill("Table ♠️");
   await panel.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(panel.getByText("Table ♠️", { exact: true })).toHaveCount(1);
-  await page.getByRole("button", { name: "1", exact: true }).click();
-  await page.locator(".bid-strains button").filter({ hasText: "NT" }).click();
+  await page.getByRole("button", { name: "Bid 1NT", exact: true }).click();
   await expect(page.locator(".dummy-hand .physical-card")).toHaveCount(13);
   for (const [width, height] of [
     [320, 700],

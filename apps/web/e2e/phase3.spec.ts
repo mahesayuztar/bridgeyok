@@ -99,8 +99,7 @@ async function makeCall(page: Page, name: RegExp) {
 }
 
 async function makeBid(page: Page, level: number, strain: string) {
-  await page.getByRole("button", { name: String(level), exact: true }).click();
-  const button = page.locator(".bid-strains button").filter({ hasText: strain });
+  const button = page.getByRole("button", { name: `Bid ${level}${strain}`, exact: true });
   await expect(button).toBeEnabled();
   await button.click();
   await expect(page.locator(".auction-workspace .auction-table tbody")).toContainText(`${level}${strain}`, { timeout: 250 });
@@ -641,7 +640,7 @@ async function assertGameplayGeometry(page: Page) {
   expect(
     geometry.cards
       .filter((card) => card.className.includes("card-hand"))
-      .every((card) => card.width >= 52),
+      .every((card) => card.width >= (geometry.viewport.width <= 360 ? 44 : 52)),
   ).toBe(true);
   expect(
     geometry.cards
@@ -662,7 +661,7 @@ async function assertGameplayGeometry(page: Page) {
       .every((card) => card.width >= 49),
   ).toBe(true);
   expect(geometry.ownCardExposure.every((exposure) => exposure >= 18)).toBe(true);
-  expect(geometry.ownCardRows).toBe(1);
+  expect(geometry.ownCardRows).toBe(geometry.viewport.width <= 360 ? 2 : 1);
   expect(geometry.ownHandScrollable).toBe(false);
   expect(geometry.dummyHasExtras).toBe(false);
   expect(geometry.playedCardsOverlap).toBe(false);
@@ -876,7 +875,7 @@ async function assertCompletedDealGeometry(page: Page) {
 
   expect(geometry.handCount).toBe(4);
   expect(geometry.cardCounts).toEqual([13, 13, 13, 13]);
-  expect(geometry.terms).toEqual(["Contract", "Result", "Score"]);
+  expect(geometry.terms).toEqual(["Board", "Contract", "Result", "Score"]);
   expect(geometry.ownHandCount).toBe(0);
   expect(geometry.cardsInsidePlayZone).toBe(true);
   expect(geometry.crossHandCollisions).toBe(0);
@@ -1308,9 +1307,7 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
   ).toHaveCount(0);
   const westFramesBeforeDrag = mutationFrameCount(west.sentFrames);
   await west.page.setViewportSize({ width: 320, height: 700 });
-  await west.page.getByRole("button", { name: "Pilih kartu" }).click();
-  await expect(west.page.locator('.own-hand[data-expanded="true"]')).toBeVisible();
-  const expandedHandGeometry = await west.page.locator(".own-hand").evaluate((hand) => {
+  const handGeometry = await west.page.locator(".own-hand").evaluate((hand) => {
     const cards = [...hand.querySelectorAll<HTMLElement>(".physical-card")].map((card) => {
       const bounds = card.getBoundingClientRect();
       return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom, width: bounds.width };
@@ -1325,17 +1322,16 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
       documentOverflow: document.documentElement.scrollWidth > innerWidth,
     };
   });
-  expect(expandedHandGeometry).toEqual({
+  expect(handGeometry).toEqual({
     cardCount: 13,
     minimumWidth: expect.any(Number),
     overlaps: false,
     documentOverflow: false,
   });
-  expect(expandedHandGeometry.minimumWidth).toBeGreaterThanOrEqual(44);
-  await west.page.screenshot({ path: testInfo.outputPath("hand-picker-320x700.png"), fullPage: false });
-  await west.page.locator('.own-hand[data-expanded="true"] button[aria-label^="Mainkan "]:enabled').first().click();
+  expect(handGeometry.minimumWidth).toBeGreaterThanOrEqual(44);
+  await west.page.screenshot({ path: testInfo.outputPath("hand-320x700.png"), fullPage: false });
+  await west.page.locator('.own-hand button[aria-label^="Mainkan "]:enabled').first().click();
   expect(mutationFrameCount(west.sentFrames)).toBe(westFramesBeforeDrag + 1);
-  await expect(west.page.locator('.own-hand[data-expanded="true"]')).toHaveCount(0);
   await playNextCard(activePages);
   await expect(east.page.locator(".current-trick")).toHaveAttribute(
     "data-motion-stage",
@@ -1582,19 +1578,15 @@ test("four accounts finish boards, recover a controller, and keep hidden hands p
   await replacementTab.locator(".board-play-zone").click({
     position: { x: 10, y: 10 },
   });
-  await replacementTab.clock.runFor(5_200);
   await expect(replacementTab.locator(".board-result")).toBeVisible();
   await expect(replacementTab.locator(".auction-workspace")).toHaveCount(0);
-  await replacementTab.getByRole("button", { name: "Board berikutnya" }).click();
+  await replacementTab.clock.runFor(5_200);
   await replacementTab.clock.resume();
   await expect(replacementTab.locator(".board-result")).toHaveCount(0);
   assertPrivateFrames(north.frames, "latest");
   assertPrivateFrames(east.frames, "latest");
   assertPrivateFrames(south.frames, "full");
   assertPrivateFrames(west.frames, "latest");
-  await expect(
-    replacementTab.getByRole("button", { name: "Board berikutnya" }),
-  ).toHaveCount(0);
   await expect(
     replacementTab.locator('.auction-workspace .auction-table th[data-turn="true"]'),
   ).toHaveText("E");
