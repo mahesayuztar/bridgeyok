@@ -183,7 +183,7 @@ Do not let two agents edit `globals.css` concurrently. Do not let two agents edi
 | WI-01 | `done` | WI-00 | A | `score-sheet.tsx`, `board-replay-modal.tsx` |
 | WI-02 | `partial` | WI-00 | A | `globals.css`, table geometry |
 | WI-03 | `done` | WI-00 | A | projection/replay/session files |
-| WI-04 | `ready` | WI-00 | A | Playwright/E2E evidence |
+| WI-04 | `partial` | WI-00 | A | Playwright/E2E evidence |
 | WI-05 | `pending` | WI-01, WI-02, WI-03 | B | `score-sheet.tsx` |
 | WI-06 | `pending` | WI-01, WI-02, WI-03 | B | `board-replay-modal.tsx` |
 | WI-07 | `pending` | WI-02, WI-04 | B | `globals.css`, `table-surface.tsx` only if required |

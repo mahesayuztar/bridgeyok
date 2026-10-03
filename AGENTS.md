@@ -8,6 +8,20 @@
 * The web build uses `NEXT_PUBLIC_API_BASE_URL=https://bridgeyok-api.vercel.app`.
 * The API Origin allowlist must include `https://bridgeyok-web.vercel.app`.
 
+## Environment Access During Testing
+
+Agents may source repository environment files, including `.env`, `.env.local`, and test-specific variants, when required to run the project's tests, migrations, health checks, or local development services.
+
+When an environment file contains production credentials or endpoints:
+
+* use the values only for the explicitly scoped verification or diagnosis;
+* prefer read-only checks and never mutate production data, deploy, rotate credentials, or send external messages without explicit user authorization;
+* do not print, commit, paste, summarize, or otherwise expose secret values, tokens, cookies, connection strings, or authorization headers;
+* redact command output and failure artifacts that may contain sensitive configuration;
+* if a test requires a production mutation or broader access, stop and request explicit scope before proceeding.
+
+This testing policy is mandatory within the repository, but it does not override system safety, workspace, or user-scope constraints.
+
 ---
 
 # Core Development Principles
