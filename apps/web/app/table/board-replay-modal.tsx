@@ -33,6 +33,9 @@ export function BoardReplayModal({
   const orientation = tableOrientation(table.viewerSeat);
   const surfaceWrapRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const requestVersionRef = useRef(0);
+  const closeRequestedRef = useRef(false);
   const [replay, setReplay] = useState<BoardReplay | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -42,16 +45,25 @@ export function BoardReplayModal({
   useEffect(() => {
     const dialog = dialogRef.current;
     const media = window.matchMedia("(max-width: 48rem), (pointer: coarse)");
-    function showDialog() {
-      dialog?.close();
-      if (media.matches) dialog?.show();
-      else dialog?.showModal();
+    let focusFrame: number | undefined;
+    function showDialog(focus = false) {
+      if (!dialog) return;
+      if (dialog.open) dialog.close();
+      if (media.matches) dialog.show();
+      else dialog.showModal();
+      if (focus) {
+        focusFrame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+      }
     }
-    showDialog();
-    media.addEventListener("change", showDialog);
+    function handleMediaChange() {
+      showDialog();
+    }
+    showDialog(true);
+    media.addEventListener("change", handleMediaChange);
     return () => {
-      media.removeEventListener("change", showDialog);
-      dialog?.close();
+      media.removeEventListener("change", handleMediaChange);
+      if (focusFrame !== undefined) window.cancelAnimationFrame(focusFrame);
+      if (dialog?.open) dialog.close();
     };
   }, []);
 
@@ -81,10 +93,11 @@ export function BoardReplayModal({
   }, [replay]);
 
   useEffect(() => {
+    const requestVersion = ++requestVersionRef.current;
     const controller = new AbortController();
     loadBoardReplay(entry.boardId, controller.signal)
       .then((record) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || requestVersion !== requestVersionRef.current) return;
         if (
           record.boardId !== entry.boardId ||
           record.game.phase !== "BOARD_SCORED" ||
@@ -95,7 +108,9 @@ export function BoardReplayModal({
         setReplay(record);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setError("Replay tidak tersedia.");
+        if (!controller.signal.aborted && requestVersion === requestVersionRef.current) {
+          setError("Replay tidak tersedia.");
+        }
       });
     return () => controller.abort();
   }, [entry.boardId, loadBoardReplay, attempt]);
@@ -118,8 +133,17 @@ export function BoardReplayModal({
       },
     ),
   ) as Record<Seat, string>;
+  const frameLabel = frame === null
+    ? "Memuat replay"
+    : frame.showResult
+      ? "Hasil board"
+      : step === 0
+        ? "Auction board"
+        : `Kartu ${step} dari ${frame.lastStep - 1}`;
 
   function closeReplay() {
+    if (closeRequestedRef.current) return;
+    closeRequestedRef.current = true;
     dialogRef.current?.close();
     onClose();
   }
@@ -136,6 +160,8 @@ export function BoardReplayModal({
       onKeyDown={(event) => {
         if (event.key === "Escape") { event.preventDefault(); closeReplay(); }
         if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          const target = event.target;
+          if (target instanceof Element && target !== event.currentTarget && !target.closest(".replay-navigation")) return;
           event.preventDefault();
           event.currentTarget.querySelector<HTMLElement>(".replay-navigation")?.focus();
           if (frame !== null)
@@ -155,6 +181,7 @@ export function BoardReplayModal({
         <h2 id="board-replay-title">Replay board {entry.boardNumber}</h2>
         <button type="button" aria-pressed={doubleDummy} onClick={() => setDoubleDummy((value) => !value)} title="Predicted total tricks pasangan yang sedang turn">DD {doubleDummy ? "ON" : "OFF"}</button>
         <button
+          ref={closeButtonRef}
           type="button"
           className="score-sheet-close"
           aria-label="Tutup replay"
@@ -169,6 +196,8 @@ export function BoardReplayModal({
           <button
             type="button"
             onClick={() => {
+              setReplay(null);
+              setStep(0);
               setError(null);
               setAttempt((current) => current + 1);
             }}
@@ -182,6 +211,7 @@ export function BoardReplayModal({
         </p>
       ) : (
         <>
+          <p className="sr-only" role="status" aria-live="polite">{frameLabel}</p>
           {analysis.failed ? <p role="status">DDS tidak tersedia untuk posisi ini.</p> : null}
           <div ref={surfaceWrapRef} className="replay-surface-wrap" data-turn={frame.turn} data-dummy-revealed={frame.dummyRevealed}>
             <TableSurface
@@ -233,9 +263,9 @@ export function BoardReplayModal({
             </button>
             <span
               role="status"
-              aria-label={frame.showResult ? "Hasil board" : `Kartu ${step}`}
+              aria-label={frameLabel}
             >
-              {Math.min(step, frame.lastStep - 1)} / {frame.lastStep - 1}
+              {frame.showResult ? "Hasil" : `${Math.min(step, frame.lastStep - 1)} / ${frame.lastStep - 1}`}
             </span>
             <button
               type="button"

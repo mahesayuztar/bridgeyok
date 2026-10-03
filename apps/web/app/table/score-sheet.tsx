@@ -17,20 +17,46 @@ export function ScoreSheet({
   loadPositionAnalysis: TableSession["loadPositionAnalysis"];
 }) {
   const dialogDrag = useDialogDrag();
+  const scoreSheetTriggerRef = useRef<HTMLButtonElement | null>(null);
   const selectedTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [selectedEntry, setSelectedEntry] = useState<
-    LiveTableProjection["scoreSheet"][number] | null
-  >(null);
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const scoreSheetId = `score-sheet-${table.tableId}`;
   const scoreSheetTitleId = `${scoreSheetId}-title`;
   const scoreNS = table.scoreSheet.reduce(
     (total, entry) => total + entry.result.scoreNS,
     0,
   );
+  const selectedEntry = selectedBoardId === null
+    ? null
+    : table.scoreSheet.find((entry) => entry.boardId === selectedBoardId) ?? null;
+
+  function selectEntry(
+    entry: LiveTableProjection["scoreSheet"][number],
+    trigger: HTMLButtonElement,
+  ) {
+    if (table.matchId && !table.matchComplete) return;
+    selectedTriggerRef.current = trigger;
+    document.getElementById(scoreSheetId)?.hidePopover();
+    setSelectedBoardId(entry.boardId);
+  }
+
+  function restoreScoreSheetFocus() {
+    const trigger = selectedTriggerRef.current;
+    window.requestAnimationFrame(() => {
+      document.getElementById(scoreSheetId)?.showPopover();
+      const focusTarget = trigger?.isConnected && !trigger.disabled && trigger.getClientRects().length > 0
+        ? trigger
+        : scoreSheetTriggerRef.current;
+      if (focusTarget?.isConnected && !focusTarget.disabled && focusTarget.getClientRects().length > 0) {
+        focusTarget.focus();
+      }
+    });
+  }
 
   return (
     <>
       <button
+        ref={scoreSheetTriggerRef}
         className={
           compact ? "score-sheet-trigger score-summary" : "score-sheet-trigger"
         }
@@ -100,12 +126,9 @@ export function ScoreSheet({
                   <tr
                     key={entry.boardId}
                     onClick={(event) => {
-                      if (table.matchId && !table.matchComplete) return;
-                      selectedTriggerRef.current =
-                        event.currentTarget.querySelector("button");
-                      selectedTriggerRef.current?.focus();
-                      document.getElementById(scoreSheetId)?.hidePopover();
-                      setSelectedEntry(entry);
+                      if (event.target instanceof Element && event.target.closest("button")) return;
+                      const trigger = event.currentTarget.querySelector("button");
+                      if (trigger) selectEntry(entry, trigger);
                     }}
                   >
                     <th scope="row">
@@ -115,6 +138,10 @@ export function ScoreSheet({
                         className="score-replay-trigger"
                         type="button"
                         aria-label={`Replay board ${entry.boardNumber}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          selectEntry(entry, event.currentTarget);
+                        }}
                       >
                         {entry.boardNumber}
                       </button>
@@ -145,9 +172,8 @@ export function ScoreSheet({
           entry={selectedEntry}
           loadBoardReplay={loadBoardReplay} loadPositionAnalysis={loadPositionAnalysis}
           onClose={() => {
-            setSelectedEntry(null);
-            document.getElementById(scoreSheetId)?.showPopover();
-            selectedTriggerRef.current?.focus();
+            setSelectedBoardId(null);
+            restoreScoreSheetFocus();
           }}
         />
       )}
