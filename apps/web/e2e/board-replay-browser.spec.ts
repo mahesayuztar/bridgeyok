@@ -10,7 +10,7 @@ function browserBundle(entry: string) {
     if (modules.has(path)) return path;
     modules.set(path, "");
     const source = readFileSync(path, "utf8");
-    let code = /\.tsx?$/.test(path) ? ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText : source;
+    let code = /\.[jt]sx?$/.test(path) ? ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText : source;
     code = code.replace(/require\(["']([^"']+)["']\)/g, (_, specifier: string) => {
       let dependency: string;
       try { dependency = createRequire(path).resolve(specifier); }
@@ -32,7 +32,17 @@ const root = resolve(__dirname, "..");
 const bundle = browserBundle(resolve(__dirname, "fixtures/replay-harness.tsx"));
 const stylesheet = readFileSync(resolve(root, "app/globals.css"), "utf8").replace('@import "tailwindcss";', "");
 
-for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 320, height: 700 }]) {
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 800 },
+  { width: 1024, height: 768 },
+  { width: 768, height: 1024 },
+  { width: 400, height: 844 },
+  { width: 390, height: 844 },
+  { width: 360, height: 800 },
+  { width: 320, height: 800 },
+  { width: 844, height: 390 },
+]) {
   test(`replay position, DDS fencing and table interaction at ${viewport.width}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.setContent(`<style>${stylesheet}</style><div id="root"></div>`);
@@ -55,7 +65,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024
     await page.mouse.down();
     await page.mouse.move(handleBox.x + 10, handleBox.y + 80, { steps: 5 });
     await page.mouse.up();
-    expect((await dialog.boundingBox())!.y).toBeGreaterThan(initial.y + 40);
+    const dragged = (await dialog.boundingBox())!;
+    if (viewport.height >= viewport.width) expect(dragged.y).toBeGreaterThan(initial.y + 40);
+    else expect(dragged.y + dragged.height).toBeLessThanOrEqual(viewport.height);
     await handle.focus();
     await page.keyboard.press("ArrowUp");
     expect((await dialog.boundingBox())!.y).toBeLessThan(initial.y + 60);
@@ -109,7 +121,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024
     await page.getByRole("button", { name: "Buka skor meja" }).click();
     const scoreHistory = page.getByRole("dialog", { name: "History", exact: true });
     const replayTrigger = scoreHistory.getByRole("button", { name: "Replay board 1", exact: true });
-    await replayTrigger.click();
+    await replayTrigger.focus();
+    await page.keyboard.press("Enter");
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Tutup replay" }).click();
     await expect(dialog).toHaveCount(0);
@@ -134,7 +147,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
       [/Buka menu South/, /South/, "Tutup menu pemain"],
     ] as const) {
       if (triggerName === "Ajukan claim") {
-        await page.locator('summary[aria-label="Buka menu meja"]').click();
+        const tableMenu = page.locator('summary[aria-label="Buka menu meja"]');
+        await tableMenu.focus();
+        await page.keyboard.press("Enter");
       }
       const trigger = triggerName === "Ajukan claim"
         ? page.getByLabel("Ajukan claim", { exact: true })

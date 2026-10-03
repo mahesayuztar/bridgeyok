@@ -183,11 +183,11 @@ Do not let two agents edit `globals.css` concurrently. Do not let two agents edi
 | WI-01 | `done` | WI-00 | A | `score-sheet.tsx`, `board-replay-modal.tsx` |
 | WI-02 | `partial` | WI-00 | A | `globals.css`, table geometry |
 | WI-03 | `done` | WI-00 | A | projection/replay/session files |
-| WI-04 | `partial` | WI-00 | A | Playwright/E2E evidence |
-| WI-05 | `pending` | WI-01, WI-02, WI-03 | B | `score-sheet.tsx` |
-| WI-06 | `pending` | WI-01, WI-02, WI-03 | B | `board-replay-modal.tsx` |
-| WI-07 | `pending` | WI-02, WI-04 | B | `globals.css`, `table-surface.tsx` only if required |
-| WI-08 | `pending` | WI-01, WI-03 | B | `history-workspace.tsx` |
+| WI-04 | `done` | WI-00 | A | Playwright/E2E evidence |
+| WI-05 | `partial` | WI-01, WI-02, WI-03 | B | `score-sheet.tsx` |
+| WI-06 | `done` | WI-01, WI-02, WI-03 | B | `board-replay-modal.tsx` |
+| WI-07 | `done` | WI-02, WI-04 | B | `globals.css`, `table-surface.tsx` only if required |
+| WI-08 | `partial` | WI-01, WI-03 | B | `history-workspace.tsx` |
 | WI-09 | `pending` | WI-05–WI-08 | C | E2E, browser evidence, regression fixes |
 | WI-10 | `pending` | WI-09 | D | cache/review/commits |
 
@@ -474,7 +474,7 @@ Depends on: `WI-01`, `WI-02`, `WI-03`
 
 ## WI-06 — BoardReplayModal lifecycle and navigation
 
-Status: `pending`
+Status: `done`
 
 Depends on: `WI-01`, `WI-02`, `WI-03`
 
@@ -504,7 +504,7 @@ Depends on: `WI-01`, `WI-02`, `WI-03`
 
 ## WI-07 — Responsive replay and table geometry
 
-Status: `pending`
+Status: `done`
 
 Depends on: `WI-02`, `WI-04`
 
@@ -534,7 +534,7 @@ Depends on: `WI-02`, `WI-04`
 
 ## WI-08 — HistoryWorkspace consistency and master-detail behavior
 
-Status: `pending`
+Status: `partial`
 
 Depends on: `WI-01`, `WI-03`
 
