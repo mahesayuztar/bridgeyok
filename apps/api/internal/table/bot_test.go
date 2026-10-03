@@ -100,25 +100,23 @@ func TestSampleBotStatePreservesVisibleCardsAndResamplesHiddenCards(t *testing.T
 	}
 	state := *aggregate.Game
 	actor := state.Turn
-	maskedState := state
+	state, err := visibleBotState(state, actor)
+	if err != nil {
+		t.Fatal(err)
+	}
 	hiddenSeats := []bridge.Seat{}
 	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
 		if seat != actor {
 			hiddenSeats = append(hiddenSeats, seat)
 		}
 	}
-	swapDealHands(&maskedState.Deal, hiddenSeats[0], hiddenSeats[1])
-	if botSampleSeed(state, actor, 0) != botSampleSeed(maskedState, actor, 0) {
-		t.Fatal("sampling seed depends on hidden hand ownership")
-	}
-	actualHidden := map[bridge.Seat]bridge.Hand{}
-	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
-		if seat != actor {
-			actualHidden[seat] = state.Deal.Hand(seat)
+	for _, seat := range hiddenSeats {
+		if hand := state.Deal.Hand(seat); len(hand) != 0 {
+			t.Fatalf("visible source retains hidden cards for %s", seat)
 		}
 	}
 
-	differentHiddenWorld := false
+	worlds := make(map[string]bool)
 	for _sampleIndex := 0; _sampleIndex < 4; _sampleIndex++ {
 		sampled, err := sampleBotState(state, actor, _sampleIndex)
 		if err != nil {
@@ -127,17 +125,52 @@ func TestSampleBotStatePreservesVisibleCardsAndResamplesHiddenCards(t *testing.T
 		if !reflect.DeepEqual(sampled.Deal.Hand(actor), state.Deal.Hand(actor)) {
 			t.Fatal("sample changed bot hand")
 		}
-		for seat, actual := range actualHidden {
-			if !reflect.DeepEqual(sampled.Deal.Hand(seat), actual) {
-				differentHiddenWorld = true
-			}
-		}
 		if err := sampled.ValidateInvariants(); err != nil {
 			t.Fatalf("sampled state violates bridge invariants: %v", err)
 		}
+		encoded, err := json.Marshal(sampled.Deal)
+		if err != nil {
+			t.Fatal(err)
+		}
+		worlds[string(encoded)] = true
 	}
-	if !differentHiddenWorld {
-		t.Fatal("sampler retained the authoritative hidden partition")
+	if len(worlds) < 2 {
+		t.Fatal("sampler did not produce different hidden worlds")
+	}
+}
+
+func TestSampleBotStateUsesLegalAssignmentWhenVoidConstraintsAreTight(t *testing.T) {
+	t.Parallel()
+
+	aggregate := testStartedAggregate(t)
+	for _, call := range []bridge.Call{bridge.Bid(1, bridge.StrainClubs), bridge.Pass(), bridge.Pass(), bridge.Pass()} {
+		aggregate = acceptedDecision(t, aggregate, Command{Name: CommandMakeCall, SessionID: sessionForSeat(t, aggregate, aggregate.Game.Turn), Call: &call}).NextState
+	}
+	state := *aggregate.Game
+	for _playIndex := 0; _playIndex < 44; _playIndex++ {
+		actor := state.Turn
+		if state.Auction.Contract != nil && actor == state.Auction.Contract.Dummy() {
+			actor = state.Auction.Contract.Declarer
+		}
+		legal, legalError := state.LegalCards(actor)
+		if legalError != nil {
+			t.Fatalf("LegalCards() error = %v", legalError)
+		}
+		decision, domainError := bridge.Decide(state, bridge.PlayCardCommand(actor, legal[0]))
+		if domainError != nil {
+			t.Fatalf("play %s: %v", state.Turn, domainError)
+		}
+		state = decision.NextState
+	}
+	if !state.Turn.Valid() {
+		t.Fatal("expected a late-play position to exercise constrained sampling")
+	}
+	sampled, err := sampleBotState(state, state.Turn, 0)
+	if err != nil {
+		t.Fatalf("sampleBotState() error = %v", err)
+	}
+	if err := sampled.ValidateInvariants(); err != nil {
+		t.Fatalf("sampled state violates invariants: %v", err)
 	}
 }
 
@@ -174,30 +207,6 @@ func TestBotDecisionEngineCachesCompletePositions(t *testing.T) {
 type recordingBotSolver struct {
 	mutex sync.Mutex
 	calls int
-}
-
-func swapDealHands(deal *bridge.Deal, first bridge.Seat, second bridge.Seat) {
-	firstHand, secondHand := deal.Hand(first), deal.Hand(second)
-	switch first {
-	case bridge.North:
-		deal.North = secondHand
-	case bridge.East:
-		deal.East = secondHand
-	case bridge.South:
-		deal.South = secondHand
-	case bridge.West:
-		deal.West = secondHand
-	}
-	switch second {
-	case bridge.North:
-		deal.North = firstHand
-	case bridge.East:
-		deal.East = firstHand
-	case bridge.South:
-		deal.South = firstHand
-	case bridge.West:
-		deal.West = firstHand
-	}
 }
 
 func (solver *recordingBotSolver) SolvePosition(_ context.Context, state bridge.State) ([]analysis.CardPrediction, error) {

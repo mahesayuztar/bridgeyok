@@ -134,9 +134,11 @@ func (engine *BotDecisionEngine) decideCard(ctx context.Context, state bridge.St
 	}
 
 	completedSamples := 0
+	usableSamples := 0
 	ddsCalls := 0
 	cacheHits := 0
 	cacheMisses := 0
+	var solveError error
 	for _, budget := range engine.options.ProgressiveSamples {
 		if budget > engine.options.SampleCount {
 			budget = engine.options.SampleCount
@@ -151,9 +153,11 @@ func (engine *BotDecisionEngine) decideCard(ctx context.Context, state bridge.St
 			}
 			predictions, hit, err := engine.solveCached(ctx, sampledState)
 			if err != nil {
+				solveError = err
 				completedSamples++
 				continue
 			}
+			usableSamples++
 			if hit {
 				cacheHits++
 			} else {
@@ -177,7 +181,10 @@ func (engine *BotDecisionEngine) decideCard(ctx context.Context, state bridge.St
 			break
 		}
 	}
-	if completedSamples == 0 {
+	if usableSamples == 0 {
+		if solveError != nil {
+			return botDecision{}, fmt.Errorf("DDS produced no usable bot evaluations: %w", solveError)
+		}
 		return botDecision{}, fmt.Errorf("DDS produced no usable bot evaluations")
 	}
 
@@ -476,6 +483,11 @@ func callSortKey(call bridge.Call) string {
 }
 
 func sampleBotState(state bridge.State, actor bridge.Seat, sampleIndex int) (bridge.State, error) {
+	visibleState, err := visibleBotState(state, actor)
+	if err != nil {
+		return bridge.State{}, err
+	}
+	state = visibleState
 	knownSeats := map[bridge.Seat]bool{actor: true}
 	if state.Auction.Contract != nil && state.DummyRevealed {
 		knownSeats[state.Auction.Contract.Dummy()] = true
@@ -527,51 +539,115 @@ func sampleBotState(state bridge.State, actor bridge.Seat, sampleIndex int) (bri
 	}
 	seed := botSampleSeed(state, actor, sampleIndex)
 	random := rand.New(rand.NewSource(seed))
-	for _attempt := 0; _attempt < 128; _attempt++ {
-		shuffled := append([]bridge.Card(nil), deck...)
-		random.Shuffle(len(shuffled), func(_leftIndex, _rightIndex int) {
-			shuffled[_leftIndex], shuffled[_rightIndex] = shuffled[_rightIndex], shuffled[_leftIndex]
-		})
-		deal := bridge.Deal{}
-		for seat := range knownSeats {
-			setBotHand(&deal, seat, state.Deal.Hand(seat))
-		}
-		cursor := 0
-		valid := true
-		for _, seat := range hiddenSeats {
-			remaining := 13 - playedBySeat[seat]
-			if cursor+remaining > len(shuffled) {
-				valid = false
-				break
-			}
-			hand := append([]bridge.Card(nil), shuffled[cursor:cursor+remaining]...)
-			cursor += remaining
-			for _, card := range hand {
-				if voids[seat][card.Suit] {
-					valid = false
-					break
-				}
-			}
-			if !valid {
-				break
-			}
-			setBotHand(&deal, seat, hand)
-		}
-		if valid && cursor == len(shuffled) {
-			sampled := state
-			sampled.Deal = deal
-			return sampled, nil
+	deal, valid := assignSampledCards(deck, hiddenSeats, playedBySeat, voids, random)
+	if !valid {
+		return bridge.State{}, fmt.Errorf("unable to sample a legal hidden deal")
+	}
+	for seat := range knownSeats {
+		setBotHand(&deal, seat, state.Deal.Hand(seat))
+	}
+	sampled := state
+	sampled.Deal = deal
+	return sampled, nil
+}
+
+func visibleBotState(state bridge.State, actor bridge.Seat) (bridge.State, error) {
+	visible := state.Clone()
+	visible.Deal = bridge.Deal{North: bridge.Hand{}, East: bridge.Hand{}, South: bridge.Hand{}, West: bridge.Hand{}}
+	knownSeats := map[bridge.Seat]bool{actor: true}
+	if state.Auction.Contract != nil && state.Turn == state.Auction.Contract.Dummy() {
+		knownSeats[state.Auction.Contract.Declarer] = true
+	}
+	if state.Auction.Contract != nil && state.DummyRevealed {
+		dummy := state.Auction.Contract.Dummy()
+		knownSeats[dummy] = true
+		setBotHand(&visible.Deal, dummy, state.Deal.Hand(dummy))
+	}
+	setBotHand(&visible.Deal, actor, state.Deal.Hand(actor))
+	playedBySeat := make(map[bridge.Seat]int, 4)
+	for _, trick := range state.CompletedTricks {
+		for _, play := range trick.Plays {
+			playedBySeat[play.Seat]++
 		}
 	}
-	return bridge.State{}, fmt.Errorf("unable to sample a legal hidden deal")
+	for _, play := range state.CurrentTrick.Plays {
+		playedBySeat[play.Seat]++
+	}
+	for _, seat := range []bridge.Seat{bridge.North, bridge.East, bridge.South, bridge.West} {
+		if !knownSeats[seat] {
+			continue
+		}
+		hand := visible.Deal.Hand(seat)
+		remaining := 13 - playedBySeat[seat]
+		if len(hand) != remaining {
+			return bridge.State{}, fmt.Errorf("visible hand for %s has %d cards, want %d", seat, len(hand), remaining)
+		}
+	}
+	return visible, nil
+}
+
+func assignSampledCards(cards []bridge.Card, seats []bridge.Seat, playedBySeat map[bridge.Seat]int, voids map[bridge.Seat]map[bridge.Suit]bool, random *rand.Rand) (bridge.Deal, bool) {
+	deal := bridge.Deal{}
+	remaining := make(map[bridge.Seat]int, len(seats))
+	for _, seat := range seats {
+		remaining[seat] = 13 - playedBySeat[seat]
+	}
+	shuffled := append([]bridge.Card(nil), cards...)
+	random.Shuffle(len(shuffled), func(_leftIndex, _rightIndex int) {
+		shuffled[_leftIndex], shuffled[_rightIndex] = shuffled[_rightIndex], shuffled[_leftIndex]
+	})
+	var assign func([]bridge.Card) bool
+	assign = func(unassigned []bridge.Card) bool {
+		if len(unassigned) == 0 {
+			return true
+		}
+		selectedIndex := -1
+		var selectedSeats []bridge.Seat
+		for cardIndex, card := range unassigned {
+			eligible := make([]bridge.Seat, 0, len(seats))
+			for _, seat := range seats {
+				if remaining[seat] > 0 && !voids[seat][card.Suit] {
+					eligible = append(eligible, seat)
+				}
+			}
+			if len(eligible) == 0 {
+				return false
+			}
+			if selectedIndex == -1 || len(eligible) < len(selectedSeats) {
+				selectedIndex = cardIndex
+				selectedSeats = eligible
+			}
+		}
+		card := unassigned[selectedIndex]
+		unassigned = append(unassigned[:selectedIndex], unassigned[selectedIndex+1:]...)
+		random.Shuffle(len(selectedSeats), func(_leftIndex, _rightIndex int) {
+			selectedSeats[_leftIndex], selectedSeats[_rightIndex] = selectedSeats[_rightIndex], selectedSeats[_leftIndex]
+		})
+		for _, seat := range selectedSeats {
+			setBotHand(&deal, seat, append(deal.Hand(seat), card))
+			remaining[seat]--
+			if assign(unassigned) {
+				return true
+			}
+			remaining[seat]++
+			hand := deal.Hand(seat)
+			setBotHand(&deal, seat, hand[:len(hand)-1])
+		}
+		unassigned = append(unassigned, card)
+		return false
+	}
+	if !assign(shuffled) {
+		return bridge.Deal{}, false
+	}
+	for _, seat := range seats {
+		if remaining[seat] != 0 {
+			return bridge.Deal{}, false
+		}
+	}
+	return deal, true
 }
 
 func botSampleSeed(state bridge.State, actor bridge.Seat, sampleIndex int) int64 {
-	visibleDeal := bridge.Deal{}
-	setBotHand(&visibleDeal, actor, state.Deal.Hand(actor))
-	if state.Auction.Contract != nil && state.DummyRevealed {
-		setBotHand(&visibleDeal, state.Auction.Contract.Dummy(), state.Deal.Hand(state.Auction.Contract.Dummy()))
-	}
 	encoded, _ := json.Marshal(struct {
 		Board           bridge.BoardMetadata
 		Auction         bridge.Auction
@@ -593,7 +669,7 @@ func botSampleSeed(state bridge.State, actor bridge.Seat, sampleIndex int) int64
 		CompletedTricks: state.CompletedTricks,
 		TricksNS:        state.TricksNS,
 		TricksEW:        state.TricksEW,
-		VisibleDeal:     visibleDeal,
+		VisibleDeal:     state.Deal,
 		Actor:           actor,
 		SampleIndex:     sampleIndex,
 	})
