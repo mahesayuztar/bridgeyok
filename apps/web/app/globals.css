@@ -19,8 +19,13 @@
   --table-felt-dark: #0b3e29;
   --table-panel: #f0ecdf;
   --table-ink: #f7f4ea;
+  --table-line: rgb(255 255 255 / 18%);
+  --table-turn: #f1c85a;
+  --table-scrollbar: #9a9387;
   --card: #fffdf7;
+  --card-ink: #121212;
   --card-line: #d5d0c7;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 28%);
   --card-aspect-ratio: 5 / 7;
   --card-hand-width: clamp(4.25rem, 5.5vw, 5.75rem);
   --card-dummy-width: clamp(3.9rem, 5vw, 5.25rem);
@@ -843,6 +848,8 @@ h2 {
   max-height: min(28rem, calc(100dvh - 14rem));
   overflow: auto;
   overscroll-behavior: contain;
+  scrollbar-color: var(--muted) transparent;
+  scrollbar-width: thin;
 }
 .score-sheet-table-wrap:focus-visible {
   outline: 3px solid var(--focus);
@@ -1096,12 +1103,12 @@ h2 {
   position: relative;
   z-index: 12;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 18%);
+  border: 1px solid var(--table-line);
   background: var(--table-felt-dark);
   color: var(--table-ink);
 }
 .player-position[data-turn="true"] {
-  border-color: #f1c85a;
+  border-color: var(--table-turn);
 }
 .player-position[data-presence="offline"] {
   border-color: var(--offline-on-dark);
@@ -1356,7 +1363,7 @@ h2 {
   overflow-y: auto;
 
   scrollbar-width: thin;
-  scrollbar-color: #9a9387 transparent;
+  scrollbar-color: var(--table-scrollbar) transparent;
 }
 
 .auction-table-wrap::-webkit-scrollbar {
@@ -1369,7 +1376,7 @@ h2 {
 
 .auction-table-wrap::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: #9a9387;
+  background: var(--table-scrollbar);
 }
 
 /* =========================================================
@@ -1828,8 +1835,8 @@ kbd {
   border: 1px solid var(--card-line);
   border-radius: 3px 3px 1px 1px;
   background: var(--card);
-  color: #121212;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 28%);
+  color: var(--card-ink);
+  box-shadow: var(--card-shadow);
 }
 .hand-cards .physical-card + .physical-card {
   margin-left: clamp(-2.9rem, -2.8vw, -1.85rem);
@@ -4564,6 +4571,8 @@ button.physical-card.is-dragging {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--line);
   background: var(--background);
   color: var(--foreground);
@@ -4586,10 +4595,15 @@ button.physical-card.is-dragging {
   padding: 0.2rem 0.4rem;
 }
 .replay-message {
+  min-width: 0;
+  overflow: auto;
   padding: 1rem;
 }
 .replay-surface-wrap {
   position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 .replay-surface-wrap > .table-surface {
@@ -4762,7 +4776,7 @@ button.physical-card.is-dragging {
 .history-search-field span, .history-board-label > span { color: var(--muted); font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .history-search-field input, .history-board-label input { width: 100%; min-width: 0; padding: .7rem .8rem; border: 1px solid var(--line); background: var(--surface); color: var(--foreground); }
 .history-search-field input:focus-visible, .history-board-label input:focus-visible { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 2px; }
-.history-board-list { max-height: min(68svh, 48rem); margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; border-block: 1px solid var(--line); }
+.history-board-list { max-height: min(68svh, 48rem); margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--muted) transparent; scrollbar-width: thin; list-style: none; border-block: 1px solid var(--line); }
 .history-board-sentinel { min-height: 2.5rem; padding: .75rem 1rem; color: var(--muted); font-size: .78rem; text-align: center; }
 .history-load-error { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding: .8rem 1rem; border-block: 1px solid var(--line); }
 .history-load-error p { margin: 0; }
@@ -4822,6 +4836,10 @@ button.physical-card.is-dragging {
   .history-board-list { max-height: none; overflow: visible; }
   .history-board-row { grid-template-columns: minmax(0, 1fr) minmax(8rem, 12rem); gap: .75rem; padding-inline: .75rem; }
   .history-board-actions { justify-content: flex-start; }
+}
+@media (max-width: 25rem) {
+  .history-board-row { grid-template-columns: 1fr; gap: .65rem; }
+  .history-board-actions { padding-top: .75rem; }
 }
 @media (min-width: 768px) {
   .app-nav-item::after { content: attr(data-tooltip); position: absolute; left: calc(100% + .65rem); top: 50%; z-index: 50; width: max-content; max-width: 12rem; padding: .4rem .55rem; transform: translateY(-50%); border: 1px solid var(--line); background: var(--foreground); color: var(--background); font-size: .75rem; font-weight: 600; line-height: 1; opacity: 0; pointer-events: none; }
