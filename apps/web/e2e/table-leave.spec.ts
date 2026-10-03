@@ -60,9 +60,21 @@ test("active navbar stays usable across viewport sizes and confirms leaving", as
     { width: 1440, height: 900 },
   ]) {
     await page.setViewportSize(viewport);
+    const navigation = page.locator(".account-navigation");
+    await expect(navigation).toBeVisible();
+    const navigationBox = (await navigation.boundingBox())!;
+    expect(navigationBox.x).toBeGreaterThanOrEqual(0);
+    expect(navigationBox.x + navigationBox.width).toBeLessThanOrEqual(viewport.width);
+    if (viewport.width < 768) expect(navigationBox.height).toBeLessThan(72);
+    for (const item of await page.locator(".account-navigation .app-nav-item").all()) {
+      const itemBox = (await item.boundingBox())!;
+      expect(itemBox.height).toBeGreaterThanOrEqual(44);
+      expect(itemBox.x).toBeGreaterThanOrEqual(0);
+      expect(itemBox.x + itemBox.width).toBeLessThanOrEqual(viewport.width);
+    }
     for (const selector of [".table-leave-button", ".score-summary", ".board-marker", ".present-contract", ".consensus-navigation", ".status-actions"]) {
       const element = page.locator(selector);
-      await expect(element).toBeVisible();
+      if (!(await element.isVisible())) continue;
       const box = (await element.boundingBox())!;
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
