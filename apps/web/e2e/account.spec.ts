@@ -65,8 +65,7 @@ test("account guards, profile, navigation and responsive critical path", async (
     await expect(page.getByRole("link", { name: "Casual Game", exact: false })).toBeVisible();
     await expect(page.getByRole("link", { name: "Team Match", exact: false })).toBeVisible();
     await navigation.getByRole("link", { name: "History", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "History", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Team Match", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recent boards", exact: true })).toBeVisible();
     await navigation.getByRole("link", { name: "Play", exact: true }).click();
     await expect(page.getByRole("heading", { name: /^Halo,/ })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath(`play-${width}.png`) });

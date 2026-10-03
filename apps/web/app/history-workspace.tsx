@@ -96,7 +96,7 @@ function HistoryBoardRow({ board, selected, savingLabel, onSelect, onSaveLabel }
   return (
     <li className="history-board-list-item">
       <div className="history-board-row" data-selected={selected}>
-        <button className="history-board-select" type="button" aria-pressed={selected} onClick={() => onSelect(board.boardId)}>
+        <button className="history-board-select" data-testid="history-board-select" type="button" aria-label={`Pilih board ${board.boardNumber}: ${compactBoardResult(board)}`} aria-pressed={selected} onClick={() => onSelect(board.boardId)}>
           <strong className="history-board-result">{compactBoardResult(board)}</strong>
           <time className="history-board-time" dateTime={board.completedAt}>{formatBoardDate(board.completedAt)}</time>
         </button>
@@ -119,15 +119,15 @@ function HistoryBoardList({ boards, selectedBoardId, loadingMore, hasMore, savin
     return () => observer.disconnect();
   }, [hasMore, onLoadMore]);
 
-  return <ol className="history-board-list" aria-label="History board" aria-busy={loadingMore}>
-    {boards.map((board) => <HistoryBoardRow key={board.boardId} board={board} selected={selectedBoardId === board.boardId} savingLabel={savingLabelId === board.boardId} onSelect={onSelect} onSaveLabel={onSaveLabel} />)}
+  return <ol className="history-board-list" data-testid="history-board-list" aria-label="History board" aria-busy={loadingMore}>
+    {boards.map((board) => <HistoryBoardRow key={`${board.boardId}:${board.label ?? ""}`} board={board} selected={selectedBoardId === board.boardId} savingLabel={savingLabelId === board.boardId} onSelect={onSelect} onSaveLabel={onSaveLabel} />)}
     {hasMore ? <li ref={sentinelRef} className="history-board-sentinel" aria-hidden="true">{loadingMore ? "Memuat board berikutnya…" : ""}</li> : null}
   </ol>;
 }
 
 function HistoryBoardActions({ board, onOpenReplay }: { board: HistoryBoard | null; onOpenReplay: (board: HistoryBoard, trigger: HTMLButtonElement) => void }) {
   if (board === null) return null;
-  return <div className="history-board-actions">{board.replayAllowed ? <button className="history-replay-button" type="button" onClick={(event) => onOpenReplay(board, event.currentTarget)}><HistoryIcon />Pelajari board &amp; buka replay</button> : <p>Replay tersedia setelah Team Match selesai.</p>}</div>;
+  return <div className="history-board-actions">{board.replayAllowed ? <button className="history-replay-button" data-testid="history-replay-button" type="button" aria-label={`Pelajari board ${board.boardNumber} dan buka replay`} onClick={(event) => onOpenReplay(board, event.currentTarget)}><HistoryIcon />Pelajari board &amp; buka replay</button> : <p>Replay tersedia setelah Team Match selesai.</p>}</div>;
 }
 
 function replayTableFor(board: HistoryBoard, entry: ScoreSheetEntry): LiveTableProjection {
@@ -153,6 +153,7 @@ export function HistoryWorkspace() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [savingLabelId, setSavingLabelId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState("");
   const [replayBoard, setReplayBoard] = useState<HistoryBoard | null>(null);
   const replayTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -178,8 +179,12 @@ export function HistoryWorkspace() {
       setBoards((current) => replace ? page.items : [...current, ...page.items.filter((item) => !current.some((candidate) => candidate.boardId === item.boardId))]);
       setNextCursor(page.nextCursor ?? null);
       setError("");
+      setStatusMessage(replace ? `${page.items.length} board dimuat.` : `${page.items.length} board tambahan dimuat.`);
     } catch (failure) {
-      if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "Koneksi terputus.");
+      if (!controller.signal.aborted) {
+        setError(failure instanceof Error ? failure.message : "Koneksi terputus.");
+        setStatusMessage("History gagal dimuat.");
+      }
     } finally {
       if (requestRef.current === controller) {
         loadingRef.current = false;
@@ -234,8 +239,10 @@ export function HistoryWorkspace() {
         setLabelOverrides((current) => ({ ...current, [boardId]: label }));
       }
       setError("");
+      setStatusMessage(label === "" ? "Label board dihapus." : "Label board tersimpan.");
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Label belum tersimpan.");
+      setStatusMessage("Label board gagal disimpan.");
     } finally {
       setSavingLabelId(null);
     }
@@ -249,5 +256,5 @@ export function HistoryWorkspace() {
   const replayEntry = replayBoard === null ? null : scoreEntryFromHistory(replayBoard);
   const replayTable = replayBoard === null || replayEntry === null ? null : replayTableFor(replayBoard, replayEntry);
 
-  return <div className="history-workspace"><section className="history-board-section" aria-labelledby="board-history-title"><header className="history-section-heading"><div><h1 id="board-history-title">Recent boards</h1><p>Semua board yang pernah kamu mainkan, dari casual, bot, maupun Team Match.</p></div><label className="history-search-field"><span>Cari history</span><input type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tanggal, label, atau contract" aria-label="Cari berdasarkan tanggal, label, atau contract" /></label></header>{error ? <div className="history-load-error" role="alert"><p>{error}</p><button type="button" onClick={() => void loadPage(null, true, searchQuery)}>Coba lagi</button></div> : null}{loading ? <p role="status">Memuat history…</p> : visibleBoards.length === 0 ? <p className="history-empty-copy">Tidak ada board yang cocok.</p> : <><HistoryBoardList boards={visibleBoards} selectedBoardId={selectedBoard?.boardId ?? null} loadingMore={loadingMore} hasMore={nextCursor !== null} savingLabelId={savingLabelId} onSelect={(boardId) => setHistoryBoardId?.(boardId)} onLoadMore={() => void loadPage(nextCursor, false, searchQuery)} onSaveLabel={(boardId, label) => void saveLabel(boardId, label)} /><HistoryBoardActions board={selectedBoard} onOpenReplay={openReplay} /></>}{replayTable === null || replayEntry === null ? null : <BoardReplayModal key={replayBoard?.boardId} table={replayTable} entry={replayEntry} loadBoardReplay={session.loadBoardReplay} loadPositionAnalysis={session.loadPositionAnalysis} onClose={() => { setReplayBoard(null); requestAnimationFrame(() => replayTriggerRef.current?.focus()); }} />}</section></div>;
+  return <div className="history-workspace" data-testid="history-workspace"><section className="history-board-section" aria-labelledby="board-history-title"><header className="history-section-heading"><div><h1 id="board-history-title" tabIndex={-1}>Recent boards</h1><p>Semua board yang pernah kamu mainkan, dari casual, bot, maupun Team Match.</p></div><label className="history-search-field"><span>Cari history</span><input type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tanggal, label, atau contract" aria-label="Cari berdasarkan tanggal, label, atau contract" /></label></header><p className="sr-only" role="status" aria-live="polite">{statusMessage}</p>{error ? <div className="history-load-error" role="alert"><p>{error}</p><button type="button" onClick={() => void loadPage(null, true, searchQuery)}>Coba lagi</button></div> : null}{loading ? <p role="status">Memuat history…</p> : visibleBoards.length === 0 ? <p className="history-empty-copy">Tidak ada board yang cocok.</p> : <><HistoryBoardList boards={visibleBoards} selectedBoardId={selectedBoard?.boardId ?? null} loadingMore={loadingMore} hasMore={nextCursor !== null} savingLabelId={savingLabelId} onSelect={(boardId) => setHistoryBoardId?.(boardId)} onLoadMore={() => void loadPage(nextCursor, false, searchQuery)} onSaveLabel={(boardId, label) => void saveLabel(boardId, label)} /><HistoryBoardActions board={selectedBoard} onOpenReplay={openReplay} /></>}{replayTable === null || replayEntry === null ? null : <BoardReplayModal key={replayBoard?.boardId} table={replayTable} entry={replayEntry} loadBoardReplay={session.loadBoardReplay} loadPositionAnalysis={session.loadPositionAnalysis} onClose={() => { setReplayBoard(null); requestAnimationFrame(() => { const trigger = replayTriggerRef.current; if (trigger?.isConnected && !trigger.disabled && trigger.getClientRects().length > 0) trigger.focus(); else document.getElementById("board-history-title")?.focus(); }); }} />}</section></div>;
 }

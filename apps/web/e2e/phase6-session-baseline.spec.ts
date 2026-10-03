@@ -206,8 +206,7 @@ test("table to workspace navigation preserves the shared game session", async ({
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
   await page.getByLabel("Nama di meja").fill("P6 Updated");
   await softNavigate(page, "/history");
-  await expect(page.getByRole("heading", { name: "History", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Meja aktif", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recent boards", exact: true })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
   await expect(page.getByLabel("Nama di meja")).toHaveValue("P6 Updated");
