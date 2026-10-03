@@ -184,11 +184,11 @@ Do not let two agents edit `globals.css` concurrently. Do not let two agents edi
 | WI-02 | `partial` | WI-00 | A | `globals.css`, table geometry |
 | WI-03 | `done` | WI-00 | A | projection/replay/session files |
 | WI-04 | `done` | WI-00 | A | Playwright/E2E evidence |
-| WI-05 | `partial` | WI-01, WI-02, WI-03 | B | `score-sheet.tsx` |
+| WI-05 | `done` | WI-01, WI-02, WI-03 | B | `score-sheet.tsx` |
 | WI-06 | `done` | WI-01, WI-02, WI-03 | B | `board-replay-modal.tsx` |
 | WI-07 | `done` | WI-02, WI-04 | B | `globals.css`, `table-surface.tsx` only if required |
-| WI-08 | `partial` | WI-01, WI-03 | B | `history-workspace.tsx` |
-| WI-09 | `pending` | WI-05–WI-08 | C | E2E, browser evidence, regression fixes |
+| WI-08 | `done` | WI-01, WI-03 | B | `history-workspace.tsx` |
+| WI-09 | `partial` | WI-05–WI-08 | C | E2E, browser evidence, regression fixes |
 | WI-10 | `pending` | WI-09 | D | cache/review/commits |
 
 ---
@@ -445,7 +445,7 @@ Use existing Playwright configuration and project harness. If the full DB-backed
 
 ## WI-05 — ScoreSheet interaction and semantics
 
-Status: `pending`
+Status: `partial`
 
 Depends on: `WI-01`, `WI-02`, `WI-03`
 
@@ -534,7 +534,7 @@ Depends on: `WI-02`, `WI-04`
 
 ## WI-08 — HistoryWorkspace consistency and master-detail behavior
 
-Status: `partial`
+Status: `done`
 
 Depends on: `WI-01`, `WI-03`
 
@@ -563,7 +563,7 @@ Depends on: `WI-01`, `WI-03`
 
 ## WI-09 — Integrated browser verification and regression hardening
 
-Status: `pending`
+Status: `partial`
 
 Depends on: `WI-05`, `WI-06`, `WI-07`, `WI-08`
 

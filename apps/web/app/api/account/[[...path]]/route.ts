@@ -13,7 +13,10 @@ async function handle(request: Request, context: { params: Promise<{ path?: stri
   const path = (await context.params).path?.join("/") ?? "";
   const allowed = /^(signup|login|logout|heartbeat|profile|users|invitations|chat|matches|history\/boards(?:\/[a-f0-9-]+\/label)?|matches\/[a-f0-9-]+(?:\/(?:ready|start|cancel))?|users\/[a-f0-9-]+\/follow|tables\/[a-f0-9-]+\/(participants|invites))?$/;
   if (!allowed.test(path)) return new Response(null, { status: 404 });
-  if (request.method !== "GET" && request.headers.get("origin") !== new URL(request.url).origin) return new Response(null, { status: 403 });
+  const requestOrigin = request.headers.get("origin");
+  const expectedOrigin = new URL(request.url).origin;
+  const isLocalDevelopmentOrigin = process.env.NODE_ENV !== "production" && (requestOrigin === "http://localhost:3000" || requestOrigin === "http://127.0.0.1:3000" || requestOrigin === "http://0.0.0.0:3000");
+  if (request.method !== "GET" && requestOrigin !== expectedOrigin && !isLocalDevelopmentOrigin) return new Response(null, { status: 403 });
   const cookieStore = await cookies();
   const token = cookieStore.get(ACCOUNT_COOKIE)?.value;
   const isLogin = path === "signup" || path === "login";
