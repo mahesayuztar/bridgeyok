@@ -135,12 +135,39 @@ test("permanent table chat preserves gameplay geometry and pointer actions acros
   await panel.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(panel.getByText("Table ♠️", { exact: true })).toHaveCount(1);
   await page.setViewportSize({ width: 320, height: 700 });
+  await expect(panel.locator("> header")).toBeHidden();
+  await expect(panel.locator(".chat-message").first().locator("> small")).toBeHidden();
+  const chatInput = panel.getByLabel("Pesan", { exact: true });
+  const chatInputGeometry = await chatInput.evaluate((input) => {
+    const style = getComputedStyle(input);
+    return { height: input.getBoundingClientRect().height, minHeight: style.minHeight, maxHeight: style.maxHeight, fieldSizing: style.getPropertyValue("field-sizing") };
+  });
+  expect(chatInputGeometry.height).toBeGreaterThanOrEqual(32);
+  expect(chatInputGeometry.height).toBeLessThanOrEqual(72);
+  expect(chatInputGeometry.fieldSizing).toBe("content");
+  await chatInput.fill("Baris chat panjang untuk menguji pertumbuhan input mobile sampai tiga baris.");
+  const longChatInputHeight = await chatInput.evaluate((input) => input.getBoundingClientRect().height);
+  expect(longChatInputHeight).toBeGreaterThan(chatInputGeometry.height);
+  expect(longChatInputHeight).toBeLessThanOrEqual(72);
+  await chatInput.fill("");
+  const ownHand = await page.locator(".own-hand").boundingBox();
+  const chatPanel = await panel.boundingBox();
+  const ownHandPaddingBottom = await page.locator(".own-hand").evaluate((element) => getComputedStyle(element).paddingBottom);
+  const lastCard = await page.locator(".own-hand .physical-card").last().boundingBox();
+  expect(ownHand).not.toBeNull();
+  expect(chatPanel).not.toBeNull();
+  expect(lastCard).not.toBeNull();
+  expect(ownHandPaddingBottom).toBe("0px");
+  expect(Math.abs(lastCard!.y + lastCard!.height - ownHand!.y - ownHand!.height)).toBeLessThan(1);
+  expect(Math.abs(ownHand!.y + ownHand!.height - chatPanel!.y)).toBeLessThan(1);
   const levelGeometry = await page.locator(".bidding-box").evaluate((box) => {
     const levelButtons = [...box.querySelectorAll<HTMLElement>(".bid-levels button")];
     return {
       levelCount: levelButtons.length,
       minimumLevelWidth: Math.min(...levelButtons.map((button) => button.getBoundingClientRect().width)),
       minimumLevelHeight: Math.min(...levelButtons.map((button) => button.getBoundingClientRect().height)),
+      levelRows: new Set(levelButtons.map((button) => Math.round(button.getBoundingClientRect().top))).size,
+      levelRightEdge: Math.max(...levelButtons.map((button) => button.getBoundingClientRect().right)),
       overflowX: document.documentElement.scrollWidth > innerWidth,
       overflowY: document.documentElement.scrollHeight > innerHeight,
     };
@@ -149,6 +176,8 @@ test("permanent table chat preserves gameplay geometry and pointer actions acros
     levelCount: expect.any(Number),
     minimumLevelWidth: expect.any(Number),
     minimumLevelHeight: expect.any(Number),
+    levelRows: expect.any(Number),
+    levelRightEdge: expect.any(Number),
     overflowX: false,
     overflowY: false,
   });
@@ -156,7 +185,24 @@ test("permanent table chat preserves gameplay geometry and pointer actions acros
   expect(levelGeometry.levelCount).toBeLessThanOrEqual(7);
   expect(levelGeometry.minimumLevelWidth).toBeGreaterThanOrEqual(44);
   expect(levelGeometry.minimumLevelHeight).toBeGreaterThanOrEqual(44);
+  expect(levelGeometry.levelRows).toBe(1);
+  expect(levelGeometry.levelRightEdge).toBeLessThanOrEqual(320);
   await page.getByRole("button", { name: "Pilih level 1", exact: true }).click();
+  await expect(page.getByText("Denom.", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Pilih suit untuk level 1" })).toBeVisible();
+  const actionRowGeometry = await page.locator(".bid-action-row").evaluate((row) => {
+    const buttons = [...row.querySelectorAll<HTMLElement>("button")];
+    return {
+      buttonCount: buttons.length,
+      minimumWidth: Math.min(...buttons.map((button) => button.getBoundingClientRect().width)),
+      minimumHeight: Math.min(...buttons.map((button) => button.getBoundingClientRect().height)),
+      sameRow: new Set(buttons.map((button) => Math.round(button.getBoundingClientRect().top))).size === 1,
+    };
+  });
+  expect(actionRowGeometry.buttonCount).toBe(4);
+  expect(actionRowGeometry.minimumWidth).toBeGreaterThanOrEqual(44);
+  expect(actionRowGeometry.minimumHeight).toBeGreaterThanOrEqual(44);
+  expect(actionRowGeometry.sameRow).toBe(true);
   const strainGeometry = await page.locator(".bid-strains").evaluate((group) => {
     const buttons = [...group.querySelectorAll<HTMLElement>("button")];
     return {

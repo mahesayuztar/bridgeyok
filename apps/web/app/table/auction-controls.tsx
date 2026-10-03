@@ -190,35 +190,37 @@ export function BiddingBox({
 
   return (
     <section className="bidding-box" aria-label="Kotak lelang">
-      <div className="call-actions">
-        {actionCalls.map(({ label, call, shortcut }) => (
+      <div className="bid-action-row">
+        <div className="call-actions">
+          {actionCalls.map(({ label, call, shortcut }) => (
+            <button
+              type="button"
+              key={label}
+              disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}
+              onClick={() => {
+                setSelectedBid(null);
+                onCall(call);
+              }}
+            >
+              {label}
+              <kbd>{shortcut}</kbd>
+            </button>
+          ))}
+        </div>
+        <div className="bid-alert-control">
           <button
+            className={alertEnabled ? "bid-alert-toggle is-active" : "bid-alert-toggle"}
             type="button"
-            key={label}
-            disabled={disabled || !legalKeys.has(callKey(call)) || !canCall(call)}
-            onClick={() => {
-              setSelectedBid(null);
-              onCall(call);
-            }}
+            aria-pressed={alertEnabled}
+            disabled={!canAlert}
+            onClick={() => setAlertIntent({ signature: legalCallSignature, enabled: !alertEnabled })}
           >
-            {label}
-            <kbd>{shortcut}</kbd>
+            <span className="bid-alert-marker" aria-hidden="true">A</span>
+            <span>Alert</span>
+            <span className="bid-alert-state">{alertEnabled ? "ON" : "OFF"}</span>
           </button>
-        ))}
-      </div>
-      <div className="bid-alert-control">
-        <button
-          className={alertEnabled ? "bid-alert-toggle is-active" : "bid-alert-toggle"}
-          type="button"
-          aria-pressed={alertEnabled}
-          disabled={!canAlert}
-          onClick={() => setAlertIntent({ signature: legalCallSignature, enabled: !alertEnabled })}
-        >
-          <span className="bid-alert-marker" aria-hidden="true">A</span>
-          <span>Alert</span>
-          <span className="bid-alert-state">{alertEnabled ? "ON" : "OFF"}</span>
-        </button>
-        <span>Bid berikutnya artificial</span>
+          <span>Bid berikutnya artificial</span>
+        </div>
       </div>
       {activeLevel === null ? (
         <div className="bid-levels" role="group" aria-label="Pilih level bid">
@@ -243,18 +245,16 @@ export function BiddingBox({
             <button
               className="bid-stage-level"
               type="button"
-              aria-label="Ubah level bid"
+              aria-label={`Ubah level bid, level ${activeLevel}`}
               onClick={() => setSelectedBid(null)}
             >
               {activeLevel}
             </button>
-            <span aria-hidden="true">→</span>
-            <span>Denom.</span>
           </div>
           <div
             className="bid-strains"
             role="group"
-            aria-label={`Pilih denomination untuk level ${activeLevel}`}
+            aria-label={`Pilih suit untuk level ${activeLevel}`}
           >
             {strains.map((strain) => {
               const call: Call = { kind: "BID", level: activeLevel, strain };
